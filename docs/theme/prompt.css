@@ -1,0 +1,6 @@
+/* Show a `$ ` prompt on ```console blocks without it being copyable */
+pre code.language-console::before {
+  content: "$ ";
+  opacity: 0.55;
+  user-select: none;
+}

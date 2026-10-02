@@ -1,0 +1,15 @@
+{
+  "rust-analyzer.cargo.features": "all",
+  "rust-analyzer.check.invocationStrategy": "per_workspace",
+  "rust-analyzer.cargo.extraEnv": { "CARGO_TARGET_DIR": "target/ra" },
+  "[rust]": { "editor.defaultFormatter": "rust-lang.rust-analyzer" },
+  "rust-analyzer.check.command": "clippy",
+  "[toml]": { "editor.defaultFormatter": "tamasfe.even-better-toml" },
+  "rumdl.fixOnSave": true,
+  "markdown.validate.enabled": true,
+  "markdown.validate.fileLinks.markdownFragmentLinks": "ignore",
+  "json.schemaDownload.trustedDomains": { "https://plugins.dprint.dev/": true, "https://dprint.dev/": true },
+  "[json][jsonc][markdown][yaml][javascript][css]": { "editor.defaultFormatter": "dprint.dprint" },
+  "editor.formatOnSave": true,
+  "editor.formatOnPaste": true
+}

@@ -1,0 +1,23 @@
+# Local state: Claude Code's per-developer settings, notes. Its shared settings, hooks and skills
+# are committed.
+.claude/settings.local.json
+/.mcp.json
+/.annotations.json
+.notes/
+.notes.local.md
+# Editors: the shared VS Code settings are committed, the rest is each developer's.
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+# Secrets: never committed; an .env.example template is.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+/.secrets/

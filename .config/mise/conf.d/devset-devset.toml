@@ -1,0 +1,3 @@
+# devset itself, which applies the profiles: every machine and every job runs this release.
+[tools]
+"github:atomix-labs/devset" = "0.5.2"

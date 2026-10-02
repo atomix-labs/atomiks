@@ -1,0 +1,3 @@
+# The self-hosted runner labels actionlint accepts beside GitHub's own.
+self-hosted-runner:
+  labels: []

@@ -1,0 +1,2 @@
+[tools]
+"cargo:cargo-workspace-lints" = "0.1.4"

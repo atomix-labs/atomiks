@@ -1,0 +1,1116 @@
+version = 2
+
+[scaffolds."agents/claude"]
+decision = "written"
+
+[scaffolds."agents/claude".files]
+"CLAUDE.md" = "CLAUDE.md"
+
+[scaffolds."cargo-workspace/workspace"]
+decision = "written"
+
+[scaffolds."cargo-workspace/workspace".files]
+"Cargo.toml" = "Cargo.toml"
+"crates/{{ name or devset.target }}/Cargo.toml" = "crates/atomix/Cargo.toml"
+"crates/{{ name or devset.target }}/src/lib.rs" = "crates/atomix/src/lib.rs"
+
+[scaffolds."git-changelog/changelog"]
+decision = "written"
+
+[scaffolds."git-changelog/changelog".files]
+"CHANGELOG.md" = "CHANGELOG.md"
+
+[scaffolds."lychee/lychee"]
+decision = "written"
+
+[scaffolds."lychee/lychee".files]
+"lychee.toml" = "lychee.toml"
+
+[scaffolds."mdbook/book"]
+decision = "written"
+
+[scaffolds."mdbook/book".files]
+"{{ book_dir }}/README.md" = "docs/README.md"
+"{{ book_dir }}/src/SUMMARY.md" = "docs/src/SUMMARY.md"
+"{{ book_dir }}/src/getting-started.md" = "docs/src/getting-started.md"
+"{{ book_dir }}/src/introduction.md" = "docs/src/introduction.md"
+
+[files.".claude/hooks/check.sh"]
+exact = "9ccdf435877abe0b89c73c81ff6f3b32ec371f502eaef1e62dd71bd1e1286e2b"
+canonical = "9ccdf435877abe0b89c73c81ff6f3b32ec371f502eaef1e62dd71bd1e1286e2b"
+
+[files.".claude/skills/editing-cargo-manifests/SKILL.md"]
+exact = "dea9a4c6f5fe3dc22bd2611e3994153cab60c001fd558721848f1d8dc40643e2"
+canonical = "dea9a4c6f5fe3dc22bd2611e3994153cab60c001fd558721848f1d8dc40643e2"
+
+[files.".claude/skills/editing-cargo-manifests/references/sources.md"]
+exact = "225679cb4054f7eb0d15e904228103d89b07fe34c68d3d0b7aacebfd9c96ed6b"
+canonical = "225679cb4054f7eb0d15e904228103d89b07fe34c68d3d0b7aacebfd9c96ed6b"
+
+[files.".claude/skills/fixing-ci/SKILL.md"]
+exact = "996697b5f33ffdc94fd6c54bc23cb1d3cab27645dded9228f45a67dfdc13dc71"
+canonical = "996697b5f33ffdc94fd6c54bc23cb1d3cab27645dded9228f45a67dfdc13dc71"
+
+[files.".claude/skills/humanize/SKILL.md"]
+exact = "0f9d1987e1fc16785a8e445a7b774dbc73c64e8fe841e8910ba9d130ebe8c7b9"
+canonical = "0f9d1987e1fc16785a8e445a7b774dbc73c64e8fe841e8910ba9d130ebe8c7b9"
+
+[files.".claude/skills/humanize/references/sources.md"]
+exact = "7baa60eaed457e424d6694b65bfc598a4cb8383088efe307c88a61c525af68e9"
+canonical = "7baa60eaed457e424d6694b65bfc598a4cb8383088efe307c88a61c525af68e9"
+
+[files.".claude/skills/review-names/SKILL.md"]
+exact = "da66972488e301ae6a750c85c0dbe96348cb87df9a4a9e0767a6c61589637111"
+canonical = "da66972488e301ae6a750c85c0dbe96348cb87df9a4a9e0767a6c61589637111"
+
+[files.".claude/skills/review-rust/SKILL.md"]
+exact = "3009d3d311d9638551f539ac1330a0128d1662f55278fa46cbf2a950dbb1d157"
+canonical = "3009d3d311d9638551f539ac1330a0128d1662f55278fa46cbf2a950dbb1d157"
+
+[files.".claude/skills/review-security/SKILL.md"]
+exact = "4bfae0104f6225f46e12ad25fece1e026a2a0904666b67fea62f07ae324a1462"
+canonical = "4bfae0104f6225f46e12ad25fece1e026a2a0904666b67fea62f07ae324a1462"
+
+[files.".claude/skills/review-security/references/attack-classes.md"]
+exact = "353525c8a33c97b447c1bfb5e73b6e2ae24b070da212dcf6967103aebdddd94d"
+canonical = "353525c8a33c97b447c1bfb5e73b6e2ae24b070da212dcf6967103aebdddd94d"
+
+[files.".claude/skills/review-security/references/sources.md"]
+exact = "8b5815123cff1dcfa5e9bf9ebc82d1ed2d3b5af36d06c6153e0d5becf401ea8a"
+canonical = "8b5815123cff1dcfa5e9bf9ebc82d1ed2d3b5af36d06c6153e0d5becf401ea8a"
+
+[files.".claude/skills/tuning-rust-performance/SKILL.md"]
+exact = "2bc04fdf0e90f515c6f0774c0d89002aafa1b100ff63c826eaa2ec737e7a9ce1"
+canonical = "2bc04fdf0e90f515c6f0774c0d89002aafa1b100ff63c826eaa2ec737e7a9ce1"
+
+[files.".claude/skills/tuning-rust-performance/references/allocation.md"]
+exact = "9943452e5a1260d04ce1034a2f747f89f1345e4a5647bd24155f3c2177165bb7"
+canonical = "9943452e5a1260d04ce1034a2f747f89f1345e4a5647bd24155f3c2177165bb7"
+
+[files.".claude/skills/tuning-rust-performance/references/codegen.md"]
+exact = "8ed15797423071d4eacfebc07a22d4a2e9f63c7db57f48fc9acf840b9c4ace39"
+canonical = "8ed15797423071d4eacfebc07a22d4a2e9f63c7db57f48fc9acf840b9c4ace39"
+
+[files.".claude/skills/tuning-rust-performance/references/data-layout.md"]
+exact = "2413cc20b60ce66e1a8205f70c4ab96c8b93a1d2a1d59c8ddc3941084de0f32c"
+canonical = "2413cc20b60ce66e1a8205f70c4ab96c8b93a1d2a1d59c8ddc3941084de0f32c"
+
+[files.".claude/skills/tuning-rust-performance/references/measuring.md"]
+exact = "351e8e5951674cb5607d442200acd2c81e20a944ad9a0bac3b55c204b65eb3c6"
+canonical = "351e8e5951674cb5607d442200acd2c81e20a944ad9a0bac3b55c204b65eb3c6"
+
+[files.".claude/skills/tuning-rust-performance/references/sources.md"]
+exact = "c09e782e63a16f398ea1f1a57caa2244261fa449299cfbc0675ca56ac2531f51"
+canonical = "c09e782e63a16f398ea1f1a57caa2244261fa449299cfbc0675ca56ac2531f51"
+
+[files.".claude/skills/tuning-rust-performance/references/threads.md"]
+exact = "6b3c2229064b56f590e367f23d6bdfe1464b8c68be9ce2ac97f33a146a3def71"
+canonical = "6b3c2229064b56f590e367f23d6bdfe1464b8c68be9ce2ac97f33a146a3def71"
+
+[files.".claude/skills/using-devset/SKILL.md"]
+exact = "1b58e22f094fc69b393afe5ad006e4c801799970f8ebf89a26e689a43b9a9a1a"
+canonical = "1b58e22f094fc69b393afe5ad006e4c801799970f8ebf89a26e689a43b9a9a1a"
+
+[files.".claude/skills/writing-prose/SKILL.md"]
+exact = "120dbace7272c424a2877a6d0dc02b8d7fcbac4c3260c8461e130b437580cddc"
+canonical = "120dbace7272c424a2877a6d0dc02b8d7fcbac4c3260c8461e130b437580cddc"
+
+[files.".claude/skills/writing-prose/references/comments.md"]
+exact = "46b9deb02f1c95588aa026de59569b8782beaf5d50dc42e98f8f2b151e6f7cf5"
+canonical = "46b9deb02f1c95588aa026de59569b8782beaf5d50dc42e98f8f2b151e6f7cf5"
+
+[files.".claude/skills/writing-prose/references/messages.md"]
+exact = "d57ac4b67aad55ea4edaad4dfc4e3d5af2698f91e0409d48ac0a2b42cb016b19"
+canonical = "d57ac4b67aad55ea4edaad4dfc4e3d5af2698f91e0409d48ac0a2b42cb016b19"
+
+[files.".claude/skills/writing-prose/references/sources.md"]
+exact = "250d503e9d5ad3e870ffd7645f5fbfaee700c9c134361ca0a674872c580d6ccc"
+canonical = "250d503e9d5ad3e870ffd7645f5fbfaee700c9c134361ca0a674872c580d6ccc"
+
+[files.".claude/skills/writing-prose/references/tells.md"]
+exact = "79aab384b783f10a6edc9d9be354873f41f8d6a5fbf26bd55ae71d32eebf96b0"
+canonical = "79aab384b783f10a6edc9d9be354873f41f8d6a5fbf26bd55ae71d32eebf96b0"
+
+[files.".claude/skills/writing-readable-code/SKILL.md"]
+exact = "7faab715b8252682f620ad4925013fdeec1d4bec5397101216b7e52a33291ebd"
+canonical = "7faab715b8252682f620ad4925013fdeec1d4bec5397101216b7e52a33291ebd"
+
+[files.".claude/skills/writing-readable-code/references/naming.md"]
+exact = "248d67f74728070432f26f1c32ef9b0804bf7d41fe604336ef2df93db76d7c63"
+canonical = "248d67f74728070432f26f1c32ef9b0804bf7d41fe604336ef2df93db76d7c63"
+
+[files.".claude/skills/writing-readable-code/references/simplicity.md"]
+exact = "6e3c318230c7351d8660a3fc5ab6d0bd198692bf7b3f0693916d0f0eaeed7e99"
+canonical = "6e3c318230c7351d8660a3fc5ab6d0bd198692bf7b3f0693916d0f0eaeed7e99"
+
+[files.".claude/skills/writing-readable-code/references/sources.md"]
+exact = "1cbb0714449fba9565ad254efd1b3a3825399923c3f19a0820088ec85b4a3ba2"
+canonical = "1cbb0714449fba9565ad254efd1b3a3825399923c3f19a0820088ec85b4a3ba2"
+
+[files.".claude/skills/writing-readable-code/references/structure.md"]
+exact = "e43d45100e5670583012e3a0162c86b67b1f13f2d3880cc0313624316b551ad6"
+canonical = "e43d45100e5670583012e3a0162c86b67b1f13f2d3880cc0313624316b551ad6"
+
+[files.".claude/skills/writing-readmes/SKILL.md"]
+exact = "4dec46b896fefaa80147e83b5829e659affe0dbd0c0123f22e40ac9d0165f437"
+canonical = "4dec46b896fefaa80147e83b5829e659affe0dbd0c0123f22e40ac9d0165f437"
+
+[files.".claude/skills/writing-readmes/references/sources.md"]
+exact = "d39d8d8ead7d8d9dd7f88926b9ec50f526390de89968fd8b3f0a282c88c1ec6a"
+canonical = "d39d8d8ead7d8d9dd7f88926b9ec50f526390de89968fd8b3f0a282c88c1ec6a"
+
+[files.".claude/skills/writing-readmes/references/templates.md"]
+exact = "756cf40ee660d948edffcb491fcbeb47220153e8d7767ba32b1b0796b6cd7d4d"
+canonical = "756cf40ee660d948edffcb491fcbeb47220153e8d7767ba32b1b0796b6cd7d4d"
+
+[files.".claude/skills/writing-rust-tests/SKILL.md"]
+exact = "97c3dc5b220f68b8b1067fb55205be8418f384ad917e94cd104be0549dcf8146"
+canonical = "97c3dc5b220f68b8b1067fb55205be8418f384ad917e94cd104be0549dcf8146"
+
+[files.".claude/skills/writing-rust-tests/references/compile-fail.md"]
+exact = "be54486591ea960d01203f40fa0504c682932209e12077a474ea67e9c23534aa"
+canonical = "be54486591ea960d01203f40fa0504c682932209e12077a474ea67e9c23534aa"
+
+[files.".claude/skills/writing-rust-tests/references/layout.md"]
+exact = "110802c7c6dfacc961dfab8d1f3646785e42a79ceb2ddf7859047a122b3737b2"
+canonical = "110802c7c6dfacc961dfab8d1f3646785e42a79ceb2ddf7859047a122b3737b2"
+
+[files.".claude/skills/writing-rust-tests/references/properties.md"]
+exact = "d1a0fca34911dffa0079c8802e15b711f56062d9b91f9ea5ddb9285cbb414d81"
+canonical = "d1a0fca34911dffa0079c8802e15b711f56062d9b91f9ea5ddb9285cbb414d81"
+
+[files.".claude/skills/writing-rust-tests/references/running.md"]
+exact = "84bf7f7d1cf20ac5195dc19b5f0dbe19c44c646d46afdd36e4ab7acd7d33e8a5"
+canonical = "84bf7f7d1cf20ac5195dc19b5f0dbe19c44c646d46afdd36e4ab7acd7d33e8a5"
+
+[files.".claude/skills/writing-rust-tests/references/sources.md"]
+exact = "e8c0dc30006eacd84087aabb1017a252d976e7ad6db33b7be2204bc3ab223be6"
+canonical = "e8c0dc30006eacd84087aabb1017a252d976e7ad6db33b7be2204bc3ab223be6"
+
+[files.".claude/skills/writing-rust-tests/references/writing-tests.md"]
+exact = "d9311080d92d8f014689b6ed22538a5a7db3f078a422afafdfc56981295dda9f"
+canonical = "d9311080d92d8f014689b6ed22538a5a7db3f078a422afafdfc56981295dda9f"
+
+[files.".claude/skills/writing-rust/SKILL.md"]
+exact = "38ecadef800415f0532247788c5722f8d40ed25770a8224ad699abded6f4db47"
+canonical = "38ecadef800415f0532247788c5722f8d40ed25770a8224ad699abded6f4db47"
+
+[files.".claude/skills/writing-rust/references/api-design.md"]
+exact = "ab92b6375b5c2efef48ea9510e8b3ca754de6ca75268bf6a4fb820023b4e0549"
+canonical = "ab92b6375b5c2efef48ea9510e8b3ca754de6ca75268bf6a4fb820023b4e0549"
+
+[files.".claude/skills/writing-rust/references/errors.md"]
+exact = "0d1c2c1e25a61aaecd19b0c29ac647cf7fdae9a0a0d7607ca60b81c85a996bed"
+canonical = "0d1c2c1e25a61aaecd19b0c29ac647cf7fdae9a0a0d7607ca60b81c85a996bed"
+
+[files.".claude/skills/writing-rust/references/layout.md"]
+exact = "b115c55a94beb5a5ac73c48ee145b881a0a4d896857061683b610b5c79bd7916"
+canonical = "b115c55a94beb5a5ac73c48ee145b881a0a4d896857061683b610b5c79bd7916"
+
+[files.".claude/skills/writing-rust/references/lints.md"]
+exact = "7244a75cac7bc1a143b0627b539eeb3479144ddf14f5d7351ba1273a66a528f8"
+canonical = "7244a75cac7bc1a143b0627b539eeb3479144ddf14f5d7351ba1273a66a528f8"
+
+[files.".claude/skills/writing-rust/references/naming.md"]
+exact = "1bb0a3dac781cb51fd721b0385945b9fd628a80a1c318af2e52e0ee56339c61d"
+canonical = "1bb0a3dac781cb51fd721b0385945b9fd628a80a1c318af2e52e0ee56339c61d"
+
+[files.".claude/skills/writing-rust/references/ownership.md"]
+exact = "2d2472338be0aa8ca747e88c9877b7a77a8132600b87ec82ce8ed6818b48be86"
+canonical = "2d2472338be0aa8ca747e88c9877b7a77a8132600b87ec82ce8ed6818b48be86"
+
+[files.".claude/skills/writing-rust/references/sources.md"]
+exact = "3b54afbf440e387df6e1fa175504479fed6c2ce194debb12882f467d5c76815c"
+canonical = "3b54afbf440e387df6e1fa175504479fed6c2ce194debb12882f467d5c76815c"
+
+[files.".claude/skills/writing-rustdoc/SKILL.md"]
+exact = "b4da6819e3b98a0d4ff8a11558af5ae9ea62a3663ce5fbb022ea6a0a33af7fcc"
+canonical = "b4da6819e3b98a0d4ff8a11558af5ae9ea62a3663ce5fbb022ea6a0a33af7fcc"
+
+[files.".claude/skills/writing-rustdoc/references/comments.md"]
+exact = "abd492dec3e25642553548bfefe59cf51ce3a828a886a8cb39beb5412999572a"
+canonical = "abd492dec3e25642553548bfefe59cf51ce3a828a886a8cb39beb5412999572a"
+
+[files.".claude/skills/writing-rustdoc/references/exemplars.md"]
+exact = "207dcd3072d4a653e8c23dc7b0aeef86473a5ddfc708a1dd4b77e8dda5856ae5"
+canonical = "207dcd3072d4a653e8c23dc7b0aeef86473a5ddfc708a1dd4b77e8dda5856ae5"
+
+[files.".claude/skills/writing-rustdoc/references/sources.md"]
+exact = "33fb98b4db8f4823d4f702dc1fab4b6deff69f9a247688ea85b4fd5c87d88f65"
+canonical = "33fb98b4db8f4823d4f702dc1fab4b6deff69f9a247688ea85b4fd5c87d88f65"
+
+[files.".claude/skills/writing-rustdoc/references/style.md"]
+exact = "74112e5c8b7b6dd418118b5f7afcd4b8dd000ffaad58f831bf8e45227805c8d4"
+canonical = "74112e5c8b7b6dd418118b5f7afcd4b8dd000ffaad58f831bf8e45227805c8d4"
+
+[files.".claude/skills/writing-rustdoc/references/templates.md"]
+exact = "a83557a0c97fee48d5a8cb5207943b3b86f544074554fa100054c0e3adc9e096"
+canonical = "a83557a0c97fee48d5a8cb5207943b3b86f544074554fa100054c0e3adc9e096"
+
+[files.".claude/skills/writing-rustdoc/references/tooling.md"]
+exact = "c32eb62a964d206cbf1403e3821d95851c5ded3bb893c17c473f26af44c13fb8"
+canonical = "c32eb62a964d206cbf1403e3821d95851c5ded3bb893c17c473f26af44c13fb8"
+
+[files.".claude/skills/writing-rustdoc/scripts/doc-audit.sh"]
+exact = "223285eb4be23bfddc569131303b627b41e3b594386b0b3e94e5a2a2a7bf7f5b"
+canonical = "223285eb4be23bfddc569131303b627b41e3b594386b0b3e94e5a2a2a7bf7f5b"
+
+[files.".claude/skills/writing-rustdoc/scripts/doc-inventory.py"]
+exact = "4afd46c92fab57b3675d5e54de839c3818d35c1dd58ca9e4551a0ea3a6ee55e0"
+canonical = "4afd46c92fab57b3675d5e54de839c3818d35c1dd58ca9e4551a0ea3a6ee55e0"
+
+[files.".claude/skills/writing-the-book/SKILL.md"]
+exact = "453707c9f9ecc041501aa0601dc6dc8606d4604e56f550f137fd57bf71ee5f7b"
+canonical = "453707c9f9ecc041501aa0601dc6dc8606d4604e56f550f137fd57bf71ee5f7b"
+
+[files.".claude/skills/writing-unsafe-rust/SKILL.md"]
+exact = "e3c5962c629dc69527c7ef19ace30279240b78d68d56e165d44f47beb41666eb"
+canonical = "e3c5962c629dc69527c7ef19ace30279240b78d68d56e165d44f47beb41666eb"
+
+[files.".claude/skills/writing-unsafe-rust/references/atomics.md"]
+exact = "4cc035c23009a7205c87d9fd70de60f307b9b58c572b3139ff5164f179fc61d8"
+canonical = "4cc035c23009a7205c87d9fd70de60f307b9b58c572b3139ff5164f179fc61d8"
+
+[files.".claude/skills/writing-unsafe-rust/references/pointers.md"]
+exact = "c444304beeeb2d4bd92eca90be40d9b434f957529f751324e3e9178a7279f0b4"
+canonical = "c444304beeeb2d4bd92eca90be40d9b434f957529f751324e3e9178a7279f0b4"
+
+[files.".claude/skills/writing-unsafe-rust/references/safety-comments.md"]
+exact = "b0b07a7e453dc0e312aaf8fc67a3357b4eedd855d8ad5f07b4d42c233e1df141"
+canonical = "b0b07a7e453dc0e312aaf8fc67a3357b4eedd855d8ad5f07b4d42c233e1df141"
+
+[files.".claude/skills/writing-unsafe-rust/references/sources.md"]
+exact = "04fd3093ac960cddf99f17e1be159768dc5bfb0279a77f5140f7f6dbe42d3ca5"
+canonical = "04fd3093ac960cddf99f17e1be159768dc5bfb0279a77f5140f7f6dbe42d3ca5"
+
+[files.".claude/skills/writing-unsafe-rust/references/verifying.md"]
+exact = "4f7085147401b295d3978cda7e7d66d0c684ee906990f3860430c35eb9c3059d"
+canonical = "4f7085147401b295d3978cda7e7d66d0c684ee906990f3860430c35eb9c3059d"
+
+[files.".config/mise/conf.d/devset-cargo-bump.toml"]
+exact = "fcb07146bfdf1ac873fafbb51b55e276dadcf4e8944f78d18c1d714046e0efea"
+canonical = "fcb07146bfdf1ac873fafbb51b55e276dadcf4e8944f78d18c1d714046e0efea"
+
+[files.".config/mise/conf.d/devset-cargo-deny.toml"]
+exact = "efd4059cd877ad807ce033f3c281bb304d227497e86d78c676dc64aabe1bddee"
+canonical = "efd4059cd877ad807ce033f3c281bb304d227497e86d78c676dc64aabe1bddee"
+
+[files.".config/mise/conf.d/devset-cargo-hack.toml"]
+exact = "c9de9fd0882a7a7a26e47d5096060641fcba621e72aa86754fe19d972dba9806"
+canonical = "c9de9fd0882a7a7a26e47d5096060641fcba621e72aa86754fe19d972dba9806"
+
+[files.".config/mise/conf.d/devset-cargo-manifest.toml"]
+exact = "325d8ea7f7f18713f6aa7418f67bd8a33f214e721cdcb7bfa7a91852750b5cdc"
+canonical = "325d8ea7f7f18713f6aa7418f67bd8a33f214e721cdcb7bfa7a91852750b5cdc"
+
+[files.".config/mise/conf.d/devset-cargo-nextest.toml"]
+exact = "1523342719eda0439b4ace342b5aedcd704935bbd0941f4e8d9f5b8e2e5c91ac"
+canonical = "1523342719eda0439b4ace342b5aedcd704935bbd0941f4e8d9f5b8e2e5c91ac"
+
+[files.".config/mise/conf.d/devset-cargo-unused.toml"]
+exact = "c9fcf61ea2fd40cb48cb876e046eda45421d986b690a4ace7e34090a6ee1846a"
+canonical = "f9673ab6875340a3720ff69929a2e74eec86d40e5796ac69135eb9c1eb8cba44"
+
+[files.".config/mise/conf.d/devset-devset.toml"]
+exact = "a26dc769f455ffc586233771fe01f6cbb61967ee3cac88bd93ab5e107fd1d724"
+canonical = "a26dc769f455ffc586233771fe01f6cbb61967ee3cac88bd93ab5e107fd1d724"
+
+[files.".config/mise/conf.d/devset-dprint.toml"]
+exact = "dfcfdcf5b432fa82ed896b95c7ac499f0e8219f11c9e4a8a3bc457a5e3f0f88f"
+canonical = "dfcfdcf5b432fa82ed896b95c7ac499f0e8219f11c9e4a8a3bc457a5e3f0f88f"
+
+[files.".config/mise/conf.d/devset-git-changelog.toml"]
+exact = "393377cdcbf869f184e985329669fec02943f8742427a0e8c4a9758dda06bdcb"
+canonical = "393377cdcbf869f184e985329669fec02943f8742427a0e8c4a9758dda06bdcb"
+
+[files.".config/mise/conf.d/devset-git-commits.toml"]
+exact = "273196c2efef32d9fa65e2404673099c13894ee51e27ce6b3233200e1ec4b8dc"
+canonical = "273196c2efef32d9fa65e2404673099c13894ee51e27ce6b3233200e1ec4b8dc"
+
+[files.".config/mise/conf.d/devset-github-workflow-lint.toml"]
+exact = "026901f5632cfa778b73b9c9716c6a42c28be7b3878a0e2b51a4c9efbbbb28fb"
+canonical = "c9c782f9132d892926060edc4b8becbd32c2929b61e7833e2ec3f6f839b3baf6"
+
+[files.".config/mise/conf.d/devset-just.toml"]
+exact = "ee20c57ec281754f3d1c92e5e64c6a482fbee1a3796cb9817e64e7143f79fee6"
+canonical = "ee20c57ec281754f3d1c92e5e64c6a482fbee1a3796cb9817e64e7143f79fee6"
+
+[files.".config/mise/conf.d/devset-lychee.toml"]
+exact = "9117cc8303cc9a60ff4025c04349bbb6cf4af6e999ea54172429295834708926"
+canonical = "9117cc8303cc9a60ff4025c04349bbb6cf4af6e999ea54172429295834708926"
+
+[files.".config/mise/conf.d/devset-markdown.toml"]
+exact = "e048a8d69488f1ff5caed9b5a4b5fc6f2f513b1461dd5824a78feb569abfac89"
+canonical = "e048a8d69488f1ff5caed9b5a4b5fc6f2f513b1461dd5824a78feb569abfac89"
+
+[files.".config/mise/conf.d/devset-mdbook-tool.toml"]
+exact = "26a064937ab85c6125c5dad33055c0c241abdc88e3a8da4eee5870289f9042f0"
+canonical = "26a064937ab85c6125c5dad33055c0c241abdc88e3a8da4eee5870289f9042f0"
+
+[files.".config/mise/conf.d/devset-mdbook.toml"]
+exact = "61b94cc43a09b576463e73b1083bafc4135a358321538ecd95c4a14d9eea3d87"
+canonical = "61b94cc43a09b576463e73b1083bafc4135a358321538ecd95c4a14d9eea3d87"
+
+[files.".config/mise/conf.d/devset-mise.toml"]
+exact = "7627dc750a0e8c8c805a981edea22b1eeafb80914ee31add2bc0091c9fe2e725"
+canonical = "7627dc750a0e8c8c805a981edea22b1eeafb80914ee31add2bc0091c9fe2e725"
+
+[files.".config/mise/conf.d/devset-rust-toolchain.toml"]
+exact = "297395bbd210b04ae192d4e5c4f840b5b1d7c07ec08a7192d04de999dffa034f"
+canonical = "297395bbd210b04ae192d4e5c4f840b5b1d7c07ec08a7192d04de999dffa034f"
+
+[files.".config/mise/conf.d/devset-setup.toml"]
+exact = "8c2cd5b7b7bce3987b224d782cd52bb84077c6c2ecf965ab5581efa33f1bace2"
+canonical = "8c2cd5b7b7bce3987b224d782cd52bb84077c6c2ecf965ab5581efa33f1bace2"
+
+[files.".config/mise/conf.d/devset-shell.toml"]
+exact = "87a875d0937732ffa481dbc5413dea3f65065efe0334013663aa183b81686c8a"
+canonical = "87a875d0937732ffa481dbc5413dea3f65065efe0334013663aa183b81686c8a"
+
+[files.".config/mise/conf.d/devset-spelling.toml"]
+exact = "cff74acf04af9d46a5d4efb9be1f6d15e19270bf3ffdb13cd8ddb882ceef75e0"
+canonical = "cff74acf04af9d46a5d4efb9be1f6d15e19270bf3ffdb13cd8ddb882ceef75e0"
+
+[files.".config/mise/conf.d/devset-toml.toml"]
+exact = "8c1fa967eed244405e9f53c58642d57fe82f25f78dacf112a37b0fed606db364"
+canonical = "8c1fa967eed244405e9f53c58642d57fe82f25f78dacf112a37b0fed606db364"
+
+[files.".config/mise/conf.d/devset-yaml.toml"]
+exact = "4be9234ce3099a78eec8668e658c405a2faa60d8e4beb508b9b10818b73a7cb7"
+canonical = "4be9234ce3099a78eec8668e658c405a2faa60d8e4beb508b9b10818b73a7cb7"
+
+[files.".editorconfig"]
+exact = "62d0e3c5617728fa47c9f95a7a3a3e0be3c5b73acf1f88157568c385d4124eac"
+canonical = "62d0e3c5617728fa47c9f95a7a3a3e0be3c5b73acf1f88157568c385d4124eac"
+policy = "merge"
+
+[files.".github/ISSUE_TEMPLATE/bug_report.yml"]
+exact = "8d45cd4373e6f54a64d663f8aea3cf87a4ff26d0d52d25d44c483301d1091fac"
+canonical = "8d45cd4373e6f54a64d663f8aea3cf87a4ff26d0d52d25d44c483301d1091fac"
+policy = "once"
+
+[files.".github/ISSUE_TEMPLATE/config.yml"]
+exact = "0eec2b31eda45211bec496c9d649bf670fe87dc38691f115816864091eab0e95"
+canonical = "0eec2b31eda45211bec496c9d649bf670fe87dc38691f115816864091eab0e95"
+policy = "once"
+
+[files.".github/ISSUE_TEMPLATE/feature_request.yml"]
+exact = "ca1517eb44ee1095b1b7660e454408c4381617c2353da99d472977153df84441"
+canonical = "ca1517eb44ee1095b1b7660e454408c4381617c2353da99d472977153df84441"
+policy = "once"
+
+[files.".github/actionlint.yaml"]
+exact = "badcb39b58a8dae35da9f2a8daa9f11ff3e1a78db95f9571ca76df5626d682cc"
+canonical = "badcb39b58a8dae35da9f2a8daa9f11ff3e1a78db95f9571ca76df5626d682cc"
+
+[files.".github/dependabot.yml"]
+exact = "a3b46f6af5470e1bd191784a760f51862dca4b30d4e76e5b99e49fedad7f375d"
+canonical = "a3b46f6af5470e1bd191784a760f51862dca4b30d4e76e5b99e49fedad7f375d"
+policy = "merge"
+
+[files.".github/pull_request_template.md"]
+exact = "2662523c489fd93f8c2023219f7ccb8a77d4816ce278656bae4d6e8c2f8f1421"
+canonical = "2662523c489fd93f8c2023219f7ccb8a77d4816ce278656bae4d6e8c2f8f1421"
+policy = "once"
+
+[files.".github/scripts/automation.js"]
+exact = "2b6176f20f7aea656ac88f194fef2a83047f7cd7ad76bb5d8313fe1b8d876f73"
+canonical = "2b6176f20f7aea656ac88f194fef2a83047f7cd7ad76bb5d8313fe1b8d876f73"
+
+[files.".github/scripts/bump.js"]
+exact = "18cbf82f94e1feb6f81afd1b10a16712449cb4ffaa830ce0a8cc9477023f33be"
+canonical = "18cbf82f94e1feb6f81afd1b10a16712449cb4ffaa830ce0a8cc9477023f33be"
+
+[files.".github/scripts/watch.js"]
+exact = "59b882fbad94e0849b341b823a212d4f11b1877eb919150310479114d4359829"
+canonical = "59b882fbad94e0849b341b823a212d4f11b1877eb919150310479114d4359829"
+
+[files.".github/workflows/bump.yml"]
+exact = "2e6a5ad7a240c5860e3feef7028a9bfe2e3e035df8c599192945077d24efacf2"
+canonical = "2e6a5ad7a240c5860e3feef7028a9bfe2e3e035df8c599192945077d24efacf2"
+
+[files.".github/workflows/check.yml"]
+exact = "a0a3ef511b25ec1ccb0019bf0b6f6c6be9d0a00287e73fa15c80a4cafd2dd47a"
+canonical = "a0a3ef511b25ec1ccb0019bf0b6f6c6be9d0a00287e73fa15c80a4cafd2dd47a"
+
+[files.".github/workflows/labels.yml"]
+exact = "3b09611ae913272ce0f0efd481b67c53106acb54fc0f0d6b1fa1d2536da83351"
+canonical = "3b09611ae913272ce0f0efd481b67c53106acb54fc0f0d6b1fa1d2536da83351"
+
+[files.".github/workflows/nightly.yml"]
+exact = "69fee0fcb143cbe264cc46138f38d81b3def66630dd6c7c769649a36713e40da"
+canonical = "69fee0fcb143cbe264cc46138f38d81b3def66630dd6c7c769649a36713e40da"
+
+[files.".github/workflows/title.yml"]
+exact = "075361af1418e1f331c9eaeaec8c028958a9afa510b677ae881d63b06221832c"
+canonical = "075361af1418e1f331c9eaeaec8c028958a9afa510b677ae881d63b06221832c"
+
+[files.".github/workflows/watch.yml"]
+exact = "924c85f281df0e944b28a753b81f6f536b3c6d5f192ca27aed6c75af5b57280a"
+canonical = "924c85f281df0e944b28a753b81f6f536b3c6d5f192ca27aed6c75af5b57280a"
+
+[files.".github/zizmor.yml"]
+exact = "16253fa2b0144339f427808d4070502b7dc50f1155ecde41f4789957e1ee9e24"
+canonical = "16253fa2b0144339f427808d4070502b7dc50f1155ecde41f4789957e1ee9e24"
+
+[files.".just/cargo-bump.just"]
+exact = "7b8a4643cba8bdfdc75c1985f6ccfe6e4ca9d21d0435d77faa466e011ae1a8cd"
+canonical = "7b8a4643cba8bdfdc75c1985f6ccfe6e4ca9d21d0435d77faa466e011ae1a8cd"
+
+[files.".just/cargo-bump.py"]
+exact = "bac51e40f269bf7e160e4158e4b5a79191307902834ad84c21c9bffa675a5f2b"
+canonical = "bac51e40f269bf7e160e4158e4b5a79191307902834ad84c21c9bffa675a5f2b"
+
+[files.".just/cargo-deny.just"]
+exact = "ebf2690d00676b4a2ed81775921b95f944afac5e64701f471c5761da145e9a2c"
+canonical = "ebf2690d00676b4a2ed81775921b95f944afac5e64701f471c5761da145e9a2c"
+
+[files.".just/cargo-hack.just"]
+exact = "5b645bfcbfc258148d119f746445a15863a96468b66842a09b2b42c2e67a6088"
+canonical = "5b645bfcbfc258148d119f746445a15863a96468b66842a09b2b42c2e67a6088"
+
+[files.".just/cargo-manifest.just"]
+exact = "1f10c95eb4fa5a48307554016f2047a908953ed98cb9ce472519e63276d04474"
+canonical = "1f10c95eb4fa5a48307554016f2047a908953ed98cb9ce472519e63276d04474"
+
+[files.".just/cargo-manifest.py"]
+exact = "d910f91b6d8c691d341bbc55b5982d32f0a31fa1d890fb094966e487d8fed729"
+canonical = "d910f91b6d8c691d341bbc55b5982d32f0a31fa1d890fb094966e487d8fed729"
+
+[files.".just/cargo-nextest.just"]
+exact = "1001e297a53621f6cac49e2d55c3e5abd18348da57d318e3864d280cb63ada89"
+canonical = "1001e297a53621f6cac49e2d55c3e5abd18348da57d318e3864d280cb63ada89"
+
+[files.".just/cargo-unused.just"]
+exact = "a3f2a5d103e228695ba41d0ac23718582adec40d119cf6d8f298a146c1374900"
+canonical = "a3f2a5d103e228695ba41d0ac23718582adec40d119cf6d8f298a146c1374900"
+
+[files.".just/devset.just"]
+exact = "a2f04bf6942490a7b486675dca5ac6f19d26ba111b7f671cc225eb105e05df41"
+canonical = "a2f04bf6942490a7b486675dca5ac6f19d26ba111b7f671cc225eb105e05df41"
+
+[files.".just/devset.py"]
+exact = "74877ac5a11bb8cd374985924504db134c134ce57de695b21358e9fda5a5fd0c"
+canonical = "74877ac5a11bb8cd374985924504db134c134ce57de695b21358e9fda5a5fd0c"
+
+[files.".just/dprint.just"]
+exact = "6919685ae0c386030d90b00dd64ec0edbe3b3e07e663aa225631ce15185eb229"
+canonical = "6919685ae0c386030d90b00dd64ec0edbe3b3e07e663aa225631ce15185eb229"
+
+[files.".just/git-changelog.just"]
+exact = "0393ca20a05e6a7f6089b05a892c62d464ba40579649faa0f99ee6560eef4a59"
+canonical = "0393ca20a05e6a7f6089b05a892c62d464ba40579649faa0f99ee6560eef4a59"
+
+[files.".just/git-commits.just"]
+exact = "60d03daee633864b3a0a620178bd99d2c68bcc5613856a362a1e5a75ae662dc5"
+canonical = "60d03daee633864b3a0a620178bd99d2c68bcc5613856a362a1e5a75ae662dc5"
+
+[files.".just/github-labels.just"]
+exact = "80bc9b320d6a0b3efa0ba0ff62560792791ffdc9116af74939ff31333761b758"
+canonical = "80bc9b320d6a0b3efa0ba0ff62560792791ffdc9116af74939ff31333761b758"
+
+[files.".just/github-labels/labels.py"]
+exact = "39dac38b1948dae5f230d83d1a482f68e41f2985dedbebba52b3482dbdcf62d6"
+canonical = "39dac38b1948dae5f230d83d1a482f68e41f2985dedbebba52b3482dbdcf62d6"
+
+[files.".just/github-workflow-lint.just"]
+exact = "0c2d08e020c16a193f7536edb88e8d3505a204aec849a061573d30d4902209cf"
+canonical = "0c2d08e020c16a193f7536edb88e8d3505a204aec849a061573d30d4902209cf"
+
+[files.".just/lychee.just"]
+exact = "d93585830b59f983dcb1d6ab3dbb9bb489fa806df67673557f7f366c8318eeb3"
+canonical = "d93585830b59f983dcb1d6ab3dbb9bb489fa806df67673557f7f366c8318eeb3"
+
+[files.".just/markdown.just"]
+exact = "9da33503e1cf3d55ad71a994b25cb661d2a53b05498e9a05c9177a669c6581ea"
+canonical = "9da33503e1cf3d55ad71a994b25cb661d2a53b05498e9a05c9177a669c6581ea"
+
+[files.".just/mdbook.just"]
+exact = "5dd5f543695fc551c96b66c9fc215c7e2a6be439c5e3ee2d5aaafb6cf53aa475"
+canonical = "5dd5f543695fc551c96b66c9fc215c7e2a6be439c5e3ee2d5aaafb6cf53aa475"
+
+[files.".just/mdbook.py"]
+exact = "017bd24ae6b5894b91fbea158163cab7acb7b120d762aec902991fc7801d7b75"
+canonical = "017bd24ae6b5894b91fbea158163cab7acb7b120d762aec902991fc7801d7b75"
+
+[files.".just/mise.just"]
+exact = "cdd62d3a0bfad2545b71465595c32dbb00396dc7592c73333565f62e3a2aab51"
+canonical = "cdd62d3a0bfad2545b71465595c32dbb00396dc7592c73333565f62e3a2aab51"
+
+[files.".just/mise.py"]
+exact = "5f675325379a729987237cdea535911c68f645011716c69e87c0b995e30b1b15"
+canonical = "5f675325379a729987237cdea535911c68f645011716c69e87c0b995e30b1b15"
+
+[files.".just/rust-clippy.just"]
+exact = "99d4d845bafe937474d857e905e14512104694eb6603df0dde94d300ac6c994a"
+canonical = "99d4d845bafe937474d857e905e14512104694eb6603df0dde94d300ac6c994a"
+
+[files.".just/rust-doc.just"]
+exact = "e5d1bf0bfde89c21dbe14fd07589416386c2810f5836e89f4f6befd39fc73143"
+canonical = "e5d1bf0bfde89c21dbe14fd07589416386c2810f5836e89f4f6befd39fc73143"
+
+[files.".just/rust-doc.py"]
+exact = "95f7c581d64fbd2878b747dca8daef6fb99a655d42d86fb23f0dd7daa2f6729e"
+canonical = "95f7c581d64fbd2878b747dca8daef6fb99a655d42d86fb23f0dd7daa2f6729e"
+
+[files.".just/rust-fmt.just"]
+exact = "aedbb96af3066ea64851f190c37afc8f536e85aae24584cda9b2ce684a77cbf1"
+canonical = "aedbb96af3066ea64851f190c37afc8f536e85aae24584cda9b2ce684a77cbf1"
+
+[files.".just/rust-lints.just"]
+exact = "a83e41cfe290a3a92d757e24db66a98e18f71ab2aef73eea3d2cc95c01ae4ea9"
+canonical = "a83e41cfe290a3a92d757e24db66a98e18f71ab2aef73eea3d2cc95c01ae4ea9"
+
+[files.".just/rust-toolchain.just"]
+exact = "a98b0657fbbad8edb1c47bffa659ee666cff6c55d19dcb7226726c3c50623799"
+canonical = "a98b0657fbbad8edb1c47bffa659ee666cff6c55d19dcb7226726c3c50623799"
+
+[files.".just/rust-toolchain.sh"]
+exact = "7b86c522ceac318f73e69dd4f5565a15b1c64b94e66b536cd1b93f54e0e3dcca"
+canonical = "7b86c522ceac318f73e69dd4f5565a15b1c64b94e66b536cd1b93f54e0e3dcca"
+
+[files.".just/shell.just"]
+exact = "c2ed2f32fbcd0c54a1f1f2ad2e252c791f9de7c2bc2d34224fbc80532d322bac"
+canonical = "c2ed2f32fbcd0c54a1f1f2ad2e252c791f9de7c2bc2d34224fbc80532d322bac"
+
+[files.".just/spelling.just"]
+exact = "362739a51f38a1aa42171238d3948caad29c204ce2890b1d5f6fb20d2ea934fb"
+canonical = "362739a51f38a1aa42171238d3948caad29c204ce2890b1d5f6fb20d2ea934fb"
+
+[files.".just/toml.just"]
+exact = "26bf0b5efdb498b2607b7e25f09f4d814297fb225f2dc172aac1edd8b7962857"
+canonical = "26bf0b5efdb498b2607b7e25f09f4d814297fb225f2dc172aac1edd8b7962857"
+
+[files.".just/yaml.just"]
+exact = "93b6fa782273ac07d7e3f53bf7da277b8c2166e8610adf6f81ac87ed67259520"
+canonical = "93b6fa782273ac07d7e3f53bf7da277b8c2166e8610adf6f81ac87ed67259520"
+
+[files."BREAKING-CHANGES.md"]
+exact = "4638868342aa98bcc8e7ecf8815e3a7ffb6dfa185df74e31088ca7dfbe3b2424"
+canonical = "4638868342aa98bcc8e7ecf8815e3a7ffb6dfa185df74e31088ca7dfbe3b2424"
+policy = "once"
+
+[files."CHANGELOG.md"]
+exact = "4cba508f763f2ad48084c05e7e786636d66daf53a7af34ec6ba91a909c53dad6"
+canonical = "4cba508f763f2ad48084c05e7e786636d66daf53a7af34ec6ba91a909c53dad6"
+policy = "once"
+
+[files."CLAUDE.md"]
+exact = "d2333294b52059b6353e1c57c7695fff8833504c99c6257bd2adc8549db9c9e9"
+canonical = "d2333294b52059b6353e1c57c7695fff8833504c99c6257bd2adc8549db9c9e9"
+policy = "once"
+
+[files."CODE_OF_CONDUCT.md"]
+exact = "30f91b89e874822b749987977a371b2fa8ae0f292c92baa8d83abbcf3b4bf63f"
+canonical = "30f91b89e874822b749987977a371b2fa8ae0f292c92baa8d83abbcf3b4bf63f"
+policy = "once"
+
+[files."Cargo.toml"]
+exact = "896c788590ca21896f710e0ad134c76eca8c45b2b30a5934d5e881d470f5ec4d"
+canonical = "896c788590ca21896f710e0ad134c76eca8c45b2b30a5934d5e881d470f5ec4d"
+policy = "once"
+
+[files.LICENSE-APACHE]
+exact = "83cb3a2fcf829b6138e095b083016c34ddcdfa07b68d38782722c14fcf85ace6"
+canonical = "83cb3a2fcf829b6138e095b083016c34ddcdfa07b68d38782722c14fcf85ace6"
+policy = "once"
+
+[files.LICENSE-MIT]
+exact = "15f274312fc7bf14131cba4956659d61f1f706cdf2ee77297d61bfd18830dd5f"
+canonical = "15f274312fc7bf14131cba4956659d61f1f706cdf2ee77297d61bfd18830dd5f"
+policy = "once"
+
+[files."SECURITY.md"]
+exact = "ff60d68b1498a00351c4e3e7ad69b2737c7e22753e62b5a4db5e8bb799dea347"
+canonical = "ff60d68b1498a00351c4e3e7ad69b2737c7e22753e62b5a4db5e8bb799dea347"
+policy = "once"
+
+[files."SUPPORT.md"]
+exact = "9dce51d96fcdf0674b074ec54811ad6cffd01c2ccf049bd22a1269e105d22868"
+canonical = "9dce51d96fcdf0674b074ec54811ad6cffd01c2ccf049bd22a1269e105d22868"
+policy = "once"
+
+[files."cliff.toml"]
+exact = "f9028309947415c22409138fc634e74bf7ee0e4ac6af5fcbb6c3fa0f3c52384e"
+canonical = "f9028309947415c22409138fc634e74bf7ee0e4ac6af5fcbb6c3fa0f3c52384e"
+
+[files."committed.toml"]
+exact = "e247332cdf9e82db6b29a70b0d6628a6dba1054fcb1e76664602f6cda7cfe20e"
+canonical = "e247332cdf9e82db6b29a70b0d6628a6dba1054fcb1e76664602f6cda7cfe20e"
+
+[files."crates/atomix/Cargo.toml"]
+exact = "2dd04854e67d48d9c69c1bc5c57c699248a9b3472e80a73ee3869924e3dffc4d"
+canonical = "2dd04854e67d48d9c69c1bc5c57c699248a9b3472e80a73ee3869924e3dffc4d"
+policy = "once"
+
+[files."crates/atomix/src/lib.rs"]
+exact = "368b07d475f9772bce49d23a79c370bb763d55e995309f0708fd8cf2060afba0"
+canonical = "368b07d475f9772bce49d23a79c370bb763d55e995309f0708fd8cf2060afba0"
+policy = "once"
+
+[files."docs/README.md"]
+exact = "9e135659c88198581c0c8b1220edebf06d97a3d9cee99cc9dfef056cf9805b57"
+canonical = "9e135659c88198581c0c8b1220edebf06d97a3d9cee99cc9dfef056cf9805b57"
+policy = "once"
+
+[files."docs/api-link.js"]
+exact = "c2de05ad0105989ccf851720965ce244f5cc740d8bd8d7689265db3be5a2cde0"
+canonical = "c2de05ad0105989ccf851720965ce244f5cc740d8bd8d7689265db3be5a2cde0"
+
+[files."docs/src/SUMMARY.md"]
+exact = "e6bc676642e3c19676951bcc0e0d81538564ea2bba6b6779e40e6cd643b2ef28"
+canonical = "e6bc676642e3c19676951bcc0e0d81538564ea2bba6b6779e40e6cd643b2ef28"
+policy = "once"
+
+[files."docs/src/getting-started.md"]
+exact = "2d05a51a258309ed76dc5d144f5b2499a12bf57b833c4e17eb587ce8e22efbf9"
+canonical = "2d05a51a258309ed76dc5d144f5b2499a12bf57b833c4e17eb587ce8e22efbf9"
+policy = "once"
+
+[files."docs/src/introduction.md"]
+exact = "8c23dd71e4117f6a00788b3746e553eed4402dfa00c805d9adf02c5862ccde5d"
+canonical = "8c23dd71e4117f6a00788b3746e553eed4402dfa00c805d9adf02c5862ccde5d"
+policy = "once"
+
+[files."docs/src/vendor/katex/fonts/KaTeX_AMS-Regular.woff2"]
+exact = "d6591f77408a0de1a2207f1ee245578658252d909c856b2e89d3e6f8e09d30cb"
+canonical = "d6591f77408a0de1a2207f1ee245578658252d909c856b2e89d3e6f8e09d30cb"
+
+[files."docs/src/vendor/katex/fonts/KaTeX_Caligraphic-Bold.woff2"]
+exact = "2e45f8f1356559fbcb01d313bb348c73b1e837a57a6c373a4a0275781d7cb186"
+canonical = "2e45f8f1356559fbcb01d313bb348c73b1e837a57a6c373a4a0275781d7cb186"
+
+[files."docs/src/vendor/katex/fonts/KaTeX_Caligraphic-Regular.woff2"]
+exact = "e8c64a7e67f31e1548316767855b42b1a95afeb1c1fd75383a429fc3edf6aacb"
+canonical = "e8c64a7e67f31e1548316767855b42b1a95afeb1c1fd75383a429fc3edf6aacb"
+
+[files."docs/src/vendor/katex/fonts/KaTeX_Fraktur-Bold.woff2"]
+exact = "d519b49de6eabb9f23a2e5882edb647701f5a32371bb4a749c8f0b0538be4fea"
+canonical = "d519b49de6eabb9f23a2e5882edb647701f5a32371bb4a749c8f0b0538be4fea"
+
+[files."docs/src/vendor/katex/fonts/KaTeX_Fraktur-Regular.woff2"]
+exact = "3365fd6aaae9deece1b00351a0222b35e25265f8f8f5c1785859bd51a7015d3b"
+canonical = "3365fd6aaae9deece1b00351a0222b35e25265f8f8f5c1785859bd51a7015d3b"
+
+[files."docs/src/vendor/katex/fonts/KaTeX_Main-Bold.woff2"]
+exact = "bf84c9e9e6f09704cf1328d6c3101d07e532578ee1379d602f5e12ff6cd4e261"
+canonical = "bf84c9e9e6f09704cf1328d6c3101d07e532578ee1379d602f5e12ff6cd4e261"
+
+[files."docs/src/vendor/katex/fonts/KaTeX_Main-BoldItalic.woff2"]
+exact = "c0d409fb57c8ab202530a4ff28eda927121d531a0a8e0e54b529234c5d3d32b4"
+canonical = "c0d409fb57c8ab202530a4ff28eda927121d531a0a8e0e54b529234c5d3d32b4"
+
+[files."docs/src/vendor/katex/fonts/KaTeX_Main-Italic.woff2"]
+exact = "81397eb59910f084716618642f5f50bd9c5790dd44ddaf735a341cb5f2165419"
+canonical = "81397eb59910f084716618642f5f50bd9c5790dd44ddaf735a341cb5f2165419"
+
+[files."docs/src/vendor/katex/fonts/KaTeX_Main-Regular.woff2"]
+exact = "4a769208106db9db724b6b6e1367cd567a0fe28ddee419ebdf2840b6d46f6492"
+canonical = "4a769208106db9db724b6b6e1367cd567a0fe28ddee419ebdf2840b6d46f6492"
+
+[files."docs/src/vendor/katex/fonts/KaTeX_Math-BoldItalic.woff2"]
+exact = "9221f1ea5efbcb63c8f123155991aac34509ca3feb4131ebf2aae8e47474c9fd"
+canonical = "9221f1ea5efbcb63c8f123155991aac34509ca3feb4131ebf2aae8e47474c9fd"
+
+[files."docs/src/vendor/katex/fonts/KaTeX_Math-Italic.woff2"]
+exact = "ab39efc951f138c3e4cfd86b836517ad7be54c03db4e2e4f93562d05e6e45938"
+canonical = "ab39efc951f138c3e4cfd86b836517ad7be54c03db4e2e4f93562d05e6e45938"
+
+[files."docs/src/vendor/katex/fonts/KaTeX_SansSerif-Bold.woff2"]
+exact = "0217f0be099e2a66784bbab908faae7dad5885b50bb3630484490f9d42976fcf"
+canonical = "0217f0be099e2a66784bbab908faae7dad5885b50bb3630484490f9d42976fcf"
+
+[files."docs/src/vendor/katex/fonts/KaTeX_SansSerif-Italic.woff2"]
+exact = "ebee32259752115406641b37ff30d40ef00a667871799629c1a385ffdeb78942"
+canonical = "ebee32259752115406641b37ff30d40ef00a667871799629c1a385ffdeb78942"
+
+[files."docs/src/vendor/katex/fonts/KaTeX_SansSerif-Regular.woff2"]
+exact = "b16538c560e7e3c2e7a356eaf417a28adc2af74774d822253f1343430c34487b"
+canonical = "b16538c560e7e3c2e7a356eaf417a28adc2af74774d822253f1343430c34487b"
+
+[files."docs/src/vendor/katex/fonts/KaTeX_Script-Regular.woff2"]
+exact = "5a96bc9456d2766e3d2998c3e6d52a11a18c80834b83814520c06f5f5eabf51a"
+canonical = "5a96bc9456d2766e3d2998c3e6d52a11a18c80834b83814520c06f5f5eabf51a"
+
+[files."docs/src/vendor/katex/fonts/KaTeX_Size1-Regular.woff2"]
+exact = "9d40292d08e6fe6d5d05771bf63e86deb152c0edfb47a2407f4a7aa7ac4f748c"
+canonical = "9d40292d08e6fe6d5d05771bf63e86deb152c0edfb47a2407f4a7aa7ac4f748c"
+
+[files."docs/src/vendor/katex/fonts/KaTeX_Size2-Regular.woff2"]
+exact = "759d2ddcd5b8d0235d0ae86ddbaf886a2c7d1811996b35aab5a94f2f4b2f6d7f"
+canonical = "759d2ddcd5b8d0235d0ae86ddbaf886a2c7d1811996b35aab5a94f2f4b2f6d7f"
+
+[files."docs/src/vendor/katex/fonts/KaTeX_Size3-Regular.woff2"]
+exact = "b379f59b1c29e06f6de29355bde327cf3e8ae9cb5750c138b1859d93af314289"
+canonical = "b379f59b1c29e06f6de29355bde327cf3e8ae9cb5750c138b1859d93af314289"
+
+[files."docs/src/vendor/katex/fonts/KaTeX_Size4-Regular.woff2"]
+exact = "75ec7669f0dbc37ae4378db24fca63a2ab769aa77f71aa1150db4e2b8e133631"
+canonical = "75ec7669f0dbc37ae4378db24fca63a2ab769aa77f71aa1150db4e2b8e133631"
+
+[files."docs/src/vendor/katex/fonts/KaTeX_Typewriter-Regular.woff2"]
+exact = "101b46cdd62a36c8adba7c3ae508fc83ee6e46ff1c3a436e8d9d608a54c9a21f"
+canonical = "101b46cdd62a36c8adba7c3ae508fc83ee6e46ff1c3a436e8d9d608a54c9a21f"
+
+[files."docs/theme/details.css"]
+exact = "2fbca54f0c823af3704380d73ebe3c91bd3b65d8c17c96556910f8f4e0ae021d"
+canonical = "2fbca54f0c823af3704380d73ebe3c91bd3b65d8c17c96556910f8f4e0ae021d"
+policy = "merge"
+
+[files."docs/theme/logo.css"]
+exact = "013f54308415dc140e8529f91c20427f20a43234be5c67c7c8b9d549e5fde419"
+canonical = "013f54308415dc140e8529f91c20427f20a43234be5c67c7c8b9d549e5fde419"
+
+[files."docs/theme/palette.css"]
+exact = "227f8ccee4b7ff2557ea8d5bc69432b76271b650c00a5fed0ae74f2b5bb38f05"
+canonical = "227f8ccee4b7ff2557ea8d5bc69432b76271b650c00a5fed0ae74f2b5bb38f05"
+policy = "merge"
+
+[files."docs/theme/prompt.css"]
+exact = "e170869c94fee27e1964b6d1fbcaa3c09f923c348f5972469da7ffc1f3ed674d"
+canonical = "e170869c94fee27e1964b6d1fbcaa3c09f923c348f5972469da7ffc1f3ed674d"
+policy = "merge"
+
+[files."docs/theme/width.css"]
+exact = "dc3121a44cf618350b7de93b05172b00de138da3bf56838f2feb2b04c5e51f23"
+canonical = "dc3121a44cf618350b7de93b05172b00de138da3bf56838f2feb2b04c5e51f23"
+policy = "merge"
+
+[files."docs/vendor/katex/README.md"]
+exact = "2f486e8b94b4279ca1e7f62f48a0356ba2ded2ba2a653f720991d979079a3f72"
+canonical = "2f486e8b94b4279ca1e7f62f48a0356ba2ded2ba2a653f720991d979079a3f72"
+
+[files."docs/vendor/katex/katex.min.css"]
+exact = "ea22cd22d13a313a13c4eeff2ee12b7d46c4a04039cb49cce0ec00f7fcf7de39"
+canonical = "ea22cd22d13a313a13c4eeff2ee12b7d46c4a04039cb49cce0ec00f7fcf7de39"
+
+[files."lychee.toml"]
+exact = "39fecfdb0487f0a54fad16af4a9ea8e54649e6fd8e637bcc1395631674a151d9"
+canonical = "39fecfdb0487f0a54fad16af4a9ea8e54649e6fd8e637bcc1395631674a151d9"
+policy = "once"
+
+[files."policy/workflows/workflows.rego"]
+exact = "e25196f1c3e8da43a0690ab15853011f48f4e1dca3a04d27b755d20a6ac14485"
+canonical = "e25196f1c3e8da43a0690ab15853011f48f4e1dca3a04d27b755d20a6ac14485"
+
+[files."policy/workflows/workflows_test.rego"]
+exact = "b9c2ef79bb07b4ba38066606d09c4e43ca7f13cf25d3e6e0bd262df7ffaec4e2"
+canonical = "b9c2ef79bb07b4ba38066606d09c4e43ca7f13cf25d3e6e0bd262df7ffaec4e2"
+
+[files."setup.sh"]
+exact = "d21a7c0b3dca1668b2034fcc68496382da99b43af977b7a1903e617a8644904e"
+canonical = "d21a7c0b3dca1668b2034fcc68496382da99b43af977b7a1903e617a8644904e"
+
+[parts.".cargo/config.toml".cargo-workspace]
+scope = "keys"
+exact = "c1b77d647da73c905c644a3a19b8a36ef0578ac036852adbd559ebe858d32b43"
+canonical = "c1b77d647da73c905c644a3a19b8a36ef0578ac036852adbd559ebe858d32b43"
+
+[parts.".claude/settings.json".agents]
+scope = "keys"
+exact = "e981727824955d4d7a882ecb6ef3ec848afc8deac777dd6bea88d08afcbfe959"
+canonical = "e981727824955d4d7a882ecb6ef3ec848afc8deac777dd6bea88d08afcbfe959"
+policy = "merge"
+
+[parts.".config/mise/mise.lock".cargo-bump]
+scope = "keys"
+exact = "f0b0fcb4c947d36fc524dbb5f2fe8c393c8ae242aeefa9c9266258961a2ceb9b"
+canonical = "f0b0fcb4c947d36fc524dbb5f2fe8c393c8ae242aeefa9c9266258961a2ceb9b"
+
+[parts.".config/mise/mise.lock".cargo-deny]
+scope = "keys"
+exact = "c71149783c08ce8b6c4906a82b6ab75aeefdbef3031abd5fe4d4f6f7b3210b28"
+canonical = "c71149783c08ce8b6c4906a82b6ab75aeefdbef3031abd5fe4d4f6f7b3210b28"
+
+[parts.".config/mise/mise.lock".cargo-hack]
+scope = "keys"
+exact = "091dcabc25dea95527345b95c1b42a34fd19589085c1dc2a7b4f92eefdaf50cd"
+canonical = "091dcabc25dea95527345b95c1b42a34fd19589085c1dc2a7b4f92eefdaf50cd"
+
+[parts.".config/mise/mise.lock".cargo-manifest]
+scope = "keys"
+exact = "0a318b43d3842005890da90c7dfed6dc24532d9449e07c636d5bf99097557ed5"
+canonical = "0a318b43d3842005890da90c7dfed6dc24532d9449e07c636d5bf99097557ed5"
+
+[parts.".config/mise/mise.lock".cargo-nextest]
+scope = "keys"
+exact = "ec45470b54c062c3786aef121da07fa6ec3192a5b8eab2b7c6cc5cc4a0fb7a1a"
+canonical = "ec45470b54c062c3786aef121da07fa6ec3192a5b8eab2b7c6cc5cc4a0fb7a1a"
+
+[parts.".config/mise/mise.lock".cargo-unused]
+scope = "keys"
+exact = "aeb253d32d421b405480669c6413b077a10aeae1204f6d37b774997a88a0d23b"
+canonical = "aeb253d32d421b405480669c6413b077a10aeae1204f6d37b774997a88a0d23b"
+
+[parts.".config/mise/mise.lock".devset]
+scope = "keys"
+exact = "5afc081f487531dadb7ff702746d900e0d5a1801adb7586e5c8d81bfb2a41b98"
+canonical = "5afc081f487531dadb7ff702746d900e0d5a1801adb7586e5c8d81bfb2a41b98"
+
+[parts.".config/mise/mise.lock".dprint]
+scope = "keys"
+exact = "b50e88d229aaaac66a36f51812b37fda869b96af3328acfbb4c551ac344d742c"
+canonical = "b50e88d229aaaac66a36f51812b37fda869b96af3328acfbb4c551ac344d742c"
+
+[parts.".config/mise/mise.lock".git-changelog]
+scope = "keys"
+exact = "930883d65d152a0a30bf4feac2a94425747dd22b08e506c886cb80ff36ecf57c"
+canonical = "930883d65d152a0a30bf4feac2a94425747dd22b08e506c886cb80ff36ecf57c"
+
+[parts.".config/mise/mise.lock".git-commits]
+scope = "keys"
+exact = "7991ee6bc1c1d4a99f03644a44cc5b6b9cc26e1d818f7ad740fc5da9e3e3f70f"
+canonical = "7991ee6bc1c1d4a99f03644a44cc5b6b9cc26e1d818f7ad740fc5da9e3e3f70f"
+
+[parts.".config/mise/mise.lock".github-workflow-lint]
+scope = "keys"
+exact = "a13b435045a8d954804161d0bf396be46a25d3a157d8d575dfda8cc03989f6ae"
+canonical = "a13b435045a8d954804161d0bf396be46a25d3a157d8d575dfda8cc03989f6ae"
+
+[parts.".config/mise/mise.lock".just]
+scope = "keys"
+exact = "68831b2dd35963a8ea8bf917e85c7589af6d50a22829b8484830ab831c3bbad4"
+canonical = "68831b2dd35963a8ea8bf917e85c7589af6d50a22829b8484830ab831c3bbad4"
+
+[parts.".config/mise/mise.lock".lychee]
+scope = "keys"
+exact = "e1652f8b93020d153329e4f11e1bdd1afe92dc27a7647d93d7c12d5bde85e8b8"
+canonical = "e1652f8b93020d153329e4f11e1bdd1afe92dc27a7647d93d7c12d5bde85e8b8"
+
+[parts.".config/mise/mise.lock".markdown]
+scope = "keys"
+exact = "5da0208bdd831fb2c5b5a5a441dea3aaa06f0a4ff6cdf7c45eb913666420b491"
+canonical = "5da0208bdd831fb2c5b5a5a441dea3aaa06f0a4ff6cdf7c45eb913666420b491"
+
+[parts.".config/mise/mise.lock".mdbook]
+scope = "keys"
+exact = "d60a33f12c7c87af6765b9c17ed442028cdcd6447bddb569dce356184cfde57a"
+canonical = "d60a33f12c7c87af6765b9c17ed442028cdcd6447bddb569dce356184cfde57a"
+
+[parts.".config/mise/mise.lock".mdbook-tool]
+scope = "keys"
+exact = "786f0e03f041c5dfb6928de6195a3da6150e4651a9eff4f4d706ca30dc08bfb7"
+canonical = "786f0e03f041c5dfb6928de6195a3da6150e4651a9eff4f4d706ca30dc08bfb7"
+
+[parts.".config/mise/mise.lock".mise]
+scope = "keys"
+exact = "7eab898e721557d32ae69b723909edb9e34601f6e1a6c6b798534e58c362755f"
+canonical = "7eab898e721557d32ae69b723909edb9e34601f6e1a6c6b798534e58c362755f"
+
+[parts.".config/mise/mise.lock".shell]
+scope = "keys"
+exact = "6ab9fadd8c1c8be4f65d0aa1cf8e8e696765008d1ee72af7cc9dc45f793023c9"
+canonical = "6ab9fadd8c1c8be4f65d0aa1cf8e8e696765008d1ee72af7cc9dc45f793023c9"
+
+[parts.".config/mise/mise.lock".spelling]
+scope = "keys"
+exact = "05f1539278b31a1a2428bec044f40febbc1ad781d09c842e7d57e3918559a081"
+canonical = "05f1539278b31a1a2428bec044f40febbc1ad781d09c842e7d57e3918559a081"
+
+[parts.".config/mise/mise.lock".toml]
+scope = "keys"
+exact = "5fa02c597fbbdc0e332762c0caa7ff89aa0663cd92b2842afcd0071710a0686a"
+canonical = "5fa02c597fbbdc0e332762c0caa7ff89aa0663cd92b2842afcd0071710a0686a"
+
+[parts.".config/mise/mise.lock".yaml]
+scope = "keys"
+exact = "646ad78affc4308c09c4fa5da849ff12a602c38dfbabe36206f8add18d58a323"
+canonical = "646ad78affc4308c09c4fa5da849ff12a602c38dfbabe36206f8add18d58a323"
+
+[parts.".config/nextest.toml".cargo-nextest]
+scope = "keys"
+exact = "f3932f59d310dd8f8dedcef2fe001ad680a9cb0a29d9e56663c177afd47777f4"
+canonical = "f3932f59d310dd8f8dedcef2fe001ad680a9cb0a29d9e56663c177afd47777f4"
+
+[parts.".gitattributes".git-attributes]
+scope = "block"
+exact = "101c66ee41425f624b75e0d8e0417a28c93be54fef7bd97514a51195d077ddf4"
+canonical = "101c66ee41425f624b75e0d8e0417a28c93be54fef7bd97514a51195d077ddf4"
+
+[parts.".github/automation.json".github-automation]
+scope = "keys"
+exact = "4691e262c0fa726a835ecfc325176e8057203d0a9569483ec400d3412323626f"
+canonical = "4691e262c0fa726a835ecfc325176e8057203d0a9569483ec400d3412323626f"
+policy = "merge"
+
+[parts.".github/automation.json".mdbook]
+scope = "keys"
+exact = "06fd1104edca2a567bc087186ecb098427536b3f5c87bf28dec9ae8fbcf70421"
+canonical = "06fd1104edca2a567bc087186ecb098427536b3f5c87bf28dec9ae8fbcf70421"
+
+[parts.".github/labels.toml".github-labels]
+scope = "keys"
+exact = "f7611bbea3230467eef827b7e9584943baf3508750625cfe8082d762836a7529"
+canonical = "f7611bbea3230467eef827b7e9584943baf3508750625cfe8082d762836a7529"
+policy = "merge"
+
+[parts.".gitignore".cargo-profiles]
+scope = "block"
+exact = "5c49f07118167890a599a839ff4607c063c17e09a6d70374994de93d1bbb9bc3"
+canonical = "5c49f07118167890a599a839ff4607c063c17e09a6d70374994de93d1bbb9bc3"
+
+[parts.".gitignore".cargo-workspace]
+scope = "block"
+exact = "29fba7f8a0e8608b4686426307c37524deb3150675899f448fbd71a272429cec"
+canonical = "29fba7f8a0e8608b4686426307c37524deb3150675899f448fbd71a272429cec"
+
+[parts.".gitignore".git-ignore]
+scope = "block"
+exact = "36f9fb5a7fbffe747290eb4391e91ed8aa483e86a8fadddfcb492b92772f06bc"
+canonical = "36f9fb5a7fbffe747290eb4391e91ed8aa483e86a8fadddfcb492b92772f06bc"
+
+[parts.".gitignore".markdown]
+scope = "block"
+exact = "a14c0e0978298ce8a4370a64fa78801ffd3a70b199bedfd7b5f8bef5cb44b522"
+canonical = "a14c0e0978298ce8a4370a64fa78801ffd3a70b199bedfd7b5f8bef5cb44b522"
+
+[parts.".gitignore".mdbook]
+scope = "block"
+exact = "a0997faa5ce96a9d4b9704eee10ac402072589195bfc7a59ad971c6f4e1d0faf"
+canonical = "a0997faa5ce96a9d4b9704eee10ac402072589195bfc7a59ad971c6f4e1d0faf"
+
+[parts.".rumdl.toml".markdown]
+scope = "keys"
+exact = "33dbb6fdcf87dc5765b7a57b43c4823e5e842a71a872ff812cf8e33a2decbe16"
+canonical = "33dbb6fdcf87dc5765b7a57b43c4823e5e842a71a872ff812cf8e33a2decbe16"
+policy = "merge"
+
+[parts.".vscode/extensions.json".vscode]
+scope = "keys"
+exact = "e9670ceb192900054dc827eaae9f43cd876476622ea8dd26e99e6556955783dd"
+canonical = "e9670ceb192900054dc827eaae9f43cd876476622ea8dd26e99e6556955783dd"
+policy = "merge"
+
+[parts.".vscode/settings.json".vscode]
+scope = "keys"
+exact = "7ec53948c688ce0f271827efeb28c50cbe2908543e1259651e9e5956c845f92c"
+canonical = "7ec53948c688ce0f271827efeb28c50cbe2908543e1259651e9e5956c845f92c"
+policy = "merge"
+
+[parts.".yamllint.yaml".yaml]
+scope = "keys"
+exact = "295f9b25709e659bef8279b4fc26505b0ffc119578062b3dc336b335fce73ea7"
+canonical = "295f9b25709e659bef8279b4fc26505b0ffc119578062b3dc336b335fce73ea7"
+policy = "merge"
+
+[parts."AGENTS.md".agents]
+scope = "block"
+exact = "db51037b8cea3e30b07a148ddfed64f1f01cc983e6bb3ffd09f9c97e74d44534"
+canonical = "78c4a08f10d588b29a5a28ffff202efb74024dbeaeacd2f08a993c598ef8b71d"
+
+[parts."AGENTS.md".cargo-deny]
+scope = "block"
+exact = "cf9476ccb9b11bed2247e5603622e1d80a4828df386c353edcc4085e168de69b"
+canonical = "bbc3a56be1d4968cb5d096598be8c3bab03f0ae669722cf21a58d33169fc0d0f"
+
+[parts."AGENTS.md".git-commits]
+scope = "block"
+exact = "2160577dedcf0b5ff8de2e5cf96184fcc97c05f301664cd3e17a40888e65fb04"
+canonical = "08202cbacde91784a85a553fdb63e216f90020c0d84fe7cab1445cbc0d99cda7"
+
+[parts."AGENTS.md".mdbook]
+scope = "block"
+exact = "4e9b1f87345b53592e966e35ece0d0f4952554e20663e1b46711995e6441f21d"
+canonical = "b13a647382325e16cf666bb2bb1c7541920b29bba08c18b32fb5cb22a9855933"
+
+[parts."CONTRIBUTING.md".git-commits]
+scope = "block"
+exact = "ddf288444f8d4a664c49fcdd34889f82cd5ba9897cfe00c0522db656bf7da0f8"
+canonical = "8370f539a11c7b96fad133ea2d16c668b014b3312c0c83eb4a539b356f697362"
+
+[parts."CONTRIBUTING.md".github-labels]
+scope = "block"
+exact = "8ec0cac5230034f36283380952d9a4f4d4f8cd5b87b3bac21db515badfaecef1"
+canonical = "af21ba6d5cf5df5daa8d87b22d55bc028c92cf3ef3f52b22f622485c84bec5f9"
+
+[parts."CONTRIBUTING.md".project]
+scope = "block"
+exact = "df3fd6a2c9daeaa7490523c0e5cf324f56dd78846f606fc8ba30191f0b1997a8"
+canonical = "c3978df92426497a95c09cf81d99010b5a325e16392c361cbc9b90a45e7556ee"
+
+[parts."CONTRIBUTING.md".setup]
+scope = "block"
+exact = "7ad5e38fbe98d695a15701aba083a8273ab8a577d8898a716a46493d66994c4e"
+canonical = "c27dab8469e73a761513b7de46e8563e4fd9203f641dcbc2007cf76eeaa39b08"
+
+[parts."Cargo.toml".cargo-profiles]
+scope = "keys"
+exact = "50bb63c811be6194bee9518ab80709abd703fbef205297d02580809700e7910e"
+canonical = "50bb63c811be6194bee9518ab80709abd703fbef205297d02580809700e7910e"
+
+[parts."Cargo.toml".rust-lints]
+scope = "keys"
+exact = "97ae3bed43a289ecb77fd9f99ed84523563adf60c44f27a624f9f62308af2744"
+canonical = "97ae3bed43a289ecb77fd9f99ed84523563adf60c44f27a624f9f62308af2744"
+
+[parts."README.md".project]
+scope = "block"
+exact = "1f9b947a804f39272be4c0b779d9c92993fac686bf0d8388e869035a56c21e86"
+canonical = "1f9b947a804f39272be4c0b779d9c92993fac686bf0d8388e869035a56c21e86"
+
+[parts."clippy.toml".rust-clippy]
+scope = "keys"
+exact = "57d81dbe798a3d5b92796d169770493fa32485e038d6ce7fb6848f40fb2ce5d6"
+canonical = "57d81dbe798a3d5b92796d169770493fa32485e038d6ce7fb6848f40fb2ce5d6"
+
+[parts."deny.toml".cargo-deny]
+scope = "keys"
+exact = "6773a480099fa7946e6612a185d9233e457b0b2feb5c08c54d853289152a637a"
+canonical = "6773a480099fa7946e6612a185d9233e457b0b2feb5c08c54d853289152a637a"
+
+[parts."docs/book.toml".mdbook]
+scope = "keys"
+exact = "b3865047fa88aa2acb9722fd9d7e22758b0747088e467e8e374d7e2dc883e067"
+canonical = "b3865047fa88aa2acb9722fd9d7e22758b0747088e467e8e374d7e2dc883e067"
+policy = "merge"
+
+[parts."docs/theme/head.hbs".mdbook]
+scope = "block"
+exact = "8ca25ca00cb908bd8c6b767b8218d4a7e0d1894d3a94ce27bfcd63838ecd69a8"
+canonical = "8ca25ca00cb908bd8c6b767b8218d4a7e0d1894d3a94ce27bfcd63838ecd69a8"
+
+[parts."dprint.json".dprint]
+scope = "keys"
+exact = "02bf3d328ae681f9b4fc3cbdd8284014a47e87ad4a70791ac97c2c02b6f7a7fc"
+canonical = "02bf3d328ae681f9b4fc3cbdd8284014a47e87ad4a70791ac97c2c02b6f7a7fc"
+policy = "merge"
+
+[parts."dprint.json".markdown]
+scope = "keys"
+exact = "e536ec3c1a2912209cea326b271e690c0b431c7bfeafa2a6ce5331759b4f7d7e"
+canonical = "e536ec3c1a2912209cea326b271e690c0b431c7bfeafa2a6ce5331759b4f7d7e"
+policy = "merge"
+
+[parts."dprint.json".yaml]
+scope = "keys"
+exact = "07e2ca5508515c2f3809f99d6998d0cd921600c46d34e319d2dfba8680909847"
+canonical = "07e2ca5508515c2f3809f99d6998d0cd921600c46d34e319d2dfba8680909847"
+policy = "merge"
+
+[parts.justfile.just]
+scope = "block"
+exact = "c67719bcf4fd0276c413cdc3f5eba41291588bda503d0c5ff678907de01f1baf"
+canonical = "451d1ec09d793d1d04cfef80e4a055fed85f4b0d0272a6f4457f1e202d9f24b7"
+
+[parts."rust-toolchain.toml".rust-toolchain]
+scope = "keys"
+exact = "7775810c66f97f9f4c91e9fa114091d958c2f0b8094b63ac005777f7bcb702e8"
+canonical = "7775810c66f97f9f4c91e9fa114091d958c2f0b8094b63ac005777f7bcb702e8"
+
+[parts."rustfmt.toml".rust-fmt]
+scope = "keys"
+exact = "919fb816f4c60f7cc849a7ecfd77a4f3e653f777fb01df1fa439dc1953323822"
+canonical = "919fb816f4c60f7cc849a7ecfd77a4f3e653f777fb01df1fa439dc1953323822"
+policy = "merge"
+
+[parts."taplo.toml".toml]
+scope = "keys"
+exact = "4f804dd1722e005f52c4ca606fb47cd0c4b2c2659b482ac8d1a5b45a046946d6"
+canonical = "4f804dd1722e005f52c4ca606fb47cd0c4b2c2659b482ac8d1a5b45a046946d6"
+policy = "merge"
+
+[parts."typos.toml".spelling]
+scope = "keys"
+exact = "bc581dc9ebae4c00683b02bdfd8efad2889701a49a4475fe8cc0306f06a0e756"
+canonical = "bc581dc9ebae4c00683b02bdfd8efad2889701a49a4475fe8cc0306f06a0e756"
+policy = "merge"

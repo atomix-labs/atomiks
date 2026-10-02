@@ -1,0 +1,4 @@
+- [ ] The description says what changes, and why
+- [ ] The title is a Conventional Commit: `type(scope): subject`
+- [ ] `just check` passes
+- [ ] A breaking change has its entry in `BREAKING-CHANGES.md`

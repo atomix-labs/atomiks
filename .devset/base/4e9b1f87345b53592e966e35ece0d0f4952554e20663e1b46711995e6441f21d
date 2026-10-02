@@ -1,0 +1,11 @@
+
+## The Book
+
+`just check-mdbook` lints the book, builds it and runs its examples. Its pages
+are Markdown under the `src/` of its directory, each listed in `SUMMARY.md`, and
+a preview rebuilds on every save:
+
+```sh
+mdbook serve docs
+```
+

@@ -1,0 +1,86 @@
+/* Collapsible definitions. A heading names the type, the summary says what it is,
+   and the body carries the writeup and the definition. Styled as a card so a page
+   of them reads as an outline rather than as a stack of raw disclosure widgets. */
+
+.content details {
+  margin: 0.4rem 0 1.4rem;
+  border: 1px solid var(--table-border-color);
+  border-radius: 6px;
+  background: var(--quote-bg);
+}
+
+/* A heading immediately above its own expander should not float away from it. */
+.content :is(h1, h2, h3, h4, h5, h6) + details {
+  margin-top: 0.3rem;
+}
+
+.content details > summary {
+  display: flex;
+  gap: 0.55rem;
+  align-items: baseline;
+  padding: 0.55rem 0.9rem;
+  cursor: pointer;
+  list-style: none;
+  text-align: left;
+}
+
+/* Both spellings: the standard one, and WebKit's older pseudo-element. */
+.content details > summary::marker,
+.content details > summary::-webkit-details-marker {
+  display: none;
+  content: "";
+}
+
+.content details > summary::before {
+  content: "\25B8"; /* ▸ */
+  display: inline-block;
+  flex: none;
+  color: var(--links);
+  transition: transform 0.15s ease;
+}
+
+.content details[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.content details > summary:hover {
+  color: var(--links);
+}
+
+.content details[open] > summary {
+  border-bottom: 1px solid var(--table-border-color);
+}
+
+/* Inset the body, and keep the first and last child off the card's edges. */
+.content details > :not(summary) {
+  margin-inline: 0.9rem;
+}
+
+.content details[open] > :not(summary):first-of-type {
+  margin-top: 0.9rem;
+}
+
+.content details > :not(summary):last-child {
+  margin-bottom: 0.9rem;
+}
+
+/* Nested definitions: the border alone carries the level, so the cards do not
+   stack backgrounds into an ever-darker well as you drill in.
+
+   The step is on the start edge only. Indenting both edges would narrow every
+   level, and the deepest definitions are the ones that can least afford it. */
+.content details details {
+  margin-block: 0.5rem;
+  margin-inline-start: 2rem;
+  margin-inline-end: 0;
+  background: transparent;
+}
+
+/* The type name leads; the description after it is secondary. */
+.content details > summary > code {
+  flex: none;
+}
+
+.content details > summary .what {
+  opacity: 0.85;
+}

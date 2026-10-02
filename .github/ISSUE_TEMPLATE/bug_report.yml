@@ -1,0 +1,34 @@
+name: Bug report
+description: Something does not work as the documentation says
+labels: [triage]
+type: Bug
+body:
+  - type: textarea
+    id: happened
+    attributes:
+      label: What happened
+      description: What you ran, and what it did.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What was expected
+      description: What should have happened, and where the documentation says so.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: To reproduce
+      description: The smallest steps that show it.
+    validations:
+      required: true
+  - type: textarea
+    id: version
+    attributes:
+      label: Version
+      description: The version or commit, and the platform.
+      render: text
+    validations:
+      required: true

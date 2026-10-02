@@ -1,0 +1,22 @@
+name: Feature request
+description: Something the project should do
+labels: [triage]
+type: Feature
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: The need
+      description: What you are trying to do, and what stops you.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: The idea
+      description: What the project could do about it.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+      description: What you tried, or would do otherwise.

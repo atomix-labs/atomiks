@@ -1,0 +1,56 @@
+/* The book in the palette of the README's header, GitHub's own: the light theme, and navy for a
+   dark scheme, which book.toml makes the defaults. The other themes stay mdBook's. */
+.light,
+html:not(.js) {
+  --bg: #ffffff;
+  --fg: #1f2328;
+  --sidebar-bg: #f6f8fa;
+  --sidebar-fg: #1f2328;
+  --sidebar-active: #0969da;
+  --sidebar-spacer: #d1d9e0;
+  --sidebar-header-border-color: #d1d9e0;
+  --icons: #59636e;
+  --icons-hover: #1f2328;
+  --links: #0969da;
+  --inline-code-color: #1f2328;
+  --theme-popup-bg: #ffffff;
+  --theme-popup-border: #d1d9e0;
+  --theme-hover: #f6f8fa;
+  --quote-bg: #f6f8fa;
+  --quote-border: #d1d9e0;
+  --table-border-color: #d1d9e0;
+  --table-header-bg: #eff2f5;
+  --table-alternate-bg: #f6f8fa;
+  --searchbar-border-color: #d1d9e0;
+  --searchbar-bg: #ffffff;
+  --searchbar-fg: #1f2328;
+  --searchresults-li-bg: #ddf4ff;
+  --search-mark-bg: #fff8c5;
+}
+
+.navy {
+  --bg: #0d1117;
+  --fg: #e6edf3;
+  --sidebar-bg: #010409;
+  --sidebar-fg: #e6edf3;
+  --sidebar-active: #4493f8;
+  --sidebar-spacer: #3d444d;
+  --sidebar-header-border-color: #3d444d;
+  --icons: #9198a1;
+  --icons-hover: #f0f6fc;
+  --links: #4493f8;
+  --inline-code-color: #e6edf3;
+  --theme-popup-bg: #151b23;
+  --theme-popup-border: #3d444d;
+  --theme-hover: #262c36;
+  --quote-bg: #151b23;
+  --quote-border: #3d444d;
+  --table-border-color: #3d444d;
+  --table-header-bg: #212830;
+  --table-alternate-bg: #151b23;
+  --searchbar-border-color: #3d444d;
+  --searchbar-bg: #0d1117;
+  --searchbar-fg: #e6edf3;
+  --searchresults-li-bg: #151b23;
+  --search-mark-bg: #9e6a03;
+}

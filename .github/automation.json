@@ -1,0 +1,9 @@
+{
+  "broken": { "labels": ["automation"], "type": "Bug" },
+  "chore": { "labels": ["dependencies", "automation"], "type": "Task" },
+  "docs": { "labels": ["automation"], "type": "Task" },
+  "assignees": [],
+  "bump": { "mode": "pr" },
+  "nightly": { "skip_unchanged": true },
+  "pages": { "recipe": "check-mdbook", "path": "docs/book" }
+}

@@ -1,0 +1,5 @@
+["future-incompat-report","frequency"]	"always"
+["resolver","incompatible-rust-versions"]	"fallback"
+["target","cfg(all(target_arch = \"aarch64\", not(target_vendor = \"apple\")))","rustflags"]	["-C","target-feature=+crc"]
+["target","cfg(all(target_arch = \"aarch64\", target_vendor = \"apple\"))","rustflags"]	["-C","target-cpu=apple-m1"]
+["target","cfg(target_arch = \"x86_64\")","rustflags"]	["-C","target-cpu=x86-64-v2"]

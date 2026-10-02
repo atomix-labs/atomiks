@@ -1,0 +1,49 @@
+# The repository's labels, which the labels workflow keeps on GitHub as this file says. An issue's
+# kind is its type, and a pull request's its title's, so no label says it. A label with `paths` is
+# an area: a pull request that changes a file it matches takes it. `[retired]` names a label to
+# remove, and the type its issues take first. `just check` holds every label a form, the automation
+# or Dependabot names to this file.
+#
+#   [labels."area: docs"]
+#   color       = "c5def5"
+#   description = "The manual and the README"
+#   paths       = ["docs/**", "*.md"]
+
+[labels.triage]
+color       = "fbca04"
+description = "New, and yet to be looked at"
+
+[labels.waiting]
+color       = "d4c5f9"
+description = "Waiting on someone else: the reporter, or a change upstream"
+
+[labels."good first issue"]
+color       = "7057ff"
+description = "A small change, well described, to start on"
+
+[labels."help wanted"]
+color       = "008672"
+description = "Accepted, and open to anyone who wants it"
+
+[labels.breaking]
+color       = "b60205"
+description = "Changes what users rely on"
+
+[labels.dependencies]
+color       = "0366d6"
+description = "Moves a pinned tool, action or crate"
+
+[labels.automation]
+color       = "ededed"
+description = "Opened by a workflow"
+
+# GitHub's first labels: types say the kind, Discussions take questions, and closing says duplicate
+# or not planned.
+[retired]
+bug           = "Bug"
+enhancement   = "Feature"
+documentation = "Task"
+question      = ""
+duplicate     = ""
+invalid       = ""
+wontfix       = ""
