@@ -1,7 +1,8 @@
 //! Typed atomics for any value that fits one atomic word.
 
 #![no_std]
-#![feature(impl_restriction)]
+#![feature(const_convert, const_destruct, const_trait_impl, impl_restriction, integer_casts)]
+#![cfg_attr(not(loom), feature(const_atomic))]
 
 #[cfg(all(loom, not(feature = "loom")))]
 compile_error!(concat!(
@@ -12,3 +13,9 @@ compile_error!(concat!(
 ));
 
 pub mod ordering;
+
+mod primitive;
+
+#[doc(hidden)]
+pub use crate::primitive::{Bitwise, CellAccess, CellOps, FetchAdd};
+pub use crate::primitive::{FetchBitwise, Integer, Load, MinMax, Primitive, Store, Swap};
