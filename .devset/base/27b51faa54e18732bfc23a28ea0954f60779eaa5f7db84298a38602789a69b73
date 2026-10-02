@@ -1,0 +1,17 @@
+["output","html","additional-css"]	["vendor/katex/katex.min.css","theme/palette.css","theme/prompt.css","theme/width.css","theme/details.css","theme/logo.css"]
+["output","html","additional-js"]	["api-link.js"]
+["output","html","default-theme"]	"light"
+["output","html","edit-url-template"]	"https://github.com/atomix-labs/atomiks/edit/main/docs/{path}"
+["output","html","fold","enable"]	true
+["output","html","fold","level"]	1
+["output","html","git-repository-url"]	"https://github.com/atomix-labs/atomiks"
+["output","html","preferred-dark-theme"]	"navy"
+["output","html","search","enable"]	true
+["output","html","search","limit-results"]	30
+["output","html","search","use-boolean-and"]	true
+["output","html","site-url"]	"/atomiks/"
+["preprocessor","katex","after"]	["links"]
+["preprocessor","katex","no-css"]	true
+["preprocessor","rustdoc-links","base-url"]	"/api"
+["preprocessor","rustdoc-links","fail-on-warnings"]	"always"
+["preprocessor","rustdoc-links","unstable-features"]	true

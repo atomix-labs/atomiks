@@ -1,5 +1,5 @@
 [book]
-title    = "atomix"
+title    = "atomiks"
 language = "en"
 src      = "src"
 
@@ -13,9 +13,9 @@ edition = "2024"
 [output.html]
 default-theme        = "light"
 preferred-dark-theme = "navy"
-git-repository-url   = "https://github.com/atomix-labs/atomix"
-edit-url-template    = "https://github.com/atomix-labs/atomix/edit/main/docs/{path}"
-site-url             = "/atomix/"
+git-repository-url   = "https://github.com/atomix-labs/atomiks"
+edit-url-template    = "https://github.com/atomix-labs/atomiks/edit/main/docs/{path}"
+site-url             = "/atomiks/"
 
 # What the book loads: its look, and what each feature brings.
 additional-css = [

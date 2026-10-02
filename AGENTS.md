@@ -1,4 +1,4 @@
-# Working in `atomix`
+# Working in `atomiks`
 
 What an agent needs to work here: what the repository is, how to check a change,
 and the rules a change keeps.
