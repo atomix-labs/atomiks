@@ -1,0 +1,3 @@
+# Built with cargo, as its releases carry no binaries.
+[tools]
+"cargo:cargo-edit" = "0.13.13"

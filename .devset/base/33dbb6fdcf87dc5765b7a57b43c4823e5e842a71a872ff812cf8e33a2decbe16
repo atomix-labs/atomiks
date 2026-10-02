@@ -1,0 +1,8 @@
+["MD024","siblings_only"]	true
+["MD033","allowed_elements"]	["details","summary","code","span","h1","p","picture","source","img","a"]
+["global","disable"]	["MD013","MD038","MD049","MD050","MD052"]
+["global","extend-enable"]	["MD063"]
+["per-file-ignores","**/SUMMARY.md"]	["MD025","MD063"]
+["per-file-ignores",".github/ISSUE_TEMPLATE/*.md"]	["MD041"]
+["per-file-ignores",".github/pull_request_template.md"]	["MD041"]
+["per-file-ignores",".github/release-notes.md"]	["MD041"]

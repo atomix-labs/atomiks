@@ -1,0 +1,40 @@
+/* Wider than mdBook's 750px default so tables and mermaid diagrams have room.
+   Prose is deliberately uncapped: justified full-width text is the house style. */
+:root {
+  --content-max-width: 1040px;
+}
+
+.content main :is(p, li, dd) {
+  text-align: justify;
+  text-justify: inter-word;
+}
+
+/* Center rendered mermaid diagrams (title included) within the content column. */
+.content .mermaid {
+  text-align: center;
+}
+
+.content .mermaid svg {
+  margin-inline: auto;
+}
+
+/* Mermaid wraps label text in <p>; keep the page's justify rule from stretching a
+   wrapped label across the node (which spaces the words out and overlaps). */
+.content .mermaid :is(p, li, dd) {
+  text-align: center;
+  text-justify: auto;
+}
+
+/* The menu bar's buttons are icons; the API link is the one word among them. */
+#mdbook-menu-bar .right-buttons a.api-reference {
+  margin-inline-end: 0.6rem;
+  padding-inline: 0.4rem;
+  font-size: 1.4rem;
+  line-height: var(--menu-bar-height);
+  text-decoration: none;
+  color: var(--icons);
+}
+
+#mdbook-menu-bar .right-buttons a.api-reference:hover {
+  color: var(--icons-hover);
+}

@@ -1,0 +1,15 @@
+[tools]
+
+# Built with cargo: its Linux arm64 release needs a newer glibc than many distributions carry.
+"cargo:cargo-machete" = "0.9.2"
+
+
+# The release's static musl builds on Linux, which run on any distribution; mise's lock keeps the
+# asset each platform takes.
+[tools."github:Boshen/cargo-shear"]
+version = "1.14.0"
+
+[tools."github:Boshen/cargo-shear".platforms]
+linux-x64   = { asset_pattern = "cargo-shear-x86_64-unknown-linux-musl.tar.gz" }
+linux-arm64 = { asset_pattern = "cargo-shear-aarch64-unknown-linux-musl.tar.gz" }
+

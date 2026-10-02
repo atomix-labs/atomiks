@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://atomix-labs.github.io/atomix/
+    about: The book, which may answer it already
+  - name: Security
+    url: https://github.com/atomix-labs/atomix/security/advisories/new
+    about: Report a vulnerability privately, never in a public issue

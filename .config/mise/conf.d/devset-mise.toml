@@ -1,0 +1,16 @@
+# How mise installs the tools every atom pins: from the lock, verified, and never a release younger
+# than three days; a download may take two minutes, as a release's can on a busy runner. An install
+# never rewrites the lock: `mise lock` and `just bump-mise` do. min_version is the mise the setup
+# stub installs, moved with it. Python runs .just/mise.py; uv installs the tools that come from PyPI.
+min_version = "2026.9.13"
+
+[settings]
+lockfile = true
+locked   = true
+minimum_release_age = "3d"
+http_timeout = "120s"
+
+[tools]
+python = "3.14"
+# pipx: tools install through uv.
+uv = "0.12.19"

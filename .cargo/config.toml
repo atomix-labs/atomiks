@@ -1,0 +1,22 @@
+# CPU floors every realistic machine of each architecture meets, so a build runs wherever it is
+# copied, and a cache CI runners share never holds an instruction another runner lacks. A build
+# tuned to this machine sets RUSTFLAGS="-C target-cpu=native", which replaces them.
+
+# SSE4.2 and POPCNT: every x86_64 CPU since 2009.
+[target.'cfg(target_arch = "x86_64")']
+rustflags = ["-C", "target-cpu=x86-64-v2"]
+
+# CRC32 instructions: every mainstream Arm server and board core.
+[target.'cfg(all(target_arch = "aarch64", not(target_vendor = "apple")))']
+rustflags = ["-C", "target-feature=+crc"]
+
+# The first Apple silicon.
+[target.'cfg(all(target_arch = "aarch64", target_vendor = "apple"))']
+rustflags = ["-C", "target-cpu=apple-m1"]
+
+[future-incompat-report]
+frequency = "always"
+
+[resolver]
+# A bump takes the newest release the workspace's `rust-version` builds.
+incompatible-rust-versions = "fallback"

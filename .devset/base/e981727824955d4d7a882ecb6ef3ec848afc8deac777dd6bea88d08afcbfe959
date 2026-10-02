@@ -1,0 +1,5 @@
+["hooks","Stop"]	[{"hooks":[{"command":"\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/check.sh","timeout":600,"type":"command"}]}]
+["hooks","UserPromptSubmit"]	[{"hooks":[{"command":"\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/check.sh start","type":"command"}]}]
+["permissions","allow"]	["Bash(just check*)","Bash(just fix*)","Bash(just --list)","Bash(devset status*)","Bash(devset diff*)","Bash(devset explain*)","Bash(git diff *)","Bash(git log *)","Bash(git show *)","Bash(git status *)","Skill(humanize *)"]
+["permissions","ask"]	["Bash(just * release*)"]
+["permissions","deny"]	["Bash(just publish*)","Bash(just * publish*)","Bash(just bump*)","Bash(just * bump*)"]

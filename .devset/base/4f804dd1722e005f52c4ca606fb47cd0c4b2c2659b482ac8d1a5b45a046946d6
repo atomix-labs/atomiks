@@ -1,0 +1,19 @@
+["exclude"]	["**/node_modules/**","**/target/**",".devset/**",".config/mise/conf.d/**"]
+["formatting","align_comments"]	true
+["formatting","align_entries"]	true
+["formatting","allowed_blank_lines"]	1
+["formatting","array_auto_collapse"]	true
+["formatting","array_auto_expand"]	true
+["formatting","array_trailing_comma"]	true
+["formatting","column_width"]	100
+["formatting","compact_arrays"]	true
+["formatting","compact_entries"]	false
+["formatting","compact_inline_tables"]	false
+["formatting","indent_entries"]	false
+["formatting","indent_string"]	"    "
+["formatting","indent_tables"]	false
+["formatting","inline_table_expand"]	false
+["formatting","reorder_arrays"]	false
+["formatting","reorder_keys"]	false
+["formatting","trailing_newline"]	true
+["rule"]	[{"formatting":{"reorder_keys":true},"include":["**/Cargo.toml"],"keys":["dependencies","dev-dependencies","build-dependencies","workspace.dependencies"]}]

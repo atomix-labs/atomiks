@@ -1,0 +1,440 @@
+[[tools."cargo:cargo-edit"]]
+version = "0.13.13"
+backend = "cargo:cargo-edit"
+[[tools."aqua:EmbarkStudios/cargo-deny"]]
+version = "0.20.2"
+backend = "aqua:EmbarkStudios/cargo-deny"
+
+[tools."aqua:EmbarkStudios/cargo-deny"."platforms.linux-arm64"]
+checksum = "sha256:995c82be0defc7a025cae49a2aa2644ce8245c9a3318fc4103907c6a285e8c7d"
+url = "https://github.com/EmbarkStudios/cargo-deny/releases/download/0.20.2/cargo-deny-0.20.2-aarch64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/EmbarkStudios/cargo-deny/releases/assets/471598345"
+
+[tools."aqua:EmbarkStudios/cargo-deny"."platforms.linux-x64"]
+checksum = "sha256:9f12ed4c49936e09b48bf862b595cde2fe64fcbd9d74dfacac6131ca824c8d5f"
+url = "https://github.com/EmbarkStudios/cargo-deny/releases/download/0.20.2/cargo-deny-0.20.2-x86_64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/EmbarkStudios/cargo-deny/releases/assets/471598214"
+
+[tools."aqua:EmbarkStudios/cargo-deny"."platforms.macos-arm64"]
+checksum = "sha256:fe67d82a10d8597a3549364cb733a3f9cc1bfff9031b7ae46384a9f2a72090c3"
+url = "https://github.com/EmbarkStudios/cargo-deny/releases/download/0.20.2/cargo-deny-0.20.2-aarch64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/EmbarkStudios/cargo-deny/releases/assets/471597689"
+[[tools."github:taiki-e/cargo-hack"]]
+version = "0.6.45"
+backend = "github:taiki-e/cargo-hack"
+
+[tools."github:taiki-e/cargo-hack".options]
+asset_pattern = "cargo-hack-x86_64-unknown-linux-musl.tar.gz"
+
+[tools."github:taiki-e/cargo-hack"."platforms.linux-x64"]
+checksum = "sha256:b242dffcfd43317ac484dd2dbc3b9fc5f8a7eb3ba252af31b531503f0bad33d1"
+url = "https://github.com/taiki-e/cargo-hack/releases/download/v0.6.45/cargo-hack-x86_64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/taiki-e/cargo-hack/releases/assets/433843120"
+provenance = "github-attestations"
+
+[[tools."github:taiki-e/cargo-hack"]]
+version = "0.6.45"
+backend = "github:taiki-e/cargo-hack"
+
+[tools."github:taiki-e/cargo-hack".options]
+asset_pattern = "cargo-hack-aarch64-unknown-linux-musl.tar.gz"
+
+[tools."github:taiki-e/cargo-hack"."platforms.linux-arm64"]
+checksum = "sha256:9ac71756f1da6e8798ac5afbfd222abecb95de9c10e672ed52c179b637d6444b"
+url = "https://github.com/taiki-e/cargo-hack/releases/download/v0.6.45/cargo-hack-aarch64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/taiki-e/cargo-hack/releases/assets/433843102"
+provenance = "github-attestations"
+
+[[tools."github:taiki-e/cargo-hack"]]
+version = "0.6.45"
+backend = "github:taiki-e/cargo-hack"
+
+[tools."github:taiki-e/cargo-hack"."platforms.macos-arm64"]
+checksum = "sha256:af0ab90e56aa716ae9f545a93e4338d4f36525e187d367b6519da71b60249b50"
+url = "https://github.com/taiki-e/cargo-hack/releases/download/v0.6.45/cargo-hack-aarch64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/taiki-e/cargo-hack/releases/assets/433843066"
+provenance = "github-attestations"
+[[tools."cargo:cargo-workspace-lints"]]
+version = "0.1.4"
+backend = "cargo:cargo-workspace-lints"
+[[tools."aqua:nextest-rs/nextest/cargo-nextest"]]
+version = "0.9.146"
+backend = "aqua:nextest-rs/nextest/cargo-nextest"
+
+[tools."aqua:nextest-rs/nextest/cargo-nextest"."platforms.linux-arm64"]
+checksum = "sha256:b2e33d7c72de7ade0ff7b3a948ac37516b24f8a836b7a8870c1f634a94be9de9"
+url = "https://github.com/nextest-rs/nextest/releases/download/cargo-nextest-0.9.146/cargo-nextest-0.9.146-aarch64-unknown-linux-gnu.tar.gz"
+url_api = "https://api.github.com/repos/nextest-rs/nextest/releases/assets/579608024"
+
+[tools."aqua:nextest-rs/nextest/cargo-nextest"."platforms.linux-x64"]
+checksum = "sha256:682c21b777c333e96fd532e114d3a5a894e0729ab88d94c0a9f20f8419695428"
+url = "https://github.com/nextest-rs/nextest/releases/download/cargo-nextest-0.9.146/cargo-nextest-0.9.146-x86_64-unknown-linux-gnu.tar.gz"
+url_api = "https://api.github.com/repos/nextest-rs/nextest/releases/assets/579609342"
+
+[tools."aqua:nextest-rs/nextest/cargo-nextest"."platforms.macos-arm64"]
+checksum = "sha256:39785160b3c2f6ed9a765049cf4fa79f3b39aa02eb7598a5a0e2a1a0b9ffb9a8"
+url = "https://github.com/nextest-rs/nextest/releases/download/cargo-nextest-0.9.146/cargo-nextest-0.9.146-universal-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/nextest-rs/nextest/releases/assets/579630774"
+
+[[tools."cargo:cargo-machete"]]
+version = "0.9.2"
+backend = "cargo:cargo-machete"
+
+
+[[tools."github:Boshen/cargo-shear"]]
+version = "1.14.0"
+backend = "github:Boshen/cargo-shear"
+
+[tools."github:Boshen/cargo-shear".options]
+asset_pattern = "cargo-shear-x86_64-unknown-linux-musl.tar.gz"
+
+[tools."github:Boshen/cargo-shear"."platforms.linux-x64"]
+checksum = "sha256:9004df4eb031a456026c4326ae0d0ce545321527a67be90f4524c1be729dc40e"
+url = "https://github.com/Boshen/cargo-shear/releases/download/v1.14.0/cargo-shear-x86_64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/Boshen/cargo-shear/releases/assets/580851857"
+provenance = "github-attestations"
+
+[[tools."github:Boshen/cargo-shear"]]
+version = "1.14.0"
+backend = "github:Boshen/cargo-shear"
+
+[tools."github:Boshen/cargo-shear".options]
+asset_pattern = "cargo-shear-aarch64-unknown-linux-musl.tar.gz"
+
+[tools."github:Boshen/cargo-shear"."platforms.linux-arm64"]
+checksum = "sha256:d83f7c5b02c4c237d0454697c12df041df0bd83ffecc1aba46c6e06315fd47e1"
+url = "https://github.com/Boshen/cargo-shear/releases/download/v1.14.0/cargo-shear-aarch64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/Boshen/cargo-shear/releases/assets/580851819"
+provenance = "github-attestations"
+
+[[tools."github:Boshen/cargo-shear"]]
+version = "1.14.0"
+backend = "github:Boshen/cargo-shear"
+
+[tools."github:Boshen/cargo-shear"."platforms.macos-arm64"]
+checksum = "sha256:e50b9375b1e93d2293c803819c118337f1e8fce519e4188a93bb0f5e08041ca3"
+url = "https://github.com/Boshen/cargo-shear/releases/download/v1.14.0/cargo-shear-aarch64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/Boshen/cargo-shear/releases/assets/580851820"
+provenance = "github-attestations"
+[[tools."github:atomix-labs/devset"]]
+version = "0.5.2"
+backend = "github:atomix-labs/devset"
+
+[tools."github:atomix-labs/devset"."platforms.linux-arm64"]
+checksum = "sha256:58bfc2b4d84ac1157ff5ce17fb2d155565da39d092da2842490c54bb0ef69304"
+url = "https://github.com/atomix-labs/devset/releases/download/v0.5.2/devset-0.5.2-aarch64-unknown-linux-musl.tar.xz"
+url_api = "https://api.github.com/repos/atomix-labs/devset/releases/assets/593784103"
+provenance = "github-attestations"
+
+[tools."github:atomix-labs/devset"."platforms.linux-x64"]
+checksum = "sha256:9d3cac309d7a90b784a1c79d50d2485d4e141d7a57c4a517bdd12984d74ed8a5"
+url = "https://github.com/atomix-labs/devset/releases/download/v0.5.2/devset-0.5.2-x86_64-unknown-linux-musl.tar.xz"
+url_api = "https://api.github.com/repos/atomix-labs/devset/releases/assets/593784106"
+provenance = "github-attestations"
+
+[tools."github:atomix-labs/devset"."platforms.macos-arm64"]
+checksum = "sha256:11e6fe9b0c287ae90e398ed0c9166ad3e507976b49a20f9bc221bd3a884023a4"
+url = "https://github.com/atomix-labs/devset/releases/download/v0.5.2/devset-0.5.2-aarch64-apple-darwin.tar.xz"
+url_api = "https://api.github.com/repos/atomix-labs/devset/releases/assets/593784105"
+provenance = "github-attestations"
+[[tools.dprint]]
+version = "0.57.4"
+backend = "aqua:dprint/dprint"
+
+[tools.dprint."platforms.linux-arm64"]
+checksum = "sha256:e1b713806f7f7b94072ba2b069aa19ac28f475dbb1fbc5b672d3030a2ab001ee"
+url = "https://github.com/dprint/dprint/releases/download/0.57.4/dprint-aarch64-unknown-linux-musl.zip"
+url_api = "https://api.github.com/repos/dprint/dprint/releases/assets/546351166"
+
+[tools.dprint."platforms.linux-x64"]
+checksum = "sha256:03f3e8002f9d952bf53325fc8853686d2e8808b9e5b652b215600ba147e73a5c"
+url = "https://github.com/dprint/dprint/releases/download/0.57.4/dprint-x86_64-unknown-linux-musl.zip"
+url_api = "https://api.github.com/repos/dprint/dprint/releases/assets/546351170"
+
+[tools.dprint."platforms.macos-arm64"]
+checksum = "sha256:f9e752812791f258e89ff88a7affd05c793b0db3d929718651eae7df5f19eb2e"
+url = "https://github.com/dprint/dprint/releases/download/0.57.4/dprint-aarch64-apple-darwin.zip"
+url_api = "https://api.github.com/repos/dprint/dprint/releases/assets/546351171"
+[[tools.git-cliff]]
+version = "2.14.2"
+backend = "aqua:orhun/git-cliff"
+
+[tools.git-cliff."platforms.linux-arm64"]
+checksum = "sha256:69e208f6e4baef3a0f9b759d5f44223aa9336b86c691072a3d0c98d35a816e69"
+url = "https://github.com/orhun/git-cliff/releases/download/v2.14.2/git-cliff-2.14.2-aarch64-unknown-linux-gnu.tar.gz"
+url_api = "https://api.github.com/repos/orhun/git-cliff/releases/assets/573483780"
+
+[tools.git-cliff."platforms.linux-x64"]
+checksum = "sha256:24f397c733add5390fdceee3a2088588ab0d5f944ce00d34cb7029b888cf2db4"
+url = "https://github.com/orhun/git-cliff/releases/download/v2.14.2/git-cliff-2.14.2-x86_64-unknown-linux-gnu.tar.gz"
+url_api = "https://api.github.com/repos/orhun/git-cliff/releases/assets/573483509"
+
+[tools.git-cliff."platforms.macos-arm64"]
+checksum = "sha256:a0be97e237d440d34c5e508ec21d070b2c85cbb8be48a46a56f9a4e8bd247f05"
+url = "https://github.com/orhun/git-cliff/releases/download/v2.14.2/git-cliff-2.14.2-aarch64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/orhun/git-cliff/releases/assets/573487203"
+[[tools."github:crate-ci/committed"]]
+version = "1.1.11"
+backend = "github:crate-ci/committed"
+
+[tools."github:crate-ci/committed"."platforms.linux-arm64"]
+checksum = "sha256:96d6334ab2dccc0e90b67ebdcaa2af856f29eadef48161926e21a0e35f1ae80d"
+url = "https://github.com/crate-ci/committed/releases/download/v1.1.11/committed-v1.1.11-aarch64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/crate-ci/committed/releases/assets/361545435"
+
+[tools."github:crate-ci/committed"."platforms.linux-x64"]
+checksum = "sha256:1e5c20049eeaa4633e6798283913f92dc90a97f2b5c6dfc28e8c4b7e77a67157"
+url = "https://github.com/crate-ci/committed/releases/download/v1.1.11/committed-v1.1.11-x86_64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/crate-ci/committed/releases/assets/361544963"
+
+[tools."github:crate-ci/committed"."platforms.macos-arm64"]
+checksum = "sha256:98eae08e1b0715ef6446c4bd08352f21f3a3ce21535a35687a1e132bcb4fcac1"
+url = "https://github.com/crate-ci/committed/releases/download/v1.1.11/committed-v1.1.11-aarch64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/crate-ci/committed/releases/assets/362199688"
+
+[[tools.actionlint]]
+version = "1.7.12"
+backend = "aqua:rhysd/actionlint"
+
+[tools.actionlint."platforms.linux-arm64"]
+checksum = "sha256:325e971b6ba9bfa504672e29be93c24981eeb1c07576d730e9f7c8805afff0c6"
+url = "https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_arm64.tar.gz"
+url_api = "https://api.github.com/repos/rhysd/actionlint/releases/assets/384924897"
+provenance = "github-attestations"
+
+[tools.actionlint."platforms.linux-x64"]
+checksum = "sha256:8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8"
+url = "https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz"
+url_api = "https://api.github.com/repos/rhysd/actionlint/releases/assets/384924896"
+provenance = "github-attestations"
+
+[tools.actionlint."platforms.macos-arm64"]
+checksum = "sha256:aba9ced2dee8d27fecca3dc7feb1a7f9a52caefa1eb46f3271ea66b6e0e6953f"
+url = "https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_darwin_arm64.tar.gz"
+url_api = "https://api.github.com/repos/rhysd/actionlint/releases/assets/384924893"
+provenance = "github-attestations"
+
+
+[[tools.zizmor]]
+version = "1.30.1"
+backend = "aqua:zizmorcore/zizmor"
+
+[tools.zizmor."platforms.linux-arm64"]
+checksum = "sha256:7ff1dce33bdd18fd2a4affe63bdd47efcccca97b2cec1c1863ec26e9e2647540"
+url = "https://github.com/zizmorcore/zizmor/releases/download/v1.30.1/zizmor-aarch64-unknown-linux-gnu.tar.gz"
+url_api = "https://api.github.com/repos/zizmorcore/zizmor/releases/assets/552067643"
+provenance = "github-attestations"
+
+[tools.zizmor."platforms.linux-x64"]
+checksum = "sha256:e65324f4430c2717591937edcec90ccbefaf14c174f8ec9415e03ca875b46e1a"
+url = "https://github.com/zizmorcore/zizmor/releases/download/v1.30.1/zizmor-x86_64-unknown-linux-gnu.tar.gz"
+url_api = "https://api.github.com/repos/zizmorcore/zizmor/releases/assets/552067642"
+provenance = "github-attestations"
+
+[tools.zizmor."platforms.macos-arm64"]
+checksum = "sha256:e28d22b087f9ebb8d99da6e740d348c930f559961c7c3f12badda54f882195a2"
+url = "https://github.com/zizmorcore/zizmor/releases/download/v1.30.1/zizmor-aarch64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/zizmorcore/zizmor/releases/assets/552067640"
+provenance = "github-attestations"
+
+
+[[tools.conftest]]
+version = "0.70.1"
+backend = "aqua:open-policy-agent/conftest"
+
+[tools.conftest."platforms.linux-arm64"]
+checksum = "sha256:8eb914755cb1b3c610d557019d5f373d5528b366ba706961d1a23f2ec55eab57"
+url = "https://github.com/open-policy-agent/conftest/releases/download/v0.70.1/conftest_0.70.1_Linux_arm64.tar.gz"
+url_api = "https://api.github.com/repos/open-policy-agent/conftest/releases/assets/575168381"
+
+[tools.conftest."platforms.linux-x64"]
+checksum = "sha256:613d124b8f6c1f3cee890491f7ab19114cca5a2102ca47cb2e6c35b4c23f9c8a"
+url = "https://github.com/open-policy-agent/conftest/releases/download/v0.70.1/conftest_0.70.1_Linux_x86_64.tar.gz"
+url_api = "https://api.github.com/repos/open-policy-agent/conftest/releases/assets/575168385"
+
+[tools.conftest."platforms.macos-arm64"]
+checksum = "sha256:b8eae5ce6c7c3a768a9b9c6c12b0c01f8fc065a99267c94646d309c479b218dd"
+url = "https://github.com/open-policy-agent/conftest/releases/download/v0.70.1/conftest_0.70.1_Darwin_arm64.tar.gz"
+url_api = "https://api.github.com/repos/open-policy-agent/conftest/releases/assets/575168334"
+[[tools.just]]
+version = "1.58.0"
+backend = "aqua:casey/just"
+
+[tools.just."platforms.linux-arm64"]
+checksum = "sha256:748237128c4c40cbdabc65e841d05ceba13cc23a91eaba395495894c1d9764df"
+url = "https://github.com/casey/just/releases/download/1.58.0/just-1.58.0-aarch64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/casey/just/releases/assets/500510099"
+
+[tools.just."platforms.linux-x64"]
+checksum = "sha256:4a5cc2f53e6f0f8c59092a6cc38291eb729d46a7dd95d3ae582008881b84931d"
+url = "https://github.com/casey/just/releases/download/1.58.0/just-1.58.0-x86_64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/casey/just/releases/assets/500509978"
+
+[tools.just."platforms.macos-arm64"]
+checksum = "sha256:50ae3e996c974a0bf32ea7d10f495070df33f1b43e0616b2769e3d4821ed8f48"
+url = "https://github.com/casey/just/releases/download/1.58.0/just-1.58.0-aarch64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/casey/just/releases/assets/500509965"
+[[tools.lychee]]
+version = "0.24.2"
+backend = "aqua:lycheeverse/lychee"
+
+[tools.lychee."platforms.linux-arm64"]
+checksum = "sha256:5d0b0e3aeab240f41920c633a6eaf97599be6eedda034b36e858ede7dba5e535"
+url = "https://github.com/lycheeverse/lychee/releases/download/lychee-v0.24.2/lychee-aarch64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/lycheeverse/lychee/releases/assets/409958602"
+
+[tools.lychee."platforms.linux-x64"]
+checksum = "sha256:73657a111819a30c47c08352896796f23d64e4eb2b3ed39b6d32149241566fc5"
+url = "https://github.com/lycheeverse/lychee/releases/download/lychee-v0.24.2/lychee-x86_64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/lycheeverse/lychee/releases/assets/409959271"
+
+[tools.lychee."platforms.macos-arm64"]
+checksum = "sha256:c9d3740ea2d891854d37116c9fba840f37b6e7c89d330e7db84ac333631c4977"
+url = "https://github.com/lycheeverse/lychee/releases/download/lychee-v0.24.2/lychee-aarch64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/lycheeverse/lychee/releases/assets/409957951"
+[[tools.rumdl]]
+version = "0.2.77"
+backend = "aqua:rvben/rumdl"
+
+[tools.rumdl."platforms.linux-arm64"]
+checksum = "sha256:04569b09b8e7eb31f6a410b0a17e448f220906c5e8e13e8301319c3540fd4d29"
+url = "https://github.com/rvben/rumdl/releases/download/v0.2.77/rumdl-v0.2.77-aarch64-unknown-linux-gnu.tar.gz"
+url_api = "https://api.github.com/repos/rvben/rumdl/releases/assets/583859182"
+provenance = "github-attestations"
+
+[tools.rumdl."platforms.linux-x64"]
+checksum = "sha256:cbe5cea929fbb58b64bb428a464b069f3fe12645545adedc8932e738c8bbe862"
+url = "https://github.com/rvben/rumdl/releases/download/v0.2.77/rumdl-v0.2.77-x86_64-unknown-linux-gnu.tar.gz"
+url_api = "https://api.github.com/repos/rvben/rumdl/releases/assets/583859172"
+provenance = "github-attestations"
+
+[tools.rumdl."platforms.macos-arm64"]
+checksum = "sha256:52744729012b44514b3b4de1431839035d7018464899c5b09627204eebfb73bb"
+url = "https://github.com/rvben/rumdl/releases/download/v0.2.77/rumdl-v0.2.77-aarch64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/rvben/rumdl/releases/assets/583859185"
+provenance = "github-attestations"
+
+[[tools."cargo:mdbook-katex"]]
+version = "0.10.0"
+backend = "cargo:mdbook-katex"
+
+
+
+[[tools."cargo:mdbook-rustdoc-links"]]
+version = "3.0.2"
+backend = "cargo:mdbook-rustdoc-links"
+[[tools."github:rust-lang/mdBook"]]
+version = "0.5.4"
+backend = "github:rust-lang/mdBook"
+
+[tools."github:rust-lang/mdBook"."platforms.linux-arm64"]
+checksum = "sha256:753e5c5c363ee8a56972344dcf91466f005a51db84a7aeffe427ae3ef83d6d44"
+url = "https://github.com/rust-lang/mdBook/releases/download/v0.5.4/mdbook-v0.5.4-aarch64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/rust-lang/mdBook/releases/assets/468210015"
+
+[tools."github:rust-lang/mdBook"."platforms.linux-x64"]
+checksum = "sha256:3f28de05dafca9d0f2eab99c662116b0e37b89b1d96a08f8f430b9eeae958cd7"
+url = "https://github.com/rust-lang/mdBook/releases/download/v0.5.4/mdbook-v0.5.4-x86_64-unknown-linux-gnu.tar.gz"
+url_api = "https://api.github.com/repos/rust-lang/mdBook/releases/assets/468209394"
+
+[tools."github:rust-lang/mdBook"."platforms.macos-arm64"]
+checksum = "sha256:03e8a6d8b13a2971e0b3280affd03b388373c1485e26f73407c3a76b0b1838df"
+url = "https://github.com/rust-lang/mdBook/releases/download/v0.5.4/mdbook-v0.5.4-aarch64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/rust-lang/mdBook/releases/assets/468209418"
+[[tools.python]]
+version = "3.14.7"
+backend = "core:python"
+
+[tools.python."platforms.linux-arm64"]
+checksum = "sha256:d922413468a276e69a132b79fb7493faa46ef2e85b1a29844d3af1f7710ab5bd"
+url = "https://github.com/astral-sh/python-build-standalone/releases/download/20260924/cpython-3.14.7+20260924-aarch64-unknown-linux-gnu-install_only_stripped.tar.gz"
+provenance = "github-attestations"
+
+[tools.python."platforms.linux-x64"]
+checksum = "sha256:bd0d0568ccded07bbf1c87727230dc5dd0187e706a87da23c4de78388a229b78"
+url = "https://github.com/astral-sh/python-build-standalone/releases/download/20260924/cpython-3.14.7+20260924-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz"
+provenance = "github-attestations"
+
+[tools.python."platforms.macos-arm64"]
+checksum = "sha256:f0fb6b233971672dd7add4efa90f8c209a63253e457ffabd0148b9f734638319"
+url = "https://github.com/astral-sh/python-build-standalone/releases/download/20260924/cpython-3.14.7+20260924-aarch64-apple-darwin-install_only_stripped.tar.gz"
+provenance = "github-attestations"
+
+[[tools.uv]]
+version = "0.12.19"
+backend = "aqua:astral-sh/uv"
+
+[tools.uv."platforms.linux-arm64"]
+checksum = "sha256:0804e9b164c64b6914182d5920c08551958a095986f10a3731056df701126436"
+url = "https://github.com/astral-sh/uv/releases/download/0.12.19/uv-aarch64-unknown-linux-gnu.tar.gz"
+url_api = "https://api.github.com/repos/astral-sh/uv/releases/assets/587158851"
+provenance = "github-attestations"
+
+[tools.uv."platforms.linux-x64"]
+checksum = "sha256:23bf5552d220e0842b65c862097b2ebaeba0064b74eda5e565e77fd25969d8c8"
+url = "https://github.com/astral-sh/uv/releases/download/0.12.19/uv-x86_64-unknown-linux-gnu.tar.gz"
+url_api = "https://api.github.com/repos/astral-sh/uv/releases/assets/587159011"
+provenance = "github-attestations"
+
+[tools.uv."platforms.macos-arm64"]
+checksum = "sha256:a9a8df1eedeb192f2e47e40e2faabfb387db4b850209118786d42f89dde3e0ba"
+url = "https://github.com/astral-sh/uv/releases/download/0.12.19/uv-aarch64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/astral-sh/uv/releases/assets/587158826"
+provenance = "github-attestations"
+[[tools.shellcheck]]
+version = "0.11.0"
+backend = "aqua:koalaman/shellcheck"
+
+[tools.shellcheck."platforms.linux-arm64"]
+checksum = "sha256:12b331c1d2db6b9eb13cfca64306b1b157a86eb69db83023e261eaa7e7c14588"
+url = "https://github.com/koalaman/shellcheck/releases/download/v0.11.0/shellcheck-v0.11.0.linux.aarch64.tar.xz"
+url_api = "https://api.github.com/repos/koalaman/shellcheck/releases/assets/279056934"
+
+[tools.shellcheck."platforms.linux-x64"]
+checksum = "sha256:8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198"
+url = "https://github.com/koalaman/shellcheck/releases/download/v0.11.0/shellcheck-v0.11.0.linux.x86_64.tar.xz"
+url_api = "https://api.github.com/repos/koalaman/shellcheck/releases/assets/279056942"
+
+[tools.shellcheck."platforms.macos-arm64"]
+checksum = "sha256:56affdd8de5527894dca6dc3d7e0a99a873b0f004d7aabc30ae407d3f48b0a79"
+url = "https://github.com/koalaman/shellcheck/releases/download/v0.11.0/shellcheck-v0.11.0.darwin.aarch64.tar.xz"
+url_api = "https://api.github.com/repos/koalaman/shellcheck/releases/assets/279056932"
+[[tools.typos]]
+version = "1.50.2"
+backend = "aqua:crate-ci/typos"
+
+[tools.typos."platforms.linux-arm64"]
+checksum = "sha256:27c4b6d0ba6f37d120ce32117777d703fc9d57ba71f16e8bcde5b35c987cf9b8"
+url = "https://github.com/crate-ci/typos/releases/download/v1.50.2/typos-v1.50.2-aarch64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/crate-ci/typos/releases/assets/565799446"
+
+[tools.typos."platforms.linux-x64"]
+checksum = "sha256:abcb3e257c7c2abeff4d903f7fe68071357637605bdb283ce2251f44bc70dc09"
+url = "https://github.com/crate-ci/typos/releases/download/v1.50.2/typos-v1.50.2-x86_64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/crate-ci/typos/releases/assets/565795694"
+
+[tools.typos."platforms.macos-arm64"]
+checksum = "sha256:70d61e9d682034133f0aa56f5a02bae0de168495f3cce62a87054aa7186c1901"
+url = "https://github.com/crate-ci/typos/releases/download/v1.50.2/typos-v1.50.2-aarch64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/crate-ci/typos/releases/assets/565802016"
+[[tools.taplo]]
+version = "0.10.0"
+backend = "aqua:tamasfe/taplo"
+
+[tools.taplo."platforms.linux-arm64"]
+checksum = "sha256:033681d01eec8376c3fd38fa3703c79316f5e14bb013d859943b60a07bccdcc3"
+url = "https://github.com/tamasfe/taplo/releases/download/0.10.0/taplo-linux-aarch64.gz"
+url_api = "https://api.github.com/repos/tamasfe/taplo/releases/assets/257322597"
+
+[tools.taplo."platforms.linux-x64"]
+checksum = "sha256:8fe196b894ccf9072f98d4e1013a180306e17d244830b03986ee5e8eabeb6156"
+url = "https://github.com/tamasfe/taplo/releases/download/0.10.0/taplo-linux-x86_64.gz"
+url_api = "https://api.github.com/repos/tamasfe/taplo/releases/assets/257322600"
+
+[tools.taplo."platforms.macos-arm64"]
+checksum = "sha256:713734314c3e71894b9e77513c5349835eefbd52908445a0d73b0c7dc469347d"
+url = "https://github.com/tamasfe/taplo/releases/download/0.10.0/taplo-darwin-aarch64.gz"
+url_api = "https://api.github.com/repos/tamasfe/taplo/releases/assets/257323110"
+[[tools."pipx:yamllint"]]
+version = "1.38.0"
+backend = "pipx:yamllint"

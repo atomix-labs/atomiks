@@ -1,0 +1,4 @@
+# `mise bootstrap` ends in this task: every `setup-*` recipe, as `just setup` runs them.
+[tasks.bootstrap]
+description = "Readies the checkout: every setup-* recipe"
+run = "just setup"
