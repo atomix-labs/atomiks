@@ -10,6 +10,10 @@ license      = "MIT OR Apache-2.0"
 authors      = ["Atomix Labs"]
 repository   = "https://github.com/atomix-labs/atomiks"
 
+[workspace.dependencies]
+# external
+loom = { version = "0.7" }
+
 [workspace.lints]
 
 [workspace.lints.rust]
@@ -18,6 +22,7 @@ unused_must_use               = "deny"
 unknown_lints                 = "deny"
 unfulfilled_lint_expectations = "deny"
 rust_2018_idioms              = { level = "deny", priority = -1 }
+unexpected_cfgs               = { level = "deny", check-cfg = ["cfg(loom)"] }
 unused_qualifications         = "allow"
 meta_variable_misuse          = "deny"
 macro_use_extern_crate        = "deny"

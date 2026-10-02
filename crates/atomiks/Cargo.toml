@@ -10,3 +10,11 @@ repository.workspace   = true
 
 [lints]
 workspace = true
+
+[features]
+default = []
+loom    = ["dep:loom"]
+
+[target.'cfg(loom)'.dependencies]
+# external
+loom = { workspace = true, optional = true }
