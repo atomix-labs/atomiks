@@ -26,7 +26,7 @@ security = ["default"]
 [[profiles]]
 name = "cargo-workspace"
 rev = "827ed0ea7ba94363dd1f39673a9f99c98eaa7999"
-digest = "af9b9e153647d958bce7b2bc55c3b9cab5737be13153ab28936580bc7bb969f0"
+digest = "7c19a60e42199aacbf7b09fa7c13d50d18ada661dd172ade2758d97724dab7cd"
 
 [profiles.source]
 git = "https://github.com/atomix-labs/atxp"
@@ -164,7 +164,7 @@ tag = "v0.18.0"
 [[profiles]]
 name = "git-changelog"
 rev = "827ed0ea7ba94363dd1f39673a9f99c98eaa7999"
-digest = "d90482d58a999c7a34e8d623a38aaecb5d5da8e0fe381bccb0dbb13cb3bd2e09"
+digest = "dbe32a04369d7cd74020dcf503f5d4bac74fc434b843855cc5800afedd212aaf"
 
 [profiles.source]
 git = "https://github.com/atomix-labs/atxp"
@@ -246,7 +246,7 @@ tag = "v0.18.0"
 [[profiles]]
 name = "github-labels"
 rev = "827ed0ea7ba94363dd1f39673a9f99c98eaa7999"
-digest = "7abd95f51d629ccf293f6b7214f5cbd4b0336353c14f60fd35f61a575dbe5bb2"
+digest = "fe9dfdb4a527b24d6e2ee435b96f5f1a723d530b402d4ba7d1f5443a4979328c"
 
 [profiles.source]
 git = "https://github.com/atomix-labs/atxp"
@@ -264,7 +264,7 @@ tag = "v0.18.0"
 [[profiles]]
 name = "github-templates"
 rev = "827ed0ea7ba94363dd1f39673a9f99c98eaa7999"
-digest = "a7f81092259b1f71b39adf7713d85ce9e92cb6ff71cf6c861d6f35bed0ca176c"
+digest = "252ab196f50062a952c37dfbe9b47ae68f6dc4b144429149e6d861e1da8f5899"
 
 [profiles.source]
 git = "https://github.com/atomix-labs/atxp"
@@ -327,7 +327,7 @@ tag = "v0.18.0"
 [[profiles]]
 name = "mdbook"
 rev = "827ed0ea7ba94363dd1f39673a9f99c98eaa7999"
-digest = "9c065d4e9ee64b4b818c0e4a7ed476f671fb713467cd8aab5d302a08462ade65"
+digest = "08f75ddd433b22886f755233aeb2cd2b98bc2750b88c38fc12f69e425764fe04"
 
 [profiles.source]
 git = "https://github.com/atomix-labs/atxp"
@@ -343,7 +343,7 @@ pages = ["default"]
 [[profiles]]
 name = "project"
 rev = "827ed0ea7ba94363dd1f39673a9f99c98eaa7999"
-digest = "d5bc376477f9f4801d137c9e1a690143dfbdedde36aa7a9651b3ce5145828989"
+digest = "553e98dd4fc1f16bfa1c061e8aafdc4c7c4148139e3f033270d4cf96497dbb6a"
 
 [profiles.source]
 git = "https://github.com/atomix-labs/atxp"
@@ -407,7 +407,7 @@ strict = ["rust/strict"]
 [[profiles]]
 name = "setup"
 rev = "827ed0ea7ba94363dd1f39673a9f99c98eaa7999"
-digest = "3ab0266e8476a86fde5d055ce2bcc80ead518f4d864c451fbc6974a2fac89fb9"
+digest = "d5740c0593d9d5de3885ae354a3e6e9988f6e32ee966cd840b4817d211f32b4f"
 
 [profiles.source]
 git = "https://github.com/atomix-labs/atxp"

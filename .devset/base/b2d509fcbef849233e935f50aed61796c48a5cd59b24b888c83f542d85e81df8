@@ -1,0 +1,25 @@
+
+## Getting Started
+
+`./setup.sh` readies a machine to work on the repository: it installs mise,
+pinned and checked against its release's sha256, then every tool the repository
+pins, at the version its lock records, and runs `just setup`. It needs git, curl
+and bash, installs into your home directory without sudo, and `--dry-run` says
+what it would do. Fork the repository, then:
+
+```sh
+git clone https://github.com/<you>/atomiks.git
+cd atomiks
+./setup.sh
+```
+
+Or clone and set up in one line:
+
+```sh
+curl -fsSL https://atomix-labs.github.io/atxp/setup.sh | bash -s -- github.com/atomix-labs/atomiks
+```
+
+The first run takes a few minutes; run it again after pulling, and it installs
+only what moved. `./setup.sh --activate` adds mise to your shell, so the tools
+are on `PATH` in every new one; without it, `mise exec -- just check` runs them.
+
