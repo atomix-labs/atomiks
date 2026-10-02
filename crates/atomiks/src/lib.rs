@@ -15,6 +15,7 @@ compile_error!(concat!(
 pub mod ordering;
 
 mod primitive;
+pub mod validity;
 
 #[doc(hidden)]
 pub use crate::primitive::{Bitwise, CellAccess, CellOps, FetchAdd};
