@@ -20,11 +20,16 @@ compile_error!(concat!(
 ));
 
 mod atom;
+mod atomic;
 pub mod ordering;
 mod primitive;
 pub mod validity;
 
 pub use crate::atom::{Atom, AtomAdd, AtomBitwise, AtomOrd};
+pub use crate::atomic::{
+    Atomic, AtomicBool, AtomicI8, AtomicI16, AtomicI32, AtomicI64, AtomicIsize, AtomicU8,
+    AtomicU16, AtomicU32, AtomicU64, AtomicUsize,
+};
 #[doc(hidden)]
 pub use crate::primitive::{Bitwise, CellAccess, CellOps, FetchAdd};
 pub use crate::primitive::{FetchBitwise, Integer, Load, MinMax, Primitive, Store, Swap};
