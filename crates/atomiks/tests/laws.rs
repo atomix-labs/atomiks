@@ -20,8 +20,8 @@ mod tests {
 
     #[cfg(target_arch = "aarch64")]
     use atomiks::ordering::Relaxed;
-    use atomiks::validity::{Total, TotalButZero, ZeroValid};
-    use atomiks::{Atom, AtomOrd, Integer, Primitive};
+    use atomiks::validity::{Total, TotalZeroNiche, ZeroValid};
+    use atomiks::{Atom, AtomOrd, ExactBits, Primitive};
     #[cfg(target_arch = "aarch64")]
     use atomiks::{Atomic, Load, MinMax};
     use proptest::prelude::{Strategy, any, prop_oneof};
@@ -55,7 +55,7 @@ mod tests {
     /// The range and round-trip laws for `value`, and the repr laws for its repr.
     fn round_trips<T: Atom + PartialEq + Debug>(value: T) -> Result<(), TestCaseError>
     where
-        T::Repr: Integer + PartialEq + Debug,
+        T::Repr: ExactBits + PartialEq + Debug,
     {
         let bits = value.to_repr().to_bits();
         prop_assert!(
@@ -89,7 +89,7 @@ mod tests {
         bits: u128, from_bits: fn(T::Repr) -> T,
     ) -> Result<(), TestCaseError>
     where
-        T::Repr: Integer + PartialEq + Debug,
+        T::Repr: ExactBits + PartialEq + Debug,
     {
         let repr = <T::Repr as Primitive>::from_bits(bits);
         let unsigned = repr.to_bits();
@@ -133,8 +133,8 @@ mod tests {
         canonical::<T>(repr)
     }
 
-    /// The `TotalButZero` law for `repr`: it decodes unless it is zero; then the repr laws.
-    fn total_but_zero<T: Atom<Validity = TotalButZero> + Debug>(
+    /// The `TotalZeroNiche` law for `repr`: it decodes unless it is zero; then the repr laws.
+    fn total_zero_niche<T: Atom<Validity = TotalZeroNiche> + Debug>(
         repr: T::Repr,
     ) -> Result<(), TestCaseError>
     where
@@ -190,7 +190,7 @@ mod tests {
         ($bits:expr, $other:expr; $($int:ty),+) => {$({
             let (a, b): ($int, $int) = ($bits.wrapping_cast(), $other.wrapping_cast());
             total::<$int>(a)?;
-            total_but_zero::<NonZero<$int>>(a)?;
+            total_zero_niche::<NonZero<$int>>(a)?;
             total::<Option<NonZero<$int>>>(a)?;
             round_trips(a)?;
             round_trips(Wrapping(a))?;
@@ -278,7 +278,7 @@ mod tests {
         }
         total::<*mut u8>(pointer)?;
         total::<*const u8>(pointer)?;
-        total_but_zero::<NonNull<u8>>(pointer)?;
+        total_zero_niche::<NonNull<u8>>(pointer)?;
         total::<Option<NonNull<u8>>>(pointer)
     }
 

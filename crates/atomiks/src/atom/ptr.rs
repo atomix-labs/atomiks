@@ -8,7 +8,7 @@
 use core::ptr::NonNull;
 
 use super::Atom;
-use crate::validity::{Total, TotalButZero};
+use crate::validity::{Total, TotalZeroNiche};
 
 // SAFETY: a pointer is its own repr and every repr a pointer, its bits span the address width, and
 // its address may cross threads, as `AtomicPtr`'s does.
@@ -56,7 +56,7 @@ const unsafe impl<T> Atom for *const T {
 // exactly the non-null ones; its address may cross threads, as `AtomicPtr`'s does.
 const unsafe impl<T> Atom for NonNull<T> {
     type Repr = *mut T;
-    type Validity = TotalButZero;
+    type Validity = TotalZeroNiche;
     const MIN_REPR: u128 = 1;
     const MAX_REPR: u128 = <usize as Atom>::MAX_REPR;
     #[inline]

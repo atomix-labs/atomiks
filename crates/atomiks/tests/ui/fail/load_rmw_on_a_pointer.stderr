@@ -1,16 +1,16 @@
-error[E0277]: `*mut u64` is not an integer primitive
+error[E0277]: `*mut u64` is not a primitive whose bits are its whole value
  --> tests/ui/fail/load_rmw_on_a_pointer.rs:7:52
   |
 7 |     let _ = AtomicPtr::<u64>::new(ptr::null_mut()).load_rmw(Acquire);
   |                                                    ^^^^^^^^ expected `bool` or an integer
   |
-  = help: the trait `Integer` is not implemented for `*mut u64`
+  = help: the trait `ExactBits` is not implemented for `*mut u64`
   = note: a pointer has a pure-read `load` on every target: call it rather than `load_rmw`
-help: the trait `Integer` is implemented for `u64`
- --> src/primitive/native.rs
+help: the trait `ExactBits` is implemented for `u64`
+ --> src/primitive/narrow.rs
   |
-  |           const impl Integer for $int {
-  |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |           const impl ExactBits for $int {
+  |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ...
   | / integers! {
   | |     u8 => AtomicU8;
@@ -27,6 +27,6 @@ note: required by a bound in `atomiks::Atomic::<T>::load_rmw`
 ...
   |     pub fn load_rmw<O: LoadOrdering>(&self, order: O) -> T
   |     where
-  |         T::Repr: Integer,
-  |                  ^^^^^^^ required by this bound in `Atomic::<T>::load_rmw`
+  |         T::Repr: ExactBits,
+  |                  ^^^^^^^^^ required by this bound in `Atomic::<T>::load_rmw`
   = note: this error originates in the macro `integers` (in Nightly builds, run with -Z macro-backtrace for more info)

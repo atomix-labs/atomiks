@@ -3,13 +3,13 @@
 //! A trait bound on it, rather than a promise at each call, decides where a byte-level read, or a
 //! read-modify-write that can leave any repr, is sound.
 //!
-//! | Validity         | Zero decodes | `Option` of it                                     |
-//! | ---------------- | ------------ | -------------------------------------------------- |
-//! | [`Total`]        | yes          | [`Partial`]; refused while every repr is a value   |
-//! | [`TotalButZero`] | no           | [`Total`]: `None` takes repr 0                     |
-//! | [`ZeroValid`]    | yes          | [`ZeroValid`]                                      |
-//! | [`ZeroNiche`]    | no           | [`ZeroValid`]: `None` takes repr 0                 |
-//! | [`Partial`]      | not promised | [`Partial`]                                        |
+//! | Validity           | Zero decodes | `Option` of it                                   |
+//! | ------------------ | ------------ | ------------------------------------------------ |
+//! | [`Total`]          | yes          | [`Partial`]; refused while every repr is a value |
+//! | [`TotalZeroNiche`] | no           | [`Total`]: `None` takes repr 0                   |
+//! | [`ZeroValid`]      | yes          | [`ZeroValid`]                                    |
+//! | [`ZeroNiche`]      | no           | [`ZeroValid`]: `None` takes repr 0               |
+//! | [`Partial`]        | not promised | [`Partial`]                                      |
 
 use core::marker::Destruct;
 use core::panic::RefUnwindSafe;
@@ -51,10 +51,10 @@ pub impl(crate) const trait Validity {
 #[derive(Debug)]
 pub enum Total {}
 
-/// Every repr but zero decodes, and `MIN_REPR` is 1, so `Option`'s `None` takes repr 0 and every
-/// repr of the `Option` decodes.
+/// Every repr but zero decodes, and `MIN_REPR` is 1: zero is the niche, so `Option`'s `None` takes
+/// repr 0 and every repr of the `Option` decodes.
 #[derive(Debug)]
-pub enum TotalButZero {}
+pub enum TotalZeroNiche {}
 
 /// The zero repr decodes.
 #[derive(Debug)]
@@ -127,7 +127,7 @@ macro_rules! opaque {
 }
 
 opaque! {
-    TotalButZero => Total, true;
+    TotalZeroNiche => Total, true;
     ZeroValid => ZeroValid, false;
     ZeroNiche => ZeroValid, true;
     Partial => Partial, false;
@@ -135,7 +135,7 @@ opaque! {
 
 #[cfg(test)]
 mod tests {
-    use super::{Partial, Total, TotalButZero, Validity, ZeroNiche, ZeroValid};
+    use super::{Partial, Total, TotalZeroNiche, Validity, ZeroNiche, ZeroValid};
 
     /// Compiles only where `Option` of a `V` value has validity `O`.
     const fn optional_is<V: Validity<Optional = O>, O: Validity>() {}
@@ -143,7 +143,7 @@ mod tests {
     #[test]
     fn none_fills_a_zero_niche_and_keeps_a_valid_zero() {
         optional_is::<Total, Partial>();
-        optional_is::<TotalButZero, Total>();
+        optional_is::<TotalZeroNiche, Total>();
         optional_is::<ZeroValid, ZeroValid>();
         optional_is::<ZeroNiche, ZeroValid>();
         optional_is::<Partial, Partial>();
@@ -153,8 +153,8 @@ mod tests {
     fn none_takes_zero_where_zero_is_the_niche() {
         const {
             assert!(
-                TotalButZero::NONE_TAKES_ZERO,
-                "TotalButZero: zero is no value, so `None` takes it"
+                TotalZeroNiche::NONE_TAKES_ZERO,
+                "TotalZeroNiche: zero is no value, so `None` takes it"
             );
             assert!(ZeroNiche::NONE_TAKES_ZERO, "ZeroNiche: zero is no value, so `None` takes it");
             assert!(!Total::NONE_TAKES_ZERO, "Total: zero is a value");
@@ -167,7 +167,10 @@ mod tests {
     fn an_option_of_an_option_never_needs_none_to_take_zero() {
         const {
             assert!(!<Total as Validity>::Optional::NONE_TAKES_ZERO, "Option<Total>");
-            assert!(!<TotalButZero as Validity>::Optional::NONE_TAKES_ZERO, "Option<TotalButZero>");
+            assert!(
+                !<TotalZeroNiche as Validity>::Optional::NONE_TAKES_ZERO,
+                "Option<TotalZeroNiche>"
+            );
             assert!(!<ZeroValid as Validity>::Optional::NONE_TAKES_ZERO, "Option<ZeroValid>");
             assert!(!<ZeroNiche as Validity>::Optional::NONE_TAKES_ZERO, "Option<ZeroNiche>");
             assert!(!<Partial as Validity>::Optional::NONE_TAKES_ZERO, "Option<Partial>");

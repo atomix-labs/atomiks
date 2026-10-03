@@ -9,7 +9,8 @@ use core::sync::atomic::Ordering as CoreOrdering;
 use loom::sync::atomic;
 
 use super::{
-    Bitwise, CellAccess, CellOps, FetchAdd, Integer, Load, Primitive, PtrOffset, Store, Swap,
+    AddSub, Bitwise, CellAccess, CompareExchange, ExactBits, Load, Primitive, PtrOffset, Store,
+    Swap,
 };
 #[cfg(target_arch = "aarch64")]
 use super::{FetchBitwise, MinMax};
@@ -34,7 +35,7 @@ macro_rules! loom_exclusive {
     };
 }
 
-/// Implements `CellAccess`, `CellOps`, `Load`, `Store` and `Swap` for a primitive.
+/// Implements `CellAccess`, `CompareExchange`, `Load`, `Store` and `Swap` for a primitive.
 ///
 /// Its loom cell has the same name as its core one; `relaxed` marks a loom cell without `with_mut`.
 macro_rules! cells {
@@ -87,7 +88,7 @@ macro_rules! cells {
                 loom_exclusive!(set cell value $($relaxed)?);
             }
         }
-        impl$(<$param>)? CellOps for $kind {
+        impl$(<$param>)? CompareExchange for $kind {
             #[inline]
             fn read_for_rmw(cell: &Self::Cell, order: CoreOrdering) -> Self {
                 cell.load(order)
@@ -160,8 +161,8 @@ macro_rules! bitwise {
                 cell.fetch_xor($ones, order)
             }
         }
-        // `atomic/ops.rs` repeats this cfg in the `doc(cfg(...))` of `fetch_and`, `fetch_or`,
-        // `fetch_xor` and `fetch_not`: change them with it.
+        // `atomic/capability.rs` repeats this cfg in the `doc(cfg(...))` of `fetch_and`,
+        // `fetch_or`, `fetch_xor` and `fetch_not`: change them with it.
         #[cfg(target_arch = "aarch64")]
         impl FetchBitwise for $kind {}
     )+};
@@ -193,13 +194,13 @@ macro_rules! integers {
                 self.to_bits() == bits
             }
         }
-        const impl Integer for $int {
+        const impl ExactBits for $int {
             #[inline]
             fn to_bits(self) -> u128 {
                 unsigned_bits!(self $(, $signed)?).wrapping_cast()
             }
         }
-        impl FetchAdd for $int {
+        impl AddSub for $int {
             #[inline]
             fn fetch_add(cell: &Self::Cell, delta: Self, order: CoreOrdering) -> Self {
                 cell.fetch_add(delta, order)
@@ -210,8 +211,8 @@ macro_rules! integers {
             }
         }
         // `ldsmax`, `ldumin` and the rest (an LL/SC pair without LSE); `x86_64` has neither.
-        // `atomic/ops.rs` repeats this cfg in the `doc(cfg(...))` of `max`, `min`, `fetch_max` and
-        // `fetch_min`: change them with it.
+        // `atomic/capability.rs` repeats this cfg in the `doc(cfg(...))` of `max`, `min`,
+        // `fetch_max` and `fetch_min`: change them with it.
         #[cfg(target_arch = "aarch64")]
         impl MinMax for $int {
             #[inline]
@@ -257,7 +258,7 @@ const impl Primitive for bool {
     }
 }
 
-const impl Integer for bool {
+const impl ExactBits for bool {
     #[inline]
     fn to_bits(self) -> u128 {
         u128::from(self)

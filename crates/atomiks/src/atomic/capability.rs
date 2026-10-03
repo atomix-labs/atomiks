@@ -7,14 +7,14 @@
 
 use super::Atomic;
 use crate::atom::{Atom, AtomAdd, AtomBitwise, AtomOrd};
-use crate::ordering::Ordering;
-use crate::primitive::{Bitwise, FetchAdd, FetchBitwise, MinMax};
+use crate::ordering::RmwOrdering;
+use crate::primitive::{AddSub, Bitwise, FetchBitwise, MinMax};
 
 impl<T: Atom> Atomic<T> {
     /// Adds `delta` to the repr, wrapping: [`fetch_add`](Self::fetch_add)
     /// with the value before discarded.
     #[inline]
-    pub fn add<O: Ordering>(&self, delta: T::Repr, order: O)
+    pub fn add<O: RmwOrdering>(&self, delta: T::Repr, order: O)
     where
         T: AtomAdd,
     {
@@ -25,7 +25,7 @@ impl<T: Atom> Atomic<T> {
     /// Subtracts `delta` from the repr, wrapping: [`fetch_sub`](Self::fetch_sub)
     /// with the value before discarded.
     #[inline]
-    pub fn sub<O: Ordering>(&self, delta: T::Repr, order: O)
+    pub fn sub<O: RmwOrdering>(&self, delta: T::Repr, order: O)
     where
         T: AtomAdd,
     {
@@ -37,7 +37,7 @@ impl<T: Atom> Atomic<T> {
     #[expect(unsafe_code, reason = "decodes a repr read from the cell")]
     #[must_use = "to discard the value before, call `add`"]
     #[inline]
-    pub fn fetch_add<O: Ordering>(&self, delta: T::Repr, order: O) -> T
+    pub fn fetch_add<O: RmwOrdering>(&self, delta: T::Repr, order: O) -> T
     where
         T: AtomAdd,
     {
@@ -51,7 +51,7 @@ impl<T: Atom> Atomic<T> {
     #[expect(unsafe_code, reason = "decodes a repr read from the cell")]
     #[must_use = "to discard the value before, call `sub`"]
     #[inline]
-    pub fn fetch_sub<O: Ordering>(&self, delta: T::Repr, order: O) -> T
+    pub fn fetch_sub<O: RmwOrdering>(&self, delta: T::Repr, order: O) -> T
     where
         T: AtomAdd,
     {
@@ -65,7 +65,7 @@ impl<T: Atom> Atomic<T> {
     /// with the value before discarded.
     #[doc(cfg(target_arch = "aarch64"))]
     #[inline]
-    pub fn max<O: Ordering>(&self, value: T, order: O)
+    pub fn max<O: RmwOrdering>(&self, value: T, order: O)
     where
         T: AtomOrd,
         T::Repr: MinMax,
@@ -78,7 +78,7 @@ impl<T: Atom> Atomic<T> {
     /// with the value before discarded.
     #[doc(cfg(target_arch = "aarch64"))]
     #[inline]
-    pub fn min<O: Ordering>(&self, value: T, order: O)
+    pub fn min<O: RmwOrdering>(&self, value: T, order: O)
     where
         T: AtomOrd,
         T::Repr: MinMax,
@@ -92,7 +92,7 @@ impl<T: Atom> Atomic<T> {
     #[expect(unsafe_code, reason = "decodes a repr read from the cell")]
     #[must_use = "to discard the value before, call `max`"]
     #[inline]
-    pub fn fetch_max<O: Ordering>(&self, value: T, order: O) -> T
+    pub fn fetch_max<O: RmwOrdering>(&self, value: T, order: O) -> T
     where
         T: AtomOrd,
         T::Repr: MinMax,
@@ -108,7 +108,7 @@ impl<T: Atom> Atomic<T> {
     #[expect(unsafe_code, reason = "decodes a repr read from the cell")]
     #[must_use = "to discard the value before, call `min`"]
     #[inline]
-    pub fn fetch_min<O: Ordering>(&self, value: T, order: O) -> T
+    pub fn fetch_min<O: RmwOrdering>(&self, value: T, order: O) -> T
     where
         T: AtomOrd,
         T::Repr: MinMax,
@@ -125,7 +125,7 @@ impl<T: Atom> Atomic<T> {
     /// as one `lock` instruction, which cannot return the value before. That needs an optimized
     /// build; unoptimized, `x86_64` compiles each as a compare-exchange loop.
     #[inline]
-    pub fn and<O: Ordering>(&self, value: T, order: O)
+    pub fn and<O: RmwOrdering>(&self, value: T, order: O)
     where
         T: AtomBitwise,
     {
@@ -136,7 +136,7 @@ impl<T: Atom> Atomic<T> {
     /// Applies `| value`: [`fetch_or`](Self::fetch_or) with the value before discarded, at
     /// [`and`](Self::and)'s cost.
     #[inline]
-    pub fn or<O: Ordering>(&self, value: T, order: O)
+    pub fn or<O: RmwOrdering>(&self, value: T, order: O)
     where
         T: AtomBitwise,
     {
@@ -147,7 +147,7 @@ impl<T: Atom> Atomic<T> {
     /// Applies `^ value`: [`fetch_xor`](Self::fetch_xor) with the value before discarded, at
     /// [`and`](Self::and)'s cost.
     #[inline]
-    pub fn xor<O: Ordering>(&self, value: T, order: O)
+    pub fn xor<O: RmwOrdering>(&self, value: T, order: O)
     where
         T: AtomBitwise,
     {
@@ -158,7 +158,7 @@ impl<T: Atom> Atomic<T> {
     /// Inverts every bit: [`fetch_not`](Self::fetch_not) with the value before discarded, at
     /// [`and`](Self::and)'s cost.
     #[inline]
-    pub fn not<O: Ordering>(&self, order: O)
+    pub fn not<O: RmwOrdering>(&self, order: O)
     where
         T: AtomBitwise,
     {
@@ -171,7 +171,7 @@ impl<T: Atom> Atomic<T> {
     #[expect(unsafe_code, reason = "decodes a repr read from the cell")]
     #[must_use = "to discard the value before, call `and`, which every target has"]
     #[inline]
-    pub fn fetch_and<O: Ordering>(&self, value: T, order: O) -> T
+    pub fn fetch_and<O: RmwOrdering>(&self, value: T, order: O) -> T
     where
         T: AtomBitwise,
         T::Repr: FetchBitwise,
@@ -187,7 +187,7 @@ impl<T: Atom> Atomic<T> {
     #[expect(unsafe_code, reason = "decodes a repr read from the cell")]
     #[must_use = "to discard the value before, call `or`, which every target has"]
     #[inline]
-    pub fn fetch_or<O: Ordering>(&self, value: T, order: O) -> T
+    pub fn fetch_or<O: RmwOrdering>(&self, value: T, order: O) -> T
     where
         T: AtomBitwise,
         T::Repr: FetchBitwise,
@@ -203,7 +203,7 @@ impl<T: Atom> Atomic<T> {
     #[expect(unsafe_code, reason = "decodes a repr read from the cell")]
     #[must_use = "to discard the value before, call `xor`, which every target has"]
     #[inline]
-    pub fn fetch_xor<O: Ordering>(&self, value: T, order: O) -> T
+    pub fn fetch_xor<O: RmwOrdering>(&self, value: T, order: O) -> T
     where
         T: AtomBitwise,
         T::Repr: FetchBitwise,
@@ -219,7 +219,7 @@ impl<T: Atom> Atomic<T> {
     #[expect(unsafe_code, reason = "decodes a repr read from the cell")]
     #[must_use = "to discard the value before, call `not`, which every target has"]
     #[inline]
-    pub fn fetch_not<O: Ordering>(&self, order: O) -> T
+    pub fn fetch_not<O: RmwOrdering>(&self, order: O) -> T
     where
         T: AtomBitwise,
         T::Repr: FetchBitwise,

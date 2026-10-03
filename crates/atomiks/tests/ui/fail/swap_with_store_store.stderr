@@ -1,4 +1,4 @@
-error[E0277]: `StoreStore` is not an ordering
+error[E0277]: `StoreStore` is not a read-modify-write ordering
  --> tests/ui/fail/swap_with_store_store.rs:5:39
   |
 5 |     let _ = AtomicU64::new(0).swap(1, StoreStore);
@@ -6,8 +6,9 @@ error[E0277]: `StoreStore` is not an ordering
   |                               |
   |                               required by a bound introduced by this call
   |
-  = help: the trait `atomiks::ordering::Ordering` is not implemented for `StoreStore`
-  = help: the following other types implement trait `atomiks::ordering::Ordering`:
+  = help: the trait `RmwOrdering` is not implemented for `StoreStore`
+  = note: `StoreStore` orders a fence, and nothing else
+  = help: the following other types implement trait `RmwOrdering`:
             atomiks::ordering::AcqRel
             atomiks::ordering::Acquire
             atomiks::ordering::Relaxed
@@ -18,5 +19,5 @@ note: required by a bound in `atomiks::Atomic::<T>::swap`
   |
   | impl<T: Atom> Atomic<T> {
 ...
-  |     pub fn swap<O: Ordering>(&self, value: T, order: O) -> T
-  |                    ^^^^^^^^ required by this bound in `Atomic::<T>::swap`
+  |     pub fn swap<O: RmwOrdering>(&self, value: T, order: O) -> T
+  |                    ^^^^^^^^^^^ required by this bound in `Atomic::<T>::swap`
