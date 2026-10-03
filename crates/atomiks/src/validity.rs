@@ -14,6 +14,7 @@
 use core::marker::Destruct;
 use core::panic::RefUnwindSafe;
 
+use self::opaque::Opaque;
 use crate::primitive::CellAccess;
 
 /// Which reprs of a value's primitive decode.
@@ -69,12 +70,15 @@ pub enum ZeroNiche {}
 #[derive(Debug)]
 pub enum Partial {}
 
-/// A primitive's cell behind a type that implements no trait building a value from bytes;
-/// `repr(transparent)`, so it has its cell's layout.
-#[doc(hidden)]
-#[repr(transparent)]
-#[derive(Debug)]
-pub struct Opaque<C>(C);
+mod opaque {
+    //! [`Opaque`], in a module of its own so that no path outside `validity` names it.
+
+    /// A primitive's cell behind a type that implements no trait building a value from bytes;
+    /// `repr(transparent)`, so it has its cell's layout.
+    #[repr(transparent)]
+    #[derive(Debug)]
+    pub struct Opaque<C>(pub(super) C);
+}
 
 const impl Validity for Total {
     type Cell<R: CellAccess> = R::Cell;

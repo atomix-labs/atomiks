@@ -128,6 +128,4 @@ pub use crate::atomic::{
 ))]
 pub use crate::atomic::{AtomicI128, AtomicU128};
 pub use crate::fence::{compiler_fence, fence};
-#[doc(hidden)]
-pub use crate::primitive::{AddSub, Bitwise, CellAccess, CompareExchange};
 pub use crate::primitive::{ExactBits, FetchBitwise, Load, MinMax, Primitive, Store, Swap};
