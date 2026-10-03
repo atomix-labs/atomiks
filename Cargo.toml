@@ -12,7 +12,9 @@ repository   = "https://github.com/atomix-labs/atomiks"
 
 [workspace.dependencies]
 # external
-loom = { version = "0.7" }
+loom               = { version = "0.7" }
+tracing            = { version = "0.1.44", default-features = false, features = ["std"] }
+tracing-subscriber = { version = "0.3.23", default-features = false, features = ["env-filter", "fmt"] }
 
 [workspace.lints]
 

@@ -16,6 +16,8 @@ name = "atomiks"
 version = "0.1.0"
 dependencies = [
  "loom",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
