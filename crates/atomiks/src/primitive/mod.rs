@@ -78,11 +78,12 @@ primitive!(CellAccess);
 /// A primitive whose bits are its whole value: `bool` or an integer, never a pointer, whose
 /// provenance its bits do not hold.
 ///
-/// `Primitive::IS_BITS_EXACT` is true exactly for these. Only atomiks implements it.
+/// Only atomiks implements it.
+// `Primitive::IS_BITS_EXACT` is true exactly for these.
 #[diagnostic::on_unimplemented(
     message = "`{Self}` is not a primitive whose bits are its whole value",
     label = "expected `bool` or an integer",
-    note = "a pointer has a pure-read `load` on every target: call it rather than `load_rmw`"
+    note = "a pointer's bits do not hold its provenance: for a pure-read load of a pointer, call `load`"
 )]
 pub impl(crate) const trait ExactBits: [const] Primitive {
     /// The value as unsigned bits: an integer's two's complement, `bool`'s 0 or 1.
