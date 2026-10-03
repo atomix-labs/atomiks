@@ -79,7 +79,7 @@ primitive!(CellAccess);
 /// provenance its bits do not hold.
 ///
 /// Only atomiks implements it.
-// `Primitive::IS_BITS_EXACT` is true exactly for these.
+// `Primitive::IS_BITS_EXACT` is true exactly for the primitives that implement this.
 #[diagnostic::on_unimplemented(
     message = "`{Self}` is not a primitive whose bits are its whole value",
     label = "expected `bool` or an integer",
@@ -95,8 +95,8 @@ pub impl(crate) const trait ExactBits: [const] Primitive {
 ///
 /// Every operation here and in the capabilities below takes the `core` spelling of an atomiks
 /// ordering its caller's bound admits, so `core` never refuses one.
-// `Atom::Repr` is bound by this and `Primitive`, and rustc reports only this one for a repr that is
-// neither, so it speaks as `Primitive` does.
+// `Atom::Repr` is bound by this and `Primitive`, and for a repr that is neither, rustc reports only
+// this bound, so its diagnostic repeats `Primitive`'s.
 #[diagnostic::on_unimplemented(
     message = "`{Self}` is not a primitive an atomic cell holds on this target",
     label = "expected `bool`, an integer or a `*mut T`"
