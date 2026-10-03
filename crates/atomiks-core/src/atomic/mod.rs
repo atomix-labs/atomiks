@@ -33,10 +33,11 @@ pub use self::ptr::AtomicPtr;
 ///
 /// # Examples
 /// ```
+/// # extern crate atomiks_core as atomiks;
 /// use std::thread;
 ///
-/// use atomiks_core::AtomicI64;
-/// use atomiks_core::ordering::Relaxed;
+/// use atomiks::AtomicI64;
+/// use atomiks::ordering::Relaxed;
 ///
 /// // The lowest ask any thread has seen, in ticks; it publishes nothing else, so Relaxed.
 /// static LOW: AtomicI64 = AtomicI64::new(i64::MAX);
@@ -219,8 +220,9 @@ impl<T: Atom> Atomic<T> {
     ///
     /// # Examples
     /// ```
-    /// use atomiks_core::AtomicU64;
-    /// use atomiks_core::ordering::{AcqRel, Acquire};
+    /// # extern crate atomiks_core as atomiks;
+    /// use atomiks::AtomicU64;
+    /// use atomiks::ordering::{AcqRel, Acquire};
     ///
     /// // The session that owns the order book, or 0 while it is free.
     /// let owner = AtomicU64::new(0);
@@ -278,8 +280,9 @@ impl<T: Atom> Atomic<T> {
     ///
     /// # Examples
     /// ```
-    /// use atomiks_core::AtomicU32;
-    /// use atomiks_core::ordering::{AcqRel, Acquire};
+    /// # extern crate atomiks_core as atomiks;
+    /// use atomiks::AtomicU32;
+    /// use atomiks::ordering::{AcqRel, Acquire};
     ///
     /// // A retry delay in microseconds, doubled on each failure up to a millisecond.
     /// let delay = AtomicU32::new(400);
@@ -314,8 +317,9 @@ impl<T: Atom> Atomic<T> {
     ///
     /// # Examples
     /// ```
-    /// use atomiks_core::AtomicU32;
-    /// use atomiks_core::ordering::{AcqRel, Acquire};
+    /// # extern crate atomiks_core as atomiks;
+    /// use atomiks::AtomicU32;
+    /// use atomiks::ordering::{AcqRel, Acquire};
     ///
     /// // Seats left on a flight: a booking takes one, and none once they run out.
     /// let seats = AtomicU32::new(1);
@@ -393,8 +397,9 @@ impl<T: Atom> Atomic<T> {
     ///
     /// # Examples
     /// ```
-    /// use atomiks_core::AtomicU64;
-    /// use atomiks_core::ordering::{Acquire, Release};
+    /// # extern crate atomiks_core as atomiks;
+    /// use atomiks::AtomicU64;
+    /// use atomiks::ordering::{Acquire, Release};
     ///
     /// // A sequence number laid out as a plain `u64`, as in a mapped page.
     /// let mut seq = 0_u64;

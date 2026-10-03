@@ -30,9 +30,10 @@ use crate::validity::{Partial, Total, Validity};
 /// # Examples
 /// ```
 /// #![feature(const_trait_impl)]
+/// # extern crate atomiks_core as atomiks;
 ///
-/// use atomiks_core::ordering::{Acquire, Release};
-/// use atomiks_core::{Atom, Atomic};
+/// use atomiks::ordering::{Acquire, Release};
+/// use atomiks::{Atom, Atomic};
 ///
 /// /// The side of the book an order rests on.
 /// #[derive(Clone, Copy, Debug, PartialEq, Eq)]

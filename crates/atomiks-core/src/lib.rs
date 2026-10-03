@@ -1,21 +1,7 @@
 //! The typed atomic of atomiks, the values it holds, and the orderings and primitives under it.
 //!
 //! [`Atomic<T>`](Atomic) holds a `T` as its [`Repr`](Atom::Repr), one primitive an atomic
-//! instruction reads and writes, and decodes it on the way out. The `atomiks` crate re-exports each
-//! item here, and its page says what each operation costs and how to model-check with loom.
-//!
-//! # Types
-//!
-//! - **The atomic.** [`Atomic<T>`](Atomic), with an alias for each primitive, [`AtomicU64`] and the
-//!   rest.
-//! - **Values.** [`Atom`] encodes a value as its repr and back, and its [`validity`] says which
-//!   reprs decode; [`AtomAdd`], [`AtomOrd`] and [`AtomBitwise`] add the read-modify-writes that
-//!   mean something for it.
-//! - **Orderings.** The [`ordering`] types, each accepted only where it means something, and the
-//!   [`fence`](fn@fence) and [`compiler_fence`] they order.
-//! - **Primitives.** [`Primitive`], [`ExactBits`] where the bits are the whole value, and what the
-//!   target runs without a loop: [`Load`], [`Store`], [`Swap`], [`FetchBitwise`], [`MinMax`].
-//! - **Building blocks.** The loom-shaped [`cell`], the spin [`hint`], and `model` under loom.
+//! instruction reads and writes, and decodes it on the way out.
 //!
 //! # Examples
 //! ```

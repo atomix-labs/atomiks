@@ -85,8 +85,10 @@ What a change here keeps, beyond what the checks hold it to.
 
 - Headings are in Title Case, `# Crate Features`, and a crate page's example
   sits under `# Examples`, as an item's does.
-- An item's example in `atomiks-core` names `atomiks_core`; the facade's page
-  and the book name `atomiks`, the crate a user depends on.
+- An item's example in `atomiks-core` names `atomiks`, the crate a user depends
+  on, through a hidden `# extern crate atomiks_core as atomiks;`: the facade's
+  pages show it as it is written. Only `atomiks-core`'s own page names
+  `atomiks_core`.
 - Siblings are documented alike: every alias, validity and ordering has the same
   sections, and each feature's row reads the same on every page that lists it.
 
