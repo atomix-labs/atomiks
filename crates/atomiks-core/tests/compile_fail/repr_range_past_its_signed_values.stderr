@@ -1,0 +1,17 @@
+error[E0080]: evaluation panicked: `ReprRange::<i8>::from_signed(-1, 128)`: the end is above the repr's highest signed value, 127
+  --> tests/compile_fail/repr_range_past_its_signed_values.rs:14:34
+   |
+14 |     const REPRS: ReprRange<i8> = ReprRange::from_signed(-1, 128);
+   |                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `<Never as atomiks_core::Atom>::REPRS` failed here
+
+note: erroneous constant encountered
+ --> src/atom/option.rs
+  |
+  |     let Some(spare) = T::REPRS.spare_for_none() else {
+  |                       ^^^^^^^^
+
+note: erroneous constant encountered
+ --> src/atom/option.rs
+  |
+  |             None => <T::Repr as Primitive>::from_bits(const { none_repr::<T>() }),
+  |                                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^

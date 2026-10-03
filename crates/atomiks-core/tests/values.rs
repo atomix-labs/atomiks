@@ -1,5 +1,9 @@
-//! The built-in values beyond the integers: each round-trips, and each `Option` takes its niche.
+//! The built-in values beyond the integers: each round-trips, and each `Option` takes its niche;
+//! and values of a crate's own, one whose range runs through zero among them.
 
+// Above the `cfg`, which under loom drops every attribute after it: the parser refuses a `const`
+// impl without the feature before the `cfg` drops the impl.
+#![feature(const_trait_impl)]
 // Loom's cells exist only inside a model; `model.rs` holds the loom tests.
 #![cfg(not(loom))]
 
@@ -9,7 +13,8 @@ mod tests {
     use core::ptr::{self, NonNull};
 
     use atomiks_core::ordering::{AcqRel, Acquire, Relaxed, Release};
-    use atomiks_core::{Atom, Atomic, AtomicPtr};
+    use atomiks_core::validity::{TotalZeroNiche, ZeroNiche};
+    use atomiks_core::{Atom, Atomic, AtomicPtr, ReprRange};
 
     #[test]
     fn an_opaque_cell_has_the_layout_of_its_primitive() {
@@ -133,14 +138,13 @@ mod tests {
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     struct Ticket(NonZero<u32>);
 
-    // SAFETY: the repr is the ticket's number, never zero, so within `1..=MAX_REPR`; `from_repr`
-    // decodes exactly the nonzero reprs, each as the ticket it numbers; the default unchecked
-    // decode unwraps `from_repr`; `Partial` promises nothing; a number may cross threads.
+    // SAFETY: the repr is the ticket's number, never zero, so within `REPRS`; `from_repr` decodes
+    // exactly the nonzero reprs, each as the ticket it numbers; the default unchecked decode
+    // unwraps `from_repr`; `Partial` promises nothing; a number may cross threads.
     #[expect(unsafe_code, reason = "an `Atom` impl promises what loads rely on")]
     unsafe impl Atom for Ticket {
         type Repr = u32;
-        const MIN_REPR: u128 = 1;
-        const MAX_REPR: u128 = 0xFFFF_FFFF;
+        const REPRS: ReprRange<u32> = ReprRange::NONZERO;
         fn to_repr(self) -> u32 {
             self.0.get()
         }
@@ -162,6 +166,127 @@ mod tests {
             "a compare-exchange, the ticket swapped in"
         );
         assert_eq!(next.load(Relaxed), ticket(4), "and a load, the ticket exchanged in");
+    }
+
+    /// Which way a price moved: -1, 0 or 1 as an `i8`, a range through zero.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    enum Sign {
+        Minus,
+        Flat,
+        Plus,
+    }
+
+    // SAFETY: `to_repr` gives -1, 0 or 1, within `REPRS`, and `from_repr` decodes each as the sign
+    // it came from, by the repr alone; the default unchecked decode unwraps `from_repr`; `Partial`
+    // promises nothing; a `Sign` holds no data, so it may cross threads.
+    #[expect(unsafe_code, reason = "an `Atom` impl promises what loads rely on")]
+    const unsafe impl Atom for Sign {
+        type Repr = i8;
+        const REPRS: ReprRange<i8> = ReprRange::from_signed(-1, 1);
+        fn to_repr(self) -> i8 {
+            match self {
+                Self::Minus => -1,
+                Self::Flat => 0,
+                Self::Plus => 1,
+            }
+        }
+        fn from_repr(repr: i8) -> Option<Self> {
+            match repr {
+                -1 => Some(Self::Minus),
+                0 => Some(Self::Flat),
+                1 => Some(Self::Plus),
+                _ => None,
+            }
+        }
+    }
+
+    #[test]
+    fn option_of_a_range_through_zero_takes_the_reprs_below_it() {
+        static LAST_MOVE: Atomic<Option<Sign>> = Atomic::new(None);
+        #[expect(clippy::option_option, reason = "an `Option` of an `Option` is what this tests")]
+        static FIRST_MOVE: Atomic<Option<Option<Sign>>> = Atomic::new(None);
+        assert_eq!(<Option<Sign> as Atom>::to_repr(None), -2, "`None` takes 0xFE, below -1");
+        assert_eq!(
+            <Option<Sign> as Atom>::REPRS,
+            ReprRange::from_signed(-2, 1),
+            "which its range holds"
+        );
+        assert_eq!(<Option<Option<Sign>> as Atom>::to_repr(None), -3, "the outer `None` 0xFD");
+        assert_eq!(
+            <Option<Option<Sign>> as Atom>::REPRS,
+            ReprRange::from_signed(-3, 1),
+            "and its range both"
+        );
+        assert_eq!(LAST_MOVE.load(Acquire), None, "a static built with `None`");
+        LAST_MOVE.store(Some(Sign::Minus), Release);
+        assert_eq!(LAST_MOVE.swap(Some(Sign::Plus), AcqRel), Some(Sign::Minus), "holds -1");
+        assert_eq!(LAST_MOVE.load(Acquire), Some(Sign::Plus), "and 1");
+        assert_eq!(FIRST_MOVE.load(Acquire), None, "the outer `None`");
+        FIRST_MOVE.store(Some(None), Release);
+        assert_eq!(FIRST_MOVE.load(Acquire), Some(None), "the inner `None`, apart from it");
+        FIRST_MOVE.store(Some(Some(Sign::Flat)), Release);
+        assert_eq!(FIRST_MOVE.load(Acquire), Some(Some(Sign::Flat)), "and zero, a value");
+    }
+
+    /// An even byte from 2 to 254: zero is no value, and lies apart from its range.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    struct Even(u8);
+
+    // SAFETY: `to_repr` gives the byte, even and from 2 to 254, so within `REPRS`; `from_repr`
+    // decodes exactly the even bytes but zero, each as itself, so zero decodes as none, as
+    // `ZeroNiche` promises; the default unchecked decode unwraps `from_repr`; a byte may cross
+    // threads.
+    #[expect(unsafe_code, reason = "an `Atom` impl promises what loads rely on")]
+    unsafe impl Atom for Even {
+        type Repr = u8;
+        type Validity = ZeroNiche;
+        const REPRS: ReprRange<u8> = ReprRange::new(2, 254);
+        fn to_repr(self) -> u8 {
+            self.0
+        }
+        fn from_repr(repr: u8) -> Option<Self> {
+            (repr != 0 && repr.is_multiple_of(2)).then_some(Self(repr))
+        }
+    }
+
+    #[test]
+    fn option_of_a_zero_niche_apart_from_its_range_grows_the_range_to_zero() {
+        assert_eq!(<Option<Even> as Atom>::to_repr(None), 0, "`None` takes zero");
+        assert_eq!(<Option<Even> as Atom>::REPRS, ReprRange::new(0, 254), "the range grows to it");
+        assert_eq!(<Option<Option<Even>> as Atom>::to_repr(None), 255, "the outer `None` past it");
+        let even = Atomic::from(None::<Even>);
+        even.store(Some(Even(254)), Release);
+        assert_eq!(even.swap(None, AcqRel), Some(Even(254)), "254 decodes as itself");
+        assert_eq!(even.load(Acquire), None, "and zero as `None`");
+    }
+
+    /// A nonzero byte whose range is every byte: zero lies inside it, but decodes as no value.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    struct Count(NonZero<u8>);
+
+    // SAFETY: every repr lies in `REPRS`; `from_repr` decodes every nonzero byte, as the count it
+    // is, and zero as none, as `TotalZeroNiche` promises; the default unchecked decode unwraps
+    // `from_repr`; a byte may cross threads.
+    #[expect(unsafe_code, reason = "an `Atom` impl promises what loads rely on")]
+    unsafe impl Atom for Count {
+        type Repr = u8;
+        type Validity = TotalZeroNiche;
+        const REPRS: ReprRange<u8> = ReprRange::FULL;
+        fn to_repr(self) -> u8 {
+            self.0.get()
+        }
+        fn from_repr(repr: u8) -> Option<Self> {
+            NonZero::new(repr).map(Self)
+        }
+    }
+
+    #[test]
+    fn option_of_a_zero_niche_in_a_full_range_takes_zero() {
+        assert_eq!(<Option<Count> as Atom>::to_repr(None), 0, "`None` takes zero, inside");
+        assert_eq!(<Option<Count> as Atom>::REPRS, ReprRange::FULL, "and the range stays full");
+        let count = Atomic::from(NonZero::new(3).map(Count));
+        assert_eq!(count.swap(None, AcqRel), NonZero::new(3).map(Count), "a count");
+        assert_eq!(count.load(Acquire), None, "and `None`, apart from it");
     }
 
     #[test]

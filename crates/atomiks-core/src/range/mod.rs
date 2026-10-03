@@ -11,10 +11,11 @@ use crate::primitive::Primitive;
 /// The reprs a value takes: those of the primitive `R` from `start` up to `end`, as unsigned bits,
 /// wrapping through zero where `start` is above `end`, as rustc's [`WrappingRange`] does.
 ///
-/// It holds at least one repr, and where it holds every one it runs from zero, so ranges that hold
-/// the same reprs are equal. [`new`](Self::new) builds a range in unsigned order and
-/// [`from_signed`](Self::from_signed) one in signed order, through zero where it starts below zero
-/// and ends above it; each refuses a range it cannot hold, at compile time in a constant.
+/// Each value's [`REPRS`](crate::Atom::REPRS) is one. A range holds at least one repr, and where it
+/// holds every one it runs from zero, so ranges that hold the same reprs are equal.
+/// [`new`](Self::new) builds a range in unsigned order and [`from_signed`](Self::from_signed) one
+/// in signed order, through zero where it starts below zero and ends above it; each refuses a range
+/// it cannot hold, at compile time in a constant.
 ///
 /// # Examples
 /// ```
@@ -124,6 +125,23 @@ impl<R: Primitive> ReprRange<R> {
     #[must_use]
     pub const fn contains(self, bits: u128) -> bool {
         self.span().contains(bits)
+    }
+
+    /// The smallest range that holds this one and `bits`, a repr's unsigned bits: grown down to
+    /// them or up to them, whichever adds fewer reprs, down on a tie.
+    #[inline]
+    #[must_use]
+    pub(crate) const fn including(self, bits: u128) -> Self {
+        let span = self.span().including(bits);
+        Self::from_bounds(span.start, span.end)
+    }
+
+    /// The repr beside the range that `Option`'s `None` takes where the range alone decides, as
+    /// [`Span::spare_for_none`] picks it, or `None` where the range is full.
+    #[inline]
+    #[must_use]
+    pub(crate) const fn spare_for_none(self) -> Option<u128> {
+        self.span().spare_for_none()
     }
 
     /// The range from `start` to `end`, which the caller keeps within `R`'s bits; from zero where
@@ -250,6 +268,63 @@ impl Span {
             bits >= self.start && bits <= self.end
         }
     }
+
+    /// The smallest span that holds this one and `bits`, a number of its width: grown down to them
+    /// or up to them, whichever adds fewer numbers, down on a tie.
+    #[inline]
+    #[must_use]
+    const fn including(self, bits: u128) -> Self {
+        if self.contains(bits) {
+            return self;
+        }
+        let largest = self.largest();
+        let down = self.start.wrapping_sub(bits) & largest;
+        let up = bits.wrapping_sub(self.end) & largest;
+        if up < down { Self { end: bits, ..self } } else { Self { start: bits, ..self } }
+    }
+
+    /// The number `Option`'s `None` takes beside the span, or `None` where the span is full.
+    ///
+    /// Zero where it is beside the span; else, where the span starts at zero, the number after its
+    /// end; else whichever of the number before its start and the one after its end leaves the
+    /// narrower field, the one before on a tie.
+    #[inline]
+    #[must_use]
+    const fn spare_for_none(self) -> Option<u128> {
+        if self.is_full() {
+            return None;
+        }
+        // Not full, a span that starts at 1 or ends at the largest number does not wrap.
+        if self.start == 1 || self.end == self.largest() {
+            return Some(0);
+        }
+        let above = self.end.wrapping_add(1);
+        if self.start == 0 {
+            return Some(above);
+        }
+        let below = self.start.wrapping_sub(1);
+        let narrower_above =
+            Self { end: above, ..self }.field_width() < Self { start: below, ..self }.field_width();
+        Some(if narrower_above { above } else { below })
+    }
+
+    /// The fewest bits a field takes to hold each number of the span: unsigned, or two's
+    /// complement where that is narrower; the whole width where the span wraps both through zero
+    /// and through the signed numbers' ends.
+    #[inline]
+    #[must_use]
+    const fn field_width(self) -> u32 {
+        let first = sign_extend(self.start, self.width);
+        let last = sign_extend(self.end, self.width);
+        let signed = if first > last {
+            self.width
+        } else {
+            let (low, high) = (signed_bit_length(first), signed_bit_length(last));
+            if low > high { low } else { high }
+        };
+        let unsigned = if self.wraps() { self.width } else { bit_length(self.end) };
+        if signed < unsigned { signed } else { unsigned }
+    }
 }
 
 /// The low `width` bits set: none for 0, all 128 for 128 or more.
@@ -257,6 +332,30 @@ impl Span {
 #[must_use]
 const fn mask(width: u32) -> u128 {
     u128::MAX.unbounded_shr(u128::BITS.saturating_sub(width))
+}
+
+/// How many bits `value` needs unsigned: none for zero.
+#[inline]
+#[must_use]
+const fn bit_length(value: u128) -> u32 {
+    u128::BITS.wrapping_sub(value.leading_zeros())
+}
+
+/// How many bits `value` needs in two's complement: one for 0 and -1.
+#[inline]
+#[must_use]
+const fn signed_bit_length(value: i128) -> u32 {
+    // A negative value needs what its complement, which is not negative, needs.
+    let magnitude = value ^ value.unbounded_shr(i128::BITS.wrapping_sub(1));
+    bit_length(magnitude.cast_unsigned()).wrapping_add(1)
+}
+
+/// The two's complement value of the low `width` bits of `bits`.
+#[inline]
+#[must_use]
+const fn sign_extend(bits: u128, width: u32) -> i128 {
+    let above = u128::BITS.saturating_sub(width);
+    bits.unbounded_shl(above).cast_signed().unbounded_shr(above)
 }
 
 #[cfg(test)]

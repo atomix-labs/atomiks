@@ -1,7 +1,7 @@
 error[E0277]: the trait bound `Id: const Atom` is not satisfied
-  --> tests/compile_fail/static_of_a_non_const_atom_impl.rs:22:37
+  --> tests/compile_fail/static_of_a_non_const_atom_impl.rs:21:37
    |
-22 | static ID: Atomic<Id> = Atomic::new(Id(0));
+21 | static ID: Atomic<Id> = Atomic::new(Id(0));
    |                         ----------- ^^^^^
    |                         |
    |                         required by a bound introduced by this call

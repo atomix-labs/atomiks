@@ -1,4 +1,4 @@
-error[E0080]: evaluation panicked: `Option<$CRATE::Low>`: `None` would take repr 18446744073709551609, but a pointer repr marks `None` only with null: make null no value and `MIN_REPR` 1, as `NonNull` does
+error[E0080]: evaluation panicked: `Option<$CRATE::Low>`: a pointer repr marks `None` only with null, but null lies in the value's range: leave it out, as `NonNull`'s `ReprRange::NONZERO` does
  --> src/atom/option.rs
   |
   |             None => <T::Repr as Primitive>::from_bits(const { none_repr::<T>() }),
@@ -7,14 +7,11 @@ error[E0080]: evaluation panicked: `Option<$CRATE::Low>`: `None` would take repr
 note: inside `atomiks_core::atom::option::none_repr::<Low>`
  --> src/atom/option.rs
   |
-  | /         refuse_option::<T>(
-  | |             &Message::new()
-  | |                 .text("`None` would take repr ")
-  | |                 .number(none)
-  | |                 .text(", but a pointer repr marks `None` only with null: ")
-  | |                 .text("make null no value and `MIN_REPR` 1, as `NonNull` does"),
-  | |         );
-  | |_________^
+  | /             refuse_option::<T>(&Message::new().text(concat!(
+  | |                 "a pointer repr marks `None` only with null, but null lies in the value's range: ",
+  | |                 "leave it out, as `NonNull`'s `ReprRange::NONZERO` does"
+  | |             )));
+  | |_______________^
 note: inside `atomiks_core::atom::option::refuse_option::<Low>`
  --> src/atom/option.rs
   |

@@ -1,19 +1,18 @@
-//! A pointer's bits are unreadable in const, so only null can mark `None`: at any other repr,
-//! `None` would load as a pointer.
+//! A pointer's bits are unreadable in const, so only null can mark `None`: where null is a value,
+//! `None` has no repr, though others lie outside the value's range.
 
 #![feature(const_trait_impl)]
 
-use atomiks_core::{Atom, Atomic};
+use atomiks_core::{Atom, Atomic, ReprRange};
 
-/// A pointer, null included, whose reprs stop below the top of memory: `None` would take a
-/// nonzero repr, which a pointer cannot mark.
+/// A pointer, null included, whose reprs stop below the top of memory: the reprs above are spare,
+/// but a pointer marks `None` only with null.
 #[derive(Clone, Copy)]
 struct Low(*mut u64);
 
 const unsafe impl Atom for Low {
     type Repr = *mut u64;
-    const MIN_REPR: u128 = 0;
-    const MAX_REPR: u128 = (usize::MAX - 7) as u128;
+    const REPRS: ReprRange<*mut u64> = ReprRange::new(0, (usize::MAX - 7) as u128);
     fn to_repr(self) -> *mut u64 {
         self.0
     }

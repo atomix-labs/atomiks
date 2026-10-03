@@ -1,5 +1,6 @@
-//! The `Atom` laws over every built-in: a value's repr lies in its range and decodes back to it; a
-//! repr that decodes re-encodes to itself, unchecked too; and each validity's promise holds.
+//! The `Atom` laws over every built-in: a value's repr lies in its range, which may wrap, and
+//! decodes back to it; a repr that decodes re-encodes to itself, unchecked too; each validity's
+//! promise holds; and `None` takes a repr outside its value's range.
 //!
 //! Each law runs on every repr of a byte, on the edges of each width and range, and on random bits.
 
@@ -55,12 +56,7 @@ mod tests {
         T::Repr: ExactBits + PartialEq + Debug,
     {
         let bits = value.to_repr().to_bits();
-        prop_assert!(
-            (T::MIN_REPR..=T::MAX_REPR).contains(&bits),
-            "{value:?}'s repr {bits:#x} lies in {:#x}..={:#x}",
-            T::MIN_REPR,
-            T::MAX_REPR
-        );
+        prop_assert!(T::REPRS.contains(bits), "{value:?}'s repr {bits:#x} lies in {:?}", T::REPRS);
         prop_assert_eq!(T::from_repr(value.to_repr()), Some(value), "the value decodes back");
         canonical::<T>(value.to_repr())
     }
@@ -71,10 +67,9 @@ mod tests {
     ) -> Result<(), TestCaseError> {
         let address = value.to_repr().addr();
         prop_assert!(
-            u128::try_from(address).is_ok_and(|bits| (T::MIN_REPR..=T::MAX_REPR).contains(&bits)),
-            "{value:?}'s address {address:#x} lies in {:#x}..={:#x}",
-            T::MIN_REPR,
-            T::MAX_REPR
+            u128::try_from(address).is_ok_and(|bits| T::REPRS.contains(bits)),
+            "{value:?}'s address {address:#x} lies in {:?}",
+            T::REPRS
         );
         prop_assert_eq!(T::from_repr(value.to_repr()), Some(value), "the value decodes back");
         canonical::<T>(value.to_repr())
@@ -90,12 +85,7 @@ mod tests {
     {
         let repr = <T::Repr as Primitive>::from_bits(bits);
         let unsigned = repr.to_bits();
-        prop_assert!(
-            (T::MIN_REPR..=T::MAX_REPR).contains(&unsigned),
-            "the bits {unsigned:#x} lie in {:#x}..={:#x}",
-            T::MIN_REPR,
-            T::MAX_REPR
-        );
+        prop_assert!(T::REPRS.contains(unsigned), "the bits {unsigned:#x} lie in {:?}", T::REPRS);
         prop_assert_eq!(from_bits(repr).to_repr(), repr, "the repr is the bits");
         total::<T>(repr)
     }
@@ -118,6 +108,17 @@ mod tests {
             let unchecked = unsafe { T::from_repr_unchecked(repr) };
             prop_assert_eq!(unchecked.to_repr(), repr, "{:?} decodes unchecked as checked", repr);
         }
+        Ok(())
+    }
+
+    /// The `None` law for `T`, given `none`, the bits of `None`'s repr: they lie outside `T`'s
+    /// range and decode as no `T`, and `Option<T>`'s range holds them.
+    fn none_lies_outside<T: Atom>(none: u128) -> Result<(), TestCaseError> {
+        prop_assert!(!T::REPRS.contains(none), "`None`'s {none:#x} lies outside {:?}", T::REPRS);
+        let repr = <T::Repr as Primitive>::from_bits(none);
+        prop_assert!(T::from_repr(repr).is_none(), "and decodes as no value");
+        let with_none = <Option<T> as Atom>::REPRS;
+        prop_assert!(with_none.contains(none), "and lies in `Option`'s, {:?}", with_none);
         Ok(())
     }
 
@@ -319,6 +320,37 @@ mod tests {
             #[cfg(wide)]
             assert_holds(wide_laws(bits, bits.wrapping_sub(1)));
         }
+    }
+
+    /// The bits of `None`'s repr as an `Option<T>`.
+    fn none_bits<T: Atom>() -> u128
+    where
+        T::Repr: ExactBits,
+    {
+        None::<T>.to_repr().to_bits()
+    }
+
+    /// Checks the `None` law for each integer's `NonZero`.
+    macro_rules! nonzero_none_laws {
+        ($($int:ty),+) => {$(
+            assert_holds(none_lies_outside::<NonZero<$int>>(none_bits::<NonZero<$int>>()));
+        )+};
+    }
+
+    #[test]
+    fn none_lies_outside_each_built_in_range() {
+        nonzero_none_laws!(u8, u16, u32, u64, usize, i8, i16, i32, i64, isize);
+        #[cfg(wide)]
+        nonzero_none_laws!(u128, i128);
+        assert_holds(none_lies_outside::<char>(none_bits::<char>()));
+        assert_holds(none_lies_outside::<Option<char>>(none_bits::<Option<char>>()));
+        assert_holds(none_lies_outside::<()>(none_bits::<()>()));
+        assert_holds(none_lies_outside::<Option<()>>(none_bits::<Option<()>>()));
+        assert_holds(none_lies_outside::<PhantomData<str>>(none_bits::<PhantomData<str>>()));
+        let null = None::<NonNull<u8>>.to_repr().addr();
+        assert_holds(none_lies_outside::<NonNull<u8>>(
+            u128::try_from(null).expect("an address fits a `u128`"),
+        ));
     }
 
     #[test]
