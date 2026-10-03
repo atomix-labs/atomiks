@@ -1,0 +1,22 @@
+error[E0277]: `StoreStore` is not an ordering
+ --> tests/ui/fail/swap_with_store_store.rs:5:39
+  |
+5 |     let _ = AtomicU64::new(0).swap(1, StoreStore);
+  |                               ----    ^^^^^^^^^^ expected `Relaxed`, `Acquire`, `Release`, `AcqRel` or `SeqCst` from `atomiks::ordering`
+  |                               |
+  |                               required by a bound introduced by this call
+  |
+  = help: the trait `atomiks::ordering::Ordering` is not implemented for `StoreStore`
+  = help: the following other types implement trait `atomiks::ordering::Ordering`:
+            atomiks::ordering::AcqRel
+            atomiks::ordering::Acquire
+            atomiks::ordering::Relaxed
+            atomiks::ordering::Release
+            atomiks::ordering::SeqCst
+note: required by a bound in `atomiks::Atomic::<T>::swap`
+ --> src/atomic/mod.rs
+  |
+  | impl<T: Atom> Atomic<T> {
+...
+  |     pub fn swap<O: Ordering>(&self, value: T, order: O) -> T
+  |                    ^^^^^^^^ required by this bound in `Atomic::<T>::swap`

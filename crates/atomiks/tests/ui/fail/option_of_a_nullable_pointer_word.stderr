@@ -1,0 +1,44 @@
+error[E0080]: evaluation panicked: `Option<$CRATE::Low>`: `None` would take repr 18446744073709551609, but a pointer repr marks `None` only with null: make null no value and `MIN_REPR` 1, as `NonNull` does
+ --> src/atom/option.rs
+  |
+  |             None => <T::Repr as Primitive>::from_bits(const { none_repr::<T>() }),
+  |                                                               ^^^^^^^^^^^^^^^^ evaluation of `atomiks::atom::option::<impl atomiks::Atom for std::option::Option<Low>>::to_repr::{constant#0}` failed inside this call
+  |
+note: inside `atomiks::atom::option::none_repr::<Low>`
+ --> src/atom/option.rs
+  |
+  | /         refuse_option::<T>(
+  | |             &Message::new()
+  | |                 .text("`None` would take repr ")
+  | |                 .number(none)
+  | |                 .text(", but a pointer repr marks `None` only with null: ")
+  | |                 .text("make null no value and `MIN_REPR` 1, as `NonNull` does"),
+  | |         );
+  | |_________^
+note: inside `atomiks::atom::option::refuse_option::<Low>`
+ --> src/atom/option.rs
+  |
+  | /     refuse(
+  | |         &Message::new()
+  | |             .text("`Option<")
+  | |             .name(type_name::<T>(), close.len().saturating_add(advice.len()))
+  | |             .text(close)
+  | |             .text(advice),
+  | |     )
+  | |_____^
+note: inside `atomiks::message::refuse`
+ --> $RUST/core/src/panic.rs
+  |
+  |         $crate::panicking::panic_display(&$arg);
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the failure occurred here
+  |
+ ::: src/message.rs
+  |
+  |     panic!("{}", message.as_str())
+  |     ------------------------------ in this macro invocation
+
+note: erroneous constant encountered
+ --> src/atom/option.rs
+  |
+  |             None => <T::Repr as Primitive>::from_bits(const { none_repr::<T>() }),
+  |                                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^
