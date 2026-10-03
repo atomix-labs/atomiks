@@ -91,7 +91,12 @@ mod native {
     /// A guard for reading a cell.
     #[repr(transparent)]
     #[derive(Debug)]
-    pub struct ConstPtr<T: ?Sized>(*const T);
+    pub struct ConstPtr<T: ?Sized>(
+        // INVARIANT: the address core's `UnsafeCell::get` gives for the lending cell's contents:
+        // aligned, with that cell's provenance. Only this module's `UnsafeCell::get` writes it.
+        /// The contents' address.
+        *const T,
+    );
 
     impl<T: ?Sized> ConstPtr<T> {
         /// The contents, shared.
@@ -103,8 +108,9 @@ mod native {
         #[inline]
         #[must_use]
         pub const unsafe fn deref(&self) -> &T {
-            // SAFETY: the pointer came from the cell, which the caller keeps alive and in place,
-            // with writers out.
+            // SAFETY: by the field INVARIANT the pointer is the contents' address, aligned and
+            // with the cell's provenance; the caller keeps the cell alive and in place, so the
+            // contents are initialized, and keeps writers out while the borrow lives.
             unsafe { &*self.0 }
         }
 
@@ -118,7 +124,13 @@ mod native {
     /// A guard for writing a cell.
     #[repr(transparent)]
     #[derive(Debug)]
-    pub struct MutPtr<T: ?Sized>(*mut T);
+    pub struct MutPtr<T: ?Sized>(
+        // INVARIANT: the address core's `UnsafeCell::get` gives for the lending cell's contents:
+        // aligned, with that cell's provenance, which allows writes through a shared borrow. Only
+        // this module's `UnsafeCell::get_mut` writes it.
+        /// The contents' address.
+        *mut T,
+    );
 
     impl<T: ?Sized> MutPtr<T> {
         /// The contents, exclusively.
@@ -135,8 +147,10 @@ mod native {
         #[inline]
         #[must_use]
         pub const unsafe fn deref(&self) -> &mut T {
-            // SAFETY: the pointer came from the cell, which the caller keeps alive and in place,
-            // with every other access out.
+            // SAFETY: by the field INVARIANT the pointer is the contents' address, aligned and
+            // with the cell's provenance, which allows writes; the caller keeps the cell alive and
+            // in place, so the contents are initialized, and keeps every other access out
+            // while the borrow lives.
             unsafe { &mut *self.0 }
         }
 
