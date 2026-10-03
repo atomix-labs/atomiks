@@ -117,6 +117,9 @@ impl<T: Atom> RefUnwindSafe for Atomic<T> {}
 
 impl<T: Atom> Atomic<T> {
     /// An atomic holding `value`.
+    ///
+    /// `T`'s [`Atom`] impl must be `const`, though rustdoc shows the bound without it; with any
+    /// other impl, build with [`From`].
     #[cfg(not(loom))]
     #[inline]
     #[must_use]
