@@ -13,10 +13,12 @@
 <!-- dprint-ignore-end -->
 <!-- <<< devset: project <<< -->
 
-atomiks is a workspace of Rust crates for sharing state between threads: atomic
-types, and the locks and other synchronization primitives built on them. It is
-in early development, and no crate is released yet; each crate's install line
-and first example land here with it.
+atomiks is a workspace of Rust crates for sharing state between threads. Its
+first crate, `atomiks`, gives any value that fits one atomic word a typed
+atomic: integers, `NonZero`s, `char`s, floats, pointers, and `Option`s that
+spend a spare bit pattern on `None`, with orderings checked at compile time and
+every operation the instruction its name promises. It is in early development,
+and no crate is released yet.
 
 ## Documentation
 
