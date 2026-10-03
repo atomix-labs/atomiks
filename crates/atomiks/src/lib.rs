@@ -6,10 +6,13 @@
     const_convert,
     const_destruct,
     const_trait_impl,
+    doc_cfg,
     impl_restriction,
     integer_casts
 )]
 #![cfg_attr(not(loom), feature(const_atomic))]
+// A loom build is a model of this one, not a target of its own: no badge names it.
+#![doc(auto_cfg(hide(loom)))]
 
 #[cfg(all(loom, not(feature = "loom")))]
 compile_error!(concat!(
