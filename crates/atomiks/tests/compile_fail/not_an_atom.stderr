@@ -11,7 +11,7 @@ help: the trait `Atom` is not implemented for `Order`
   |
 5 | struct Order;
   | ^^^^^^^^^^^^
-  = note: for a type of your own, keep each promise of its `# Safety` section in a `const unsafe impl Atom for Order`, which needs `#![feature(const_trait_impl)]`
+  = note: for a type of your own, keep each promise of `Atom`'s `# Safety` section in a `const unsafe impl Atom for Order`, which needs `#![feature(const_trait_impl)]`
   = help: the following other types implement trait `Atom`:
             ()
             *const T
@@ -43,7 +43,7 @@ help: the trait `Atom` is not implemented for `Order`
   |
 5 | struct Order;
   | ^^^^^^^^^^^^
-  = note: for a type of your own, keep each promise of its `# Safety` section in a `const unsafe impl Atom for Order`, which needs `#![feature(const_trait_impl)]`
+  = note: for a type of your own, keep each promise of `Atom`'s `# Safety` section in a `const unsafe impl Atom for Order`, which needs `#![feature(const_trait_impl)]`
   = help: the following other types implement trait `Atom`:
             ()
             *const T
