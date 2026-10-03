@@ -42,14 +42,16 @@ atomic (`Atom`, `Atomic`, the orderings, validity, the primitives, the fences,
 the cell and the loom seam), and the facade `atomiks` re-exports it. Each
 inherits its version, edition, licence and lints from the root `Cargo.toml`.
 `atomiks-derive`, behind the facade's `derive` feature, and `atomiks-lock` are
-yet to be written. The book is under `docs/`. The toolchain is the nightly
-`rust-toolchain.toml` pins, which the crates need for their nightly features;
-the CPU floor, x86-64-v3 and aarch64 with LSE, is `.cargo/config.toml`'s. The
-tools are the versions `.config/mise/` pins. The justfile's top section holds
-the repository's own recipes: the loom models, the lints for each target and
-CPU, the codegen fixture's format, and Miri. `.github/workflows/platforms.yml`
-is the repository's own: the tests and the loom models on arm64 Linux, which
-`check.yml`, on x86_64, cannot run.
+yet to be written. Both crates build for Linux and macOS, on aarch64 and x86_64.
+The book is under `docs/`. The toolchain is the nightly `rust-toolchain.toml`
+pins, which the crates need for their nightly features, with the four targets.
+The CPU floor is `.cargo/config.toml`'s: x86-64-v3, LSE on aarch64 Linux, and
+the M1 on macOS. The tools are the versions `.config/mise/` pins. The justfile's
+top section holds the repository's own recipes: the loom models, the lints for
+each target and CPU, the codegen fixture's format, and Miri.
+`.github/workflows/platforms.yml` is the repository's own: the tests and the
+loom models on arm64 Linux and on macOS, arm64 and x86_64, which `check.yml`, on
+x86_64 Linux, cannot run.
 
 ## Rules
 

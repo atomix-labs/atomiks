@@ -45,9 +45,21 @@
 //!   [`MinMax`]), while [`or`](Atomic::or), which discards the value before, needs no loop anywhere
 //!   in an optimized build.
 //!
-//! On `x86_64`, `AtomicU128` and `AtomicI128` need `cmpxchg16b` (`-C target-cpu=x86-64-v2`), and
-//! their [`Load`] and [`Store`] need AVX (`-C target-cpu=x86-64-v3`); `x86_64-unknown-linux-gnu`'s
-//! default CPU has neither.
+//! # Platforms
+//!
+//! atomiks builds for Linux and macOS, on `aarch64` and `x86_64`. What a target's default CPU
+//! lacks, a flag adds, `-C target-feature` on `aarch64` and `-C target-cpu` on `x86_64`:
+//!
+//! | Target          | 128-Bit Atomics        | Their `Load`, `Store` | `fetch_or`, `max`, `min` |
+//! | --------------- | ---------------------- | --------------------- | ------------------------ |
+//! | `aarch64` macOS | yes                    | yes, with LSE2        | yes                      |
+//! | `aarch64` Linux | yes                    | `+lse2`               | yes                      |
+//! | `x86_64` macOS  | yes, with `cmpxchg16b` | `x86-64-v3`, for AVX  | no                       |
+//! | `x86_64` Linux  | `x86-64-v2`            | `x86-64-v3`, for AVX  | no                       |
+//!
+//! On `aarch64` Linux, a read-modify-write is LSE's one instruction with `+lse` (Armv8.1); without
+//! it, an outline call runs that instruction where the CPU has LSE, and an LL/SC pair where it does
+//! not. Apple's CPUs all have LSE.
 //!
 //! # Model Checking
 //!
