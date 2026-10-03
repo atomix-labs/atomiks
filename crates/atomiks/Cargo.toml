@@ -24,3 +24,4 @@ tracing-subscriber = { workspace = true, optional = true }
 [dev-dependencies]
 # external
 proptest = { workspace = true }
+trybuild = { workspace = true }
