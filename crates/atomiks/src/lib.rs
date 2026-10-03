@@ -131,10 +131,3 @@ pub use crate::fence::{compiler_fence, fence};
 #[doc(hidden)]
 pub use crate::primitive::{AddSub, Bitwise, CellAccess, CompareExchange};
 pub use crate::primitive::{ExactBits, FetchBitwise, Load, MinMax, Primitive, Store, Swap};
-
-/// The loom this crate models with, so a downstream model uses the same copy.
-#[cfg(loom)]
-#[doc(hidden)]
-pub mod __private {
-    pub use loom;
-}
