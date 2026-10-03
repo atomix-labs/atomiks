@@ -37,12 +37,12 @@ with the profile, on `devset update`. Never edit `.devset/`.
 
 ## The Repository
 
-A Cargo workspace of crates for sharing state between threads: atomic types, and
-the locks and other synchronization primitives built on them. Each crate is a
-directory under `crates/`, a member of the root `Cargo.toml`'s workspace, and
-inherits its version, edition, licence and lints from it. The book is under
-`docs/`. The toolchain is the nightly `rust-toolchain.toml` pins; the tools are
-the versions `.config/mise/` pins.
+A Cargo workspace of crates for sharing state between threads: `crates/atomiks`,
+typed atomics for any value that fits one atomic word, and later the locks built
+on them. Each crate is a directory under `crates/`, a member of the root
+`Cargo.toml`'s workspace, and inherits its version, edition, licence and lints
+from it. The book is under `docs/`. The toolchain is the nightly
+`rust-toolchain.toml` pins; the tools are the versions `.config/mise/` pins.
 
 ## Rules
 
