@@ -246,8 +246,8 @@ wrappers! {
 }
 
 // The 128-bit integers and their `NonZero`s, where a 16-byte compare-exchange exists. atomiks
-// offers no 128-bit add, bitwise operation, max or min, so they have no `AtomAdd` or
-// `AtomBitwise`, and `AtomOrd` brings no `max` or `min`: `update` is each one's loop.
+// has no 128-bit add, bitwise operation, max or min, so they take no `AtomAdd` or `AtomBitwise`,
+// and `AtomOrd` brings them no `max` or `min`: `update` is each one's loop.
 #[cfg(any(target_arch = "aarch64", all(target_arch = "x86_64", target_feature = "cmpxchg16b")))]
 integers! { [AtomOrd] u128, i128 }
 #[cfg(any(target_arch = "aarch64", all(target_arch = "x86_64", target_feature = "cmpxchg16b")))]

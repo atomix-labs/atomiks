@@ -258,15 +258,15 @@ mod tests {
         ["ldxr", "ldaxr", "ldxp", "ldaxp"].iter().any(|load| mnemonic.starts_with(load))
     }
 
-    /// Checks that `name` costs nothing its entry does not name.
+    /// Checks that `name` costs nothing its `lowering` does not name.
     ///
-    /// That is no call, no load-linked, no backward branch but, if it `retries`, the one that
-    /// retries its compare-exchange, and no compare-exchange or barrier beyond those `wanted`
+    /// That is no call, no load-linked, no backward branch but, for a `Retry`, the one that
+    /// retries its compare-exchange, and no compare-exchange or barrier beyond those the lowering
     /// names. A call or a jump out of the function counts, since what it reaches, such as an
     /// outline atomic, could loop.
-    fn assert_no_unnamed_cost(
-        target: &str, name: &str, lines: &[Line], wanted: &[&str], retries: bool,
-    ) {
+    fn assert_no_unnamed_cost(target: &str, name: &str, lines: &[Line], lowering: &Lowering) {
+        let (InOrder(wanted) | Only(wanted) | Retry(wanted)) = *lowering;
+        let retries = matches!(lowering, Retry(_));
         let mut labels = Vec::new();
         let mut mnemonics = Vec::new();
         let mut branches_back = 0_usize;
@@ -334,21 +334,19 @@ mod tests {
                     Line::Label(_) => None,
                 })
                 .collect();
-            let (wanted, retries) = match lowering {
+            match lowering {
                 InOrder(wanted) | Retry(wanted) => {
                     let mut rest = mnemonics.iter();
                     assert!(
                         wanted.iter().all(|want| rest.any(|have| have == want)),
                         "{target}: `{name}` lowers to {wanted:?} in order, among {mnemonics:?}"
                     );
-                    (wanted, matches!(lowering, Retry(_)))
                 },
                 Only(wanted) => {
                     assert_eq!(&mnemonics, wanted, "{target}: `{name}` is these and nothing else");
-                    (wanted, false)
                 },
-            };
-            assert_no_unnamed_cost(target, name, &lines, wanted, retries);
+            }
+            assert_no_unnamed_cost(target, name, &lines, lowering);
         }
     }
 
