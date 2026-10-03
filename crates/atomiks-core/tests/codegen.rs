@@ -2,9 +2,8 @@
 //!
 //! The fixture builds for Linux and macOS with the repository's CPU floor and, on `aarch64` Linux,
 //! with LSE2 too. Each operation is the instructions and barriers its name promises, with no
-//! compare-exchange loop but `update`'s; each target refuses each operation it lacks: `x86_64`
-//! those only `aarch64` has, and `aarch64` Linux's floor the 128-bit ones it has no instruction
-//! for.
+//! compare-exchange loop but `update`'s, and each target refuses each operation it lacks: `x86_64`
+//! those only `aarch64` has, and `aarch64` each 128-bit one it has no instruction for.
 
 // Miri cannot run the compiler, and loom's atomics are not what ships.
 #![cfg(on_hardware)]
@@ -94,8 +93,7 @@ mod tests {
         ("u128_update", Retry(&["ldp", "dmb ishld", "caspal"])),
     ];
 
-    /// Each function of the fixture on `x86_64` with the `x86-64-v3` floor (AVX), Linux's and
-    /// macOS's.
+    /// Each function of the fixture on `x86_64`, Linux or macOS, at the `x86-64-v3` floor (AVX).
     const X86_64: &[(&str, Lowering)] = &[
         ("u64_load", Only(&["movq", "retq"])),
         ("u64_store", Only(&["movq", "retq"])),
@@ -235,8 +233,9 @@ mod tests {
         Instruction { mnemonic: String, branch: Option<String> },
     }
 
-    /// The labels and instructions of the function `name` in `target`'s assembly, which ends, in
-    /// ELF and Mach-O alike, at its `.cfi_endproc`.
+    /// The labels and instructions of the function `name` in `target`'s assembly.
+    ///
+    /// A function ends at its `.cfi_endproc`, in ELF and Mach-O alike.
     fn function(target: &str, assembly: &str, name: &str) -> Vec<Line> {
         let syntax = syntax(target);
         let mut lines = assembly
@@ -399,7 +398,9 @@ mod tests {
 
     /// The stderr of `cargo check` on the fixture for `target` with `feature`, which must fail.
     fn refused(target: &str, feature: &str) -> String {
-        let out = Path::new(env!("CARGO_TARGET_TMPDIR")).join("codegen").join(feature);
+        let out = Path::new(env!("CARGO_TARGET_TMPDIR"))
+            .join("codegen")
+            .join(format!("{target}-{feature}"));
         let check = run(cargo("check", target, &out).args(["--features", feature]), target);
         let stderr = String::from_utf8_lossy(&check.stderr).into_owned();
         assert!(!check.status.success(), "{target} refuses the `{feature}` probes:\n{stderr}");
@@ -407,12 +408,12 @@ mod tests {
     }
 
     #[test]
-    fn aarch64_lowers_each_operation_to_its_instruction() {
+    fn aarch64_linux_lowers_each_operation_to_its_instruction() {
         lowers_as_expected(AARCH64_LINUX, None, &[AARCH64, AARCH64_FLOOR]);
     }
 
     #[test]
-    fn aarch64_with_lse2_lowers_each_operation_to_its_instruction() {
+    fn aarch64_linux_with_lse2_lowers_each_operation_to_its_instruction() {
         lowers_as_expected(AARCH64_LINUX, Some("neoverse-v1"), &[AARCH64, AARCH64_LSE2]);
     }
 
@@ -422,7 +423,7 @@ mod tests {
     }
 
     #[test]
-    fn x86_64_lowers_each_operation_to_its_instruction() {
+    fn x86_64_linux_lowers_each_operation_to_its_instruction() {
         lowers_as_expected(X86_64_LINUX, None, &[X86_64]);
     }
 
@@ -431,9 +432,10 @@ mod tests {
         lowers_as_expected(X86_64_MACOS, None, &[X86_64]);
     }
 
-    #[test]
-    fn x86_64_refuses_each_operation_only_aarch64_has() {
-        let stderr = refused(X86_64_LINUX, "aarch64-only");
+    /// Checks that `target`, an `x86_64` one, refuses each probe only `aarch64` has, each with its
+    /// capability's message.
+    fn refuses_each_operation_only_aarch64_has(target: &str) {
+        let stderr = refused(target, "aarch64-only");
         let errors: Vec<&str> = stderr.lines().filter(|line| line.starts_with("error[")).collect();
         let fetch_bitwise = "has no `fetch_and`, `fetch_or`, `fetch_xor` or `fetch_not` without a \
                              compare-exchange loop on this target";
@@ -462,7 +464,17 @@ mod tests {
     }
 
     #[test]
-    fn aarch64_floor_refuses_each_wide_capability() {
+    fn x86_64_linux_refuses_each_operation_only_aarch64_has() {
+        refuses_each_operation_only_aarch64_has(X86_64_LINUX);
+    }
+
+    #[test]
+    fn x86_64_macos_refuses_each_operation_only_aarch64_has() {
+        refuses_each_operation_only_aarch64_has(X86_64_MACOS);
+    }
+
+    #[test]
+    fn aarch64_linux_refuses_each_wide_capability() {
         let stderr = refused(AARCH64_LINUX, "aarch64-refused");
         let errors: Vec<&str> = stderr.lines().filter(|line| line.starts_with("error[")).collect();
         assert_eq!(
@@ -489,5 +501,21 @@ mod tests {
         ] {
             assert!(stderr.contains(line), "the diagnostics say `{line}`:\n{stderr}");
         }
+    }
+
+    #[test]
+    fn aarch64_macos_refuses_the_wide_exchange_and_maximum() {
+        let stderr = refused(AARCH64_MACOS, "aarch64-refused");
+        let errors: Vec<&str> = stderr.lines().filter(|line| line.starts_with("error[")).collect();
+        assert_eq!(
+            errors,
+            [
+                "error[E0277]: `u128` has no atomic exchange without a compare-exchange loop on \
+                 this target",
+                "error[E0277]: `u128` has no atomic maximum or minimum without a compare-exchange \
+                 loop on this target",
+            ],
+            "LSE2 has the load and store, so only `Swap`'s and `MinMax`'s probes fail:\n{stderr}"
+        );
     }
 }

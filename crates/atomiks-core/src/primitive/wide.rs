@@ -300,9 +300,9 @@ mod x86_64 {
 
         /// The AVX 16-byte load.
         ///
-        /// A comparison chain, not a `match`: `Ordering` is non-exhaustive, and its callers,
-        /// `Atomic::load` and `read_for_rmw`, pass only a `LoadOrdering`'s, so the last branch is
-        /// `SeqCst`'s.
+        /// A comparison chain, not a `match`: `Ordering` is non-exhaustive, and its
+        /// callers, `Atomic::load` and `read_for_rmw`, pass only a `LoadOrdering`'s, so the
+        /// last branch is `SeqCst`'s.
         #[cfg(target_feature = "avx")]
         #[expect(unsafe_code, reason = "the 16-byte atomic load of the cell's own bits")]
         #[inline]
