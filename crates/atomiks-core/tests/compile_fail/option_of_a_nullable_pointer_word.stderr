@@ -25,17 +25,7 @@ note: inside `atomiks_core::atom::option::refuse_option::<Low>`
   | |             .text(close)
   | |             .text(advice),
   | |     )
-  | |_____^
-note: inside `atomiks_core::message::refuse`
- --> $RUST/core/src/panic.rs
-  |
-  |         $crate::panicking::panic_display(&$arg);
-  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the failure occurred here
-  |
- ::: src/message.rs
-  |
-  |     panic!("{}", message.as_str())
-  |     ------------------------------ in this macro invocation
+  | |_____^ the failure occurred here
 
 note: erroneous constant encountered
  --> src/atom/option.rs

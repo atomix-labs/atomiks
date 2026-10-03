@@ -1,11 +1,12 @@
-//! Compile-time messages that name the type they refuse.
+//! Messages built by const code that name what they refuse.
 
 use core::str;
 
 /// What a name cut short ends with.
 const ELLIPSIS: &str = "…";
 
-/// A message built in a const context, for a post-monomorphization refusal.
+/// A message built in a const context, for a refusal at compile time or, outside a constant, at run
+/// time.
 pub(crate) struct Message {
     /// The bytes written so far; only `len` of them are the message.
     bytes: [u8; 256],
@@ -86,6 +87,13 @@ impl Message {
         }
     }
 
+    /// Appends `value` in decimal, after a `-` where it is negative.
+    #[must_use]
+    pub(crate) const fn signed_number(self, value: i128) -> Self {
+        let message = if value < 0 { self.text("-") } else { self };
+        message.number(value.unsigned_abs())
+    }
+
     /// The message, for `panic!`.
     pub(crate) const fn as_str(&self) -> &str {
         let (written, _) = self.bytes.split_at(self.len);
@@ -96,8 +104,10 @@ impl Message {
     }
 }
 
-/// Refuses the build with `message`.
-#[expect(clippy::panic, reason = "a refusal evaluated at compile time, naming what was refused")]
+/// Refuses with `message`: the build where a constant evaluates the call, else the run, at the
+/// caller's line.
+#[track_caller]
+#[expect(clippy::panic, reason = "a refusal naming what was refused, a build error in a constant")]
 pub(crate) const fn refuse(message: &Message) -> ! {
     panic!("{}", message.as_str())
 }
@@ -121,6 +131,17 @@ mod tests {
             Message::new().number(u128::MAX).as_str(),
             "340282366920938463463374607431768211455",
             "the largest needs all 39 digits"
+        );
+    }
+
+    #[test]
+    fn a_signed_number_prints_its_sign() {
+        let message = Message::new().signed_number(-128).text(" to ").signed_number(127);
+        assert_eq!(message.as_str(), "-128 to 127", "a minus before a negative, none before zero");
+        assert_eq!(
+            Message::new().signed_number(i128::MIN).as_str(),
+            "-170141183460469231731687303715884105728",
+            "and the lowest, whose magnitude no `i128` holds"
         );
     }
 
