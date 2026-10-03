@@ -13,6 +13,7 @@ repository   = "https://github.com/atomix-labs/atomiks"
 [workspace.dependencies]
 # external
 loom               = { version = "0.7" }
+proptest           = { version = "1.11", default-features = false, features = ["std"] }
 tracing            = { version = "0.1.44", default-features = false, features = ["std"] }
 tracing-subscriber = { version = "0.3.23", default-features = false, features = ["env-filter", "fmt"] }
 
