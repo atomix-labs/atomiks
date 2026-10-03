@@ -1,0 +1,17 @@
+[package]
+name    = "atomiks-codegen"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+atomiks = { path = "../.." }
+
+[features]
+# The probes of the operations only aarch64 has, on every target: `x86_64` must refuse each.
+aarch64-only = []
+# A probe of each capability aarch64's floor lacks for 128 bits: load, store, exchange, maximum.
+aarch64-refused = []
+
+# Its own workspace: the repository's does not list it, and the codegen test builds it alone.
+[workspace]
