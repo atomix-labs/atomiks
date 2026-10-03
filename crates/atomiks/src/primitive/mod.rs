@@ -7,6 +7,8 @@ use core::panic::RefUnwindSafe;
 use core::sync::atomic::Ordering as CoreOrdering;
 
 mod native;
+#[cfg(any(target_arch = "aarch64", all(target_arch = "x86_64", target_feature = "cmpxchg16b")))]
+mod wide;
 
 /// A primitive's cell, and every access to it that is not an atomic instruction.
 ///
@@ -131,7 +133,7 @@ pub impl(crate) trait Store: CellOps {
 #[diagnostic::on_unimplemented(
     message = "`{Self}` has no atomic exchange without a compare-exchange loop on this target",
     label = "this exchange would be a compare-exchange loop",
-    note = "a 128-bit exchange is a compare-exchange loop on every supported CPU: call `update` with `|_| new`, which returns the value before"
+    note = "atomiks has no 128-bit exchange: call `update` with `|_| new`, a compare-exchange loop that returns the value before"
 )]
 pub impl(crate) trait Swap: CellOps {
     /// Writes `value` to the cell, and returns the value before.
