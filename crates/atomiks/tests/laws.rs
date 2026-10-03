@@ -284,7 +284,7 @@ mod tests {
 
     /// Panics with the broken law's message, where `laws` broke one.
     #[track_caller]
-    fn holds(laws: Result<(), TestCaseError>) {
+    fn assert_holds(laws: Result<(), TestCaseError>) {
         if let Err(broken) = laws {
             panic!("{broken}");
         }
@@ -293,40 +293,40 @@ mod tests {
     #[test]
     fn every_byte_obeys_the_laws() {
         for bits in 0..=u128::from(u8::MAX) {
-            holds(narrow_integer_laws(bits, bits.wrapping_add(1)));
+            assert_holds(narrow_integer_laws(bits, bits.wrapping_add(1)));
             let byte = u8::from_bits(bits);
-            holds(canonical::<()>(byte));
-            holds(canonical::<PhantomData<str>>(byte));
-            holds(canonical::<Option<()>>(byte));
-            holds(canonical::<Option<Option<()>>>(byte));
-            holds(canonical::<Option<PhantomData<str>>>(byte));
+            assert_holds(canonical::<()>(byte));
+            assert_holds(canonical::<PhantomData<str>>(byte));
+            assert_holds(canonical::<Option<()>>(byte));
+            assert_holds(canonical::<Option<Option<()>>>(byte));
+            assert_holds(canonical::<Option<PhantomData<str>>>(byte));
         }
         for value in [false, true] {
-            holds(total::<bool>(value));
-            holds(round_trips(value));
+            assert_holds(total::<bool>(value));
+            assert_holds(round_trips(value));
         }
-        holds(zero_decodes::<()>());
-        holds(zero_decodes::<PhantomData<str>>());
-        holds(zero_decodes::<Option<()>>());
-        holds(round_trips(()));
-        holds(round_trips(PhantomData::<str>));
-        holds(round_trips(Some(())));
-        holds(round_trips(None::<()>));
-        holds(round_trips(None::<Option<()>>));
+        assert_holds(zero_decodes::<()>());
+        assert_holds(zero_decodes::<PhantomData<str>>());
+        assert_holds(zero_decodes::<Option<()>>());
+        assert_holds(round_trips(()));
+        assert_holds(round_trips(PhantomData::<str>));
+        assert_holds(round_trips(Some(())));
+        assert_holds(round_trips(None::<()>));
+        assert_holds(round_trips(None::<Option<()>>));
     }
 
     #[test]
     fn every_edge_obeys_the_laws() {
         for bits in edges(&CHAR_EDGES) {
-            holds(narrow_integer_laws(bits, bits.wrapping_sub(1)));
-            holds(char_laws(bits, char::MAX));
-            holds(float_laws(bits));
-            holds(pointer_laws(bits));
+            assert_holds(narrow_integer_laws(bits, bits.wrapping_sub(1)));
+            assert_holds(char_laws(bits, char::MAX));
+            assert_holds(float_laws(bits));
+            assert_holds(pointer_laws(bits));
             #[cfg(any(
                 target_arch = "aarch64",
                 all(target_arch = "x86_64", target_feature = "cmpxchg16b")
             ))]
-            holds(wide_laws(bits, bits.wrapping_sub(1)));
+            assert_holds(wide_laws(bits, bits.wrapping_sub(1)));
         }
     }
 

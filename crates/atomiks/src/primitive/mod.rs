@@ -71,9 +71,9 @@ primitive!([const] CellAccess);
 primitive!(CellAccess);
 
 /// A primitive whose bits are its whole value: `bool` or an integer, never a pointer, whose
-/// provenance its bits do not hold. `Primitive::IS_BITS_EXACT` is true exactly for these.
+/// provenance its bits do not hold.
 ///
-/// Only atomiks implements it.
+/// `Primitive::IS_BITS_EXACT` is true exactly for these. Only atomiks implements it.
 #[diagnostic::on_unimplemented(
     message = "`{Self}` is not a primitive whose bits are its whole value",
     label = "expected `bool` or an integer",
