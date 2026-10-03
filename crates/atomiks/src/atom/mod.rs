@@ -71,7 +71,7 @@ pub const unsafe trait Atom: Copy {
 #[diagnostic::on_unimplemented(
     message = "`{Self}` has no atomic add",
     label = "`add`, `sub`, `fetch_add` and `fetch_sub` need `AtomAdd`",
-    note = "for a newtype, derive it: `#[derive(AtomAdd)]`",
+    note = "for a newtype of a type that has it, derive it: `#[derive(AtomAdd)]`",
     note = "to change the value in a compare-exchange loop, call `update`"
 )]
 pub trait AtomAdd: Atom<Validity = Total, Repr: FetchAdd> {}
@@ -83,7 +83,7 @@ pub trait AtomAdd: Atom<Validity = Total, Repr: FetchAdd> {}
 #[diagnostic::on_unimplemented(
     message = "`{Self}` has no atomic maximum or minimum",
     label = "`max`, `min`, `fetch_max` and `fetch_min` need `AtomOrd`",
-    note = "for a newtype, derive it: `#[derive(AtomOrd)]`",
+    note = "for a newtype of a type that has it, derive it: `#[derive(AtomOrd)]`",
     note = "to change the value in a compare-exchange loop, call `update`"
 )]
 pub trait AtomOrd: Atom + Ord {}
@@ -94,7 +94,7 @@ pub trait AtomOrd: Atom + Ord {}
 #[diagnostic::on_unimplemented(
     message = "`{Self}` has no atomic bitwise operations",
     label = "`and`, `or`, `xor`, `not` and their `fetch_` forms need `AtomBitwise`",
-    note = "for a newtype, derive it: `#[derive(AtomBitwise)]`",
+    note = "for a newtype of a type that has it, derive it: `#[derive(AtomBitwise)]`",
     note = "to change the value in a compare-exchange loop, call `update`"
 )]
 pub trait AtomBitwise: Atom<Validity = Total, Repr: Bitwise> {}

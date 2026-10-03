@@ -73,6 +73,11 @@ primitive!(CellAccess);
 /// An integer primitive, or `bool`: one whose bits pack into a field of a wider word.
 ///
 /// Only atomiks implements it.
+#[diagnostic::on_unimplemented(
+    message = "`{Self}` is not an integer primitive",
+    label = "expected `bool` or an integer",
+    note = "a pointer has a pure-read `load` on every target: call it rather than `load_rmw`"
+)]
 pub impl(crate) const trait Integer: [const] Primitive {
     /// The value as unsigned bits: an integer's two's complement, `bool`'s 0 or 1.
     #[doc(hidden)]

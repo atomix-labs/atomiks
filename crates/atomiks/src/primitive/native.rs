@@ -160,6 +160,8 @@ macro_rules! bitwise {
                 cell.fetch_xor($ones, order)
             }
         }
+        // `atomic/ops.rs` repeats this cfg in the `doc(cfg(...))` of `fetch_and`, `fetch_or`,
+        // `fetch_xor` and `fetch_not`: change them with it.
         #[cfg(target_arch = "aarch64")]
         impl FetchBitwise for $kind {}
     )+};
@@ -208,6 +210,8 @@ macro_rules! integers {
             }
         }
         // `ldsmax`, `ldumin` and the rest (an LL/SC pair without LSE); `x86_64` has neither.
+        // `atomic/ops.rs` repeats this cfg in the `doc(cfg(...))` of `max`, `min`, `fetch_max` and
+        // `fetch_min`: change them with it.
         #[cfg(target_arch = "aarch64")]
         impl MinMax for $int {
             #[inline]
