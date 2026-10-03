@@ -140,7 +140,7 @@ pub impl(crate) trait Swap: CellOps {
 }
 
 /// A primitive whose wrapping add and subtract need no compare-exchange loop: `lock xadd` on
-/// `x86_64`, `ldadd` on `aarch64` (an LL/SC pair without LSE).
+/// `x86_64`, `ldadd` on `aarch64` (without LSE, an outline call or an LL/SC pair).
 #[doc(hidden)]
 pub impl(crate) trait FetchAdd: CellOps {
     /// Adds `delta`, wrapping, and returns the value before.
@@ -150,8 +150,8 @@ pub impl(crate) trait FetchAdd: CellOps {
 }
 
 /// A primitive whose and, or, xor and not need no compare-exchange loop once an optimized build
-/// discards the value before: `lock or` on `x86_64`, `stset` on `aarch64` (an LL/SC pair without
-/// LSE).
+/// discards the value before: `lock or` on `x86_64`, `ldset` on `aarch64` (without LSE, an outline
+/// call or an LL/SC pair).
 #[doc(hidden)]
 pub impl(crate) trait Bitwise: CellOps {
     /// Applies `& value`, and returns the value before.
@@ -165,27 +165,43 @@ pub impl(crate) trait Bitwise: CellOps {
 }
 
 /// A primitive whose and, or, xor and not return the value before without a compare-exchange
-/// loop: `ldclr`, `ldset` and `ldeor` on `aarch64` (an LL/SC pair without LSE).
+/// loop: `ldclr`, `ldset` and `ldeor` on `aarch64` (without LSE, an outline call or an LL/SC pair).
 ///
 /// Only atomiks implements it.
+// Above the target-neutral attribute, so the target's notes come before its fallback.
+#[cfg_attr(
+    target_arch = "x86_64",
+    diagnostic::on_unimplemented(
+        note = "x86_64's `lock and`, `lock or` and `lock xor` cannot return the value before",
+        note = "`and`, `or`, `xor` and `not` discard it, and are one instruction in an optimized build"
+    )
+)]
 #[diagnostic::on_unimplemented(
     message = "`{Self}` has no `fetch_and`, `fetch_or`, `fetch_xor` or `fetch_not` without a compare-exchange loop on this target",
     label = "this would be a compare-exchange loop",
-    note = "x86_64's `lock and`, `lock or` and `lock xor` cannot return the value before",
-    note = "`and`, `or`, `xor` and `not` discard it, and need no loop on any target",
     note = "to accept a compare-exchange loop, call `update`"
 )]
 pub impl(crate) trait FetchBitwise: Bitwise {}
 
 /// A primitive whose maximum and minimum, in its own signed or unsigned order, need no
-/// compare-exchange loop: `ldsmax`, `ldumin` and the rest on `aarch64` (an LL/SC pair without
-/// LSE).
+/// compare-exchange loop: `ldsmax`, `ldumin` and the rest on `aarch64`
+/// (without LSE, an LL/SC pair).
 ///
 /// Only atomiks implements it.
+// Above the target-neutral attribute, so the target's notes come before its fallback.
+#[cfg_attr(
+    target_arch = "x86_64",
+    diagnostic::on_unimplemented(note = "x86_64 has no atomic maximum or minimum")
+)]
+#[cfg_attr(
+    target_arch = "aarch64",
+    diagnostic::on_unimplemented(
+        note = "aarch64's atomic maximum and minimum take an integer of at most 64 bits"
+    )
+)]
 #[diagnostic::on_unimplemented(
     message = "`{Self}` has no atomic maximum or minimum without a compare-exchange loop on this target",
     label = "this would be a compare-exchange loop",
-    note = "x86_64 has no atomic maximum or minimum, and no CPU has a 128-bit one",
     note = "to accept a compare-exchange loop, call `update`"
 )]
 pub impl(crate) trait MinMax: CellOps {

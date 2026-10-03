@@ -9,12 +9,16 @@ use crate::ordering::{LoadOrdering, Ordering, Relaxed, StoreOrdering};
 use crate::primitive::{CellAccess, CellOps, Load, Primitive, Store, Swap};
 use crate::validity::Validity;
 
+mod ops;
+
 /// A value of `T` shared between threads through one atomic word.
 ///
 /// Each operation is one atomic instruction on `T`'s repr, decoded on the way out, except
 /// [`update`](Self::update), [`try_update`](Self::try_update) and [`store_rmw`](Self::store_rmw),
-/// which are compare-exchange loops. An operation the target lacks for the repr does not exist
-/// ([`Load`], [`Store`], [`Swap`], [`FetchBitwise`](crate::FetchBitwise),
+/// which are compare-exchange loops. That holds in an optimized build, and on `aarch64` with LSE:
+/// [`and`](Self::and) says what `x86_64` compiles unoptimized, and on `aarch64` without LSE a
+/// read-modify-write is an outline call or an LL/SC pair. An operation the target lacks for the
+/// repr does not exist ([`Load`], [`Store`], [`Swap`], [`FetchBitwise`](crate::FetchBitwise),
 /// [`MinMax`](crate::MinMax)), and a capability ([`AtomAdd`](crate::AtomAdd),
 /// [`AtomOrd`](crate::AtomOrd), [`AtomBitwise`](crate::AtomBitwise)) gates each read-modify-write
 /// that means something only on some values.
