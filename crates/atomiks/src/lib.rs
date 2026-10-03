@@ -38,12 +38,12 @@
 //! - orderings are types ([`ordering`]), so `load(Release)` does not compile;
 //! - a read-modify-write needs the capability that makes it mean something: [`AtomAdd`],
 //!   [`AtomOrd`], [`AtomBitwise`]; anything else is [`update`](Atomic::update);
-//! - an operation exists only where the target runs it without a compare-exchange loop: a 16-byte
-//!   [`Load`] needs LSE2 on `aarch64` or AVX on `x86_64`, else [`load_rmw`](Atomic::load_rmw) reads
-//!   with one compare-exchange, which writes, by name; [`fetch_or`](Atomic::fetch_or) and every
-//!   form of [`max`](Atomic::max) and [`min`](Atomic::min) need `aarch64` ([`FetchBitwise`],
-//!   [`MinMax`]), while [`or`](Atomic::or), which discards the value before, needs no loop anywhere
-//!   in an optimized build.
+//! - an operation exists only where the target runs it without a compare-exchange loop, as
+//!   [Platforms](#platforms) tables: without a 16-byte [`Load`], [`load_rmw`](Atomic::load_rmw)
+//!   reads with one compare-exchange, which writes, by name; [`fetch_or`](Atomic::fetch_or),
+//!   [`max`](Atomic::max) and [`min`](Atomic::min) need [`FetchBitwise`] and [`MinMax`], while
+//!   [`or`](Atomic::or), which discards the value before, needs no loop anywhere in an optimized
+//!   build.
 //!
 //! # Platforms
 //!
@@ -58,7 +58,7 @@
 //! | `x86_64` Linux  | `x86-64-v2`            | `x86-64-v3`, for AVX  | no                       |
 //!
 //! On `aarch64` Linux, a read-modify-write is LSE's one instruction with `+lse` (Armv8.1); without
-//! it, an outline call runs that instruction where the CPU has LSE, and an LL/SC pair where it does
+//! it, an outline call runs that instruction where the CPU has LSE, and an LL/SC loop where it does
 //! not. Apple's CPUs all have LSE.
 //!
 //! # Model Checking

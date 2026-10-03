@@ -40,11 +40,11 @@ with the profile, on `devset update`. Never edit `.devset/`.
 A Cargo workspace of two crates under `crates/`: `atomiks-core` holds the typed
 atomic (`Atom`, `Atomic`, the orderings, validity, the primitives, the fences,
 the cell and the loom seam), and the facade `atomiks` re-exports it. Each
-inherits its version, edition, licence and lints from the root `Cargo.toml`.
-`atomiks-derive`, behind the facade's `derive` feature, and `atomiks-lock` are
-yet to be written. Both crates build for Linux and macOS, on aarch64 and x86_64.
-The book is under `docs/`. The toolchain is the nightly `rust-toolchain.toml`
-pins, which the crates need for their nightly features, with the four targets.
+inherits its version, edition, licence and lints from the root `Cargo.toml`, and
+builds for Linux and macOS, on aarch64 and x86_64. `atomiks-derive`, behind the
+facade's `derive` feature, and `atomiks-lock` are yet to be written. The book is
+under `docs/`. The toolchain, with the four targets, is the nightly
+`rust-toolchain.toml` pins, which the crates need for their nightly features.
 The CPU floor is `.cargo/config.toml`'s: x86-64-v3, LSE on aarch64 Linux, and
 the M1 on macOS. The tools are the versions `.config/mise/` pins. The justfile's
 top section holds the repository's own recipes: the loom models, the lints for
@@ -98,14 +98,15 @@ What a change here keeps, beyond what the checks hold it to.
 ### Checks Beyond `just check`
 
 - A change to unsafe code, a primitive or a cell runs `just nightly-miri`, Miri
-  on aarch64, x86_64 and x86-64-v2, which CI runs only each night.
+  on aarch64 Linux and macOS, x86_64 and x86-64-v2, which CI runs only each
+  night.
 - A change to an ordering, a fence or a cell adds or updates its model in
   `crates/atomiks-core/tests/model.rs`, which `just check-loom` runs.
 - What the types refuse has a fixture in
-  `crates/atomiks-core/tests/compile_fail/`, and what aarch64's floor alone
-  refuses one under its `aarch64_without_lse2/`. A new toolchain may reword a
-  message; `TRYBUILD=overwrite cargo test -p atomiks-core --test trybuild`
-  writes it again, to be read before it is committed.
+  `crates/atomiks-core/tests/compile_fail/`, and what aarch64 Linux's floor
+  alone refuses one under its `aarch64_without_lse2/`. A new toolchain may
+  reword a message; `TRYBUILD=overwrite cargo test -p atomiks-core --test
+  trybuild` writes it again, to be read before it is committed.
 
 <!-- >>> devset: cargo-deny >>> -->
 

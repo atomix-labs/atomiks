@@ -195,13 +195,13 @@ mod tests {
         fs::read_to_string(&file).expect("rustc wrote the assembly where `--emit` named")
     }
 
-    /// How `target`'s assembly is written: Mach-O on macOS, ELF on Linux.
+    /// How a target's assembly is written: Mach-O on macOS, ELF on Linux.
     struct Syntax {
         /// What starts a comment: `#` on `x86_64`; on `aarch64`, where `#` marks an immediate, `;`
         /// in Mach-O and `//` in ELF.
         comment: &'static str,
-        /// What a symbol's name starts with: `_` in Mach-O.
-        symbol: &'static str,
+        /// What each symbol's name starts with: `_` in Mach-O.
+        symbol_prefix: &'static str,
         /// Whether each function keeps a frame record, as macOS's `x86_64` ABI asks: no cost of
         /// the operation, so not counted.
         frame_record: bool,
@@ -219,7 +219,7 @@ mod tests {
             } else {
                 "//"
             },
-            symbol: if macos { "_" } else { "" },
+            symbol_prefix: if macos { "_" } else { "" },
             frame_record: macos && x86_64,
         }
     }
@@ -241,7 +241,7 @@ mod tests {
         let mut lines = assembly
             .lines()
             .map(|line| line.split_once(syntax.comment).map_or(line, |(code, _)| code).trim());
-        let start = format!("{}{name}:", syntax.symbol);
+        let start = format!("{}{name}:", syntax.symbol_prefix);
         assert!(lines.any(|line| line == start), "{target}: the assembly has `{name}`");
         let mut function = Vec::new();
         for line in lines.take_while(|line| *line != ".cfi_endproc") {
@@ -361,10 +361,12 @@ mod tests {
     /// The tables together list each function once.
     fn lowers_as_expected(target: &str, cpu: Option<&str>, expected: &[&[(&str, Lowering)]]) {
         let assembly = assembly(target, cpu);
-        let symbol = syntax(target).symbol;
+        let symbol_prefix = syntax(target).symbol_prefix;
         let mut found: Vec<&str> = assembly
             .lines()
-            .filter_map(|line| line.trim().strip_prefix(".globl")?.trim().strip_prefix(symbol))
+            .filter_map(|line| {
+                line.trim().strip_prefix(".globl")?.trim().strip_prefix(symbol_prefix)
+            })
             .collect();
         found.sort_unstable();
         let mut named: Vec<&str> =
