@@ -5,7 +5,7 @@ error[E0277]: `Saturating<u8>` has no atomic add
   |                                      ^^^ `add`, `sub`, `fetch_add` and `fetch_sub` need `AtomAdd`
   |
   = help: the trait `AtomAdd` is not implemented for `Saturating<u8>`
-  = note: for a newtype of a type that has it, implement it: `impl AtomAdd for Saturating<u8> {}`
+  = note: for your own newtype over a value that has it, implement it: `impl AtomAdd for YourNewtype {}`
   = note: to change the value in a compare-exchange loop, call `update`
   = help: the following other types implement trait `AtomAdd`:
             Wrapping<T>
