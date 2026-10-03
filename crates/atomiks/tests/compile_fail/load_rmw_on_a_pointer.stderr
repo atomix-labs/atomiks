@@ -5,7 +5,7 @@ error[E0277]: `*mut u64` is not a primitive whose bits are its whole value
    |                                                    ^^^^^^^^ expected `bool` or an integer
    |
    = help: the trait `ExactBits` is not implemented for `*mut u64`
-   = note: a pointer has a pure-read `load` on every target: call it rather than `load_rmw`
+   = note: a pointer's bits do not hold its provenance: for a pure-read load of a pointer, call `load`
 help: the trait `ExactBits` is implemented for `u64`
   --> src/primitive/narrow.rs
    |
