@@ -4,19 +4,19 @@ use core::marker::PhantomData;
 use core::num::{NonZero, Saturating, Wrapping};
 
 use super::{Atom, AtomAdd, AtomBitwise, AtomOrd};
+use crate::range::ReprRange;
 use crate::validity::{Total, TotalZeroNiche, ZeroValid};
 
 /// Implements `Atom` for integers, and the capabilities listed.
 macro_rules! integers {
     (@one [$($capability:ident),*] $int:ty) => {
-        // SAFETY: an integer is its own repr and every repr an integer, its unsigned bits span
-        // `0..=MAX_REPR`, and an integer may cross threads.
+        // SAFETY: an integer is its own repr and every repr an integer, so its range is every
+        // repr, and an integer may cross threads.
         #[expect(unsafe_code, reason = "an `Atom` impl promises what loads rely on")]
         const unsafe impl Atom for $int {
             type Repr = Self;
             type Validity = Total;
-            const MIN_REPR: u128 = 0;
-            const MAX_REPR: u128 = u128::MAX.unbounded_shr(128_u32.wrapping_sub(<$int>::BITS));
+            const REPRS: ReprRange<Self> = ReprRange::FULL;
             #[inline]
             fn to_repr(self) -> Self {
                 self
@@ -42,14 +42,13 @@ integers! {
     u8, u16, u32, u64, usize, i8, i16, i32, i64, isize,
 }
 
-// SAFETY: a `bool` is its own repr and every repr a `bool`, its bits span `0..=1`, and a `bool` may
-// cross threads.
+// SAFETY: a `bool` is its own repr and every repr a `bool`, so its range is every repr, and a
+// `bool` may cross threads.
 #[expect(unsafe_code, reason = "an `Atom` impl promises what loads rely on")]
 const unsafe impl Atom for bool {
     type Repr = Self;
     type Validity = Total;
-    const MIN_REPR: u128 = 0;
-    const MAX_REPR: u128 = 1;
+    const REPRS: ReprRange<Self> = ReprRange::FULL;
     #[inline]
     fn to_repr(self) -> Self {
         self
@@ -66,7 +65,7 @@ const unsafe impl Atom for bool {
 
 impl AtomBitwise for bool {}
 
-// The ranges and capabilities above, checked at compile time.
+// The capabilities above, checked at compile time.
 const _: () = {
     /// Compiles only for a value with every capability.
     const fn has_every_capability<T: AtomAdd + AtomOrd + AtomBitwise>() {}
@@ -80,26 +79,18 @@ const _: () = {
     has_every_capability::<i32>();
     has_every_capability::<i64>();
     has_every_capability::<isize>();
-    assert!(<u8 as Atom>::MAX_REPR == 0xFF, "u8's repr spans 8 bits");
-    assert!(<i8 as Atom>::MAX_REPR == 0xFF, "i8's spans 8, as unsigned bits");
-    assert!(<i16 as Atom>::MAX_REPR == 0xFFFF, "i16's spans 16");
-    assert!(<i32 as Atom>::MAX_REPR == 0xFFFF_FFFF, "i32's spans 32");
-    assert!(<u64 as Atom>::MAX_REPR == 0xFFFF_FFFF_FFFF_FFFF, "u64's spans 64");
-    assert!(<isize as Atom>::MAX_REPR == <usize as Atom>::MAX_REPR, "isize's spans usize's");
-    assert!(<bool as Atom>::MAX_REPR == 1, "bool's spans 1 bit");
 };
 
 /// Implements `Atom` and `AtomOrd` for the nonzero integers.
 macro_rules! nonzero {
     ($($int:ty),+ $(,)?) => {$(
-        // SAFETY: the repr is the integer, never zero, and its unsigned bits span `1..=MAX_REPR`;
-        // `new` decodes exactly the nonzero ones; a nonzero integer may cross threads.
+        // SAFETY: the repr is the integer, never zero, so within every repr but zero; `new`
+        // decodes exactly the nonzero ones; a nonzero integer may cross threads.
         #[expect(unsafe_code, reason = "an `Atom` impl promises what loads rely on")]
         const unsafe impl Atom for NonZero<$int> {
             type Repr = $int;
             type Validity = TotalZeroNiche;
-            const MIN_REPR: u128 = 1;
-            const MAX_REPR: u128 = <$int as Atom>::MAX_REPR;
+            const REPRS: ReprRange<$int> = ReprRange::NONZERO;
             #[inline]
             fn to_repr(self) -> $int {
                 self.get()
@@ -120,14 +111,13 @@ macro_rules! nonzero {
 
 nonzero!(u8, u16, u32, u64, usize, i8, i16, i32, i64, isize);
 
-// SAFETY: the repr is the scalar value, within `0..=char::MAX`; `from_u32` decodes exactly the
+// SAFETY: the repr is the scalar value, from 0 to `char::MAX`; `from_u32` decodes exactly the
 // scalar values, refusing the surrogates; a `char` may cross threads.
 #[expect(unsafe_code, reason = "an `Atom` impl promises what loads rely on")]
 const unsafe impl Atom for char {
     type Repr = u32;
     type Validity = ZeroValid;
-    const MIN_REPR: u128 = 0;
-    const MAX_REPR: u128 = 0x10_FFFF;
+    const REPRS: ReprRange<u32> = ReprRange::new(0, 0x10_FFFF);
     #[inline]
     fn to_repr(self) -> u32 {
         u32::from(self)
@@ -154,8 +144,7 @@ macro_rules! floats {
         const unsafe impl Atom for $float {
             type Repr = $bits;
             type Validity = Total;
-            const MIN_REPR: u128 = 0;
-            const MAX_REPR: u128 = <$bits as Atom>::MAX_REPR;
+            const REPRS: ReprRange<$bits> = ReprRange::FULL;
             #[inline]
             fn to_repr(self) -> $bits {
                 self.to_bits()
@@ -185,8 +174,7 @@ macro_rules! zero_width {
         const unsafe impl<$($param)*> Atom for $kind {
             type Repr = u8;
             type Validity = ZeroValid;
-            const MIN_REPR: u128 = 0;
-            const MAX_REPR: u128 = 0;
+            const REPRS: ReprRange<u8> = ReprRange::new(0, 0);
             #[inline]
             fn to_repr(self) -> u8 {
                 0
@@ -216,8 +204,7 @@ macro_rules! wrappers {
         const unsafe impl<T: [const] Atom> Atom for $wrapper<T> {
             type Repr = T::Repr;
             type Validity = T::Validity;
-            const MIN_REPR: u128 = T::MIN_REPR;
-            const MAX_REPR: u128 = T::MAX_REPR;
+            const REPRS: ReprRange<T::Repr> = T::REPRS;
             #[inline]
             fn to_repr(self) -> T::Repr {
                 self.0.to_repr()
@@ -252,12 +239,3 @@ wrappers! {
 integers! { [AtomOrd] u128, i128 }
 #[cfg(wide)]
 nonzero!(u128, i128);
-
-// The 128-bit ranges, checked by the compiler: only here does `MAX_REPR` shift by zero.
-#[cfg(wide)]
-const _: () = {
-    assert!(<u128 as Atom>::MAX_REPR == u128::MAX, "u128's repr spans 128 bits");
-    assert!(<i128 as Atom>::MAX_REPR == u128::MAX, "i128's spans 128, as unsigned bits");
-    assert!(<NonZero<u128> as Atom>::MIN_REPR == 1, "NonZero<u128>'s lowest repr is 1");
-    assert!(<NonZero<u128> as Atom>::MAX_REPR == u128::MAX, "and its highest u128::MAX");
-};

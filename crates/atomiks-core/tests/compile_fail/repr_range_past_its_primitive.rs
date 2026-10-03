@@ -1,18 +1,17 @@
-//! A range with `MIN_REPR` above `MAX_REPR` bounds no repr at all, so the repr `None` takes
-//! beside it could be one a value takes.
+//! A range past its primitive's largest bits holds reprs the primitive cannot, so `None` could
+//! take one that wraps onto a value's; it is refused where the impl's range is built.
 
 #![feature(const_trait_impl)]
 
-use atomiks_core::{Atom, Atomic};
+use atomiks_core::{Atom, Atomic, ReprRange};
 
-/// No value: its range claims none.
+/// No value: its range lies past its repr.
 #[derive(Clone, Copy)]
 enum Never {}
 
 const unsafe impl Atom for Never {
     type Repr = u8;
-    const MIN_REPR: u128 = 5;
-    const MAX_REPR: u128 = 3;
+    const REPRS: ReprRange<u8> = ReprRange::new(0, 300);
     fn to_repr(self) -> u8 {
         match self {}
     }

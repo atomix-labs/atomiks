@@ -1,18 +1,17 @@
-//! A range past its primitive's would put `None` at a repr the primitive cannot hold, so `None`
-//! would wrap onto another repr.
+//! `ReprRange::new` takes its bounds in unsigned order, so a start above the end, which would claim
+//! a range through zero, is refused where the impl's range is built.
 
 #![feature(const_trait_impl)]
 
-use atomiks_core::{Atom, Atomic};
+use atomiks_core::{Atom, Atomic, ReprRange};
 
-/// No value: its range lies past its repr.
+/// No value: its range's bounds are swapped.
 #[derive(Clone, Copy)]
 enum Never {}
 
 const unsafe impl Atom for Never {
     type Repr = u8;
-    const MIN_REPR: u128 = 301;
-    const MAX_REPR: u128 = 400;
+    const REPRS: ReprRange<u8> = ReprRange::new(5, 3);
     fn to_repr(self) -> u8 {
         match self {}
     }

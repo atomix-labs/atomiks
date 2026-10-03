@@ -78,6 +78,7 @@ mod message;
 pub mod model;
 pub mod ordering;
 mod primitive;
+mod range;
 pub mod validity;
 
 pub use crate::atom::{Atom, AtomAdd, AtomBitwise, AtomOrd};
@@ -93,3 +94,4 @@ pub use crate::atomic::{
 pub use crate::atomic::{AtomicI128, AtomicU128};
 pub use crate::fence::{compiler_fence, fence};
 pub use crate::primitive::{ExactBits, FetchBitwise, Load, MinMax, Primitive, Store, Swap};
+pub use crate::range::ReprRange;

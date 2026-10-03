@@ -8,15 +8,15 @@
 use core::ptr::NonNull;
 
 use super::Atom;
+use crate::range::ReprRange;
 use crate::validity::{Total, TotalZeroNiche};
 
-// SAFETY: a pointer is its own repr and every repr a pointer, its bits span the address width, and
-// its address may cross threads, as `AtomicPtr`'s does.
+// SAFETY: a pointer is its own repr and every repr a pointer, so its range is every repr, and its
+// address may cross threads, as `AtomicPtr`'s does.
 const unsafe impl<T> Atom for *mut T {
     type Repr = Self;
     type Validity = Total;
-    const MIN_REPR: u128 = 0;
-    const MAX_REPR: u128 = <usize as Atom>::MAX_REPR;
+    const REPRS: ReprRange<Self> = ReprRange::FULL;
     #[inline]
     fn to_repr(self) -> Self {
         self
@@ -31,13 +31,12 @@ const unsafe impl<T> Atom for *mut T {
     }
 }
 
-// SAFETY: the repr is the same pointer made mutable and every repr is one, its bits span the
-// address width, and its address may cross threads, as `AtomicPtr`'s does.
+// SAFETY: the repr is the same pointer made mutable and every repr is one, so its range is every
+// repr, and its address may cross threads, as `AtomicPtr`'s does.
 const unsafe impl<T> Atom for *const T {
     type Repr = *mut T;
     type Validity = Total;
-    const MIN_REPR: u128 = 0;
-    const MAX_REPR: u128 = <usize as Atom>::MAX_REPR;
+    const REPRS: ReprRange<*mut T> = ReprRange::FULL;
     #[inline]
     fn to_repr(self) -> *mut T {
         self.cast_mut()
@@ -52,13 +51,12 @@ const unsafe impl<T> Atom for *const T {
     }
 }
 
-// SAFETY: the repr is the pointer, never null, so its bits span `1..=MAX_REPR`; `new` decodes
-// exactly the non-null ones; its address may cross threads, as `AtomicPtr`'s does.
+// SAFETY: the repr is the pointer, never null, so within every repr but zero; `new` decodes exactly
+// the non-null ones; its address may cross threads, as `AtomicPtr`'s does.
 const unsafe impl<T> Atom for NonNull<T> {
     type Repr = *mut T;
     type Validity = TotalZeroNiche;
-    const MIN_REPR: u128 = 1;
-    const MAX_REPR: u128 = <usize as Atom>::MAX_REPR;
+    const REPRS: ReprRange<*mut T> = ReprRange::NONZERO;
     #[inline]
     fn to_repr(self) -> *mut T {
         self.as_ptr()

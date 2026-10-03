@@ -52,8 +52,8 @@ pub impl(crate) const trait Validity {
 #[derive(Debug)]
 pub enum Total {}
 
-/// Every repr but zero decodes, and `MIN_REPR` is 1: zero is the niche, so `Option`'s `None` takes
-/// repr 0 and every repr of the `Option` decodes.
+/// Every repr but zero decodes: zero is the niche, so `Option`'s `None` takes repr 0 and every repr
+/// of the `Option` decodes.
 #[derive(Debug)]
 pub enum TotalZeroNiche {}
 
@@ -61,8 +61,8 @@ pub enum TotalZeroNiche {}
 #[derive(Debug)]
 pub enum ZeroValid {}
 
-/// Zero does not decode and `MIN_REPR` is 1, so `Option`'s `None` takes repr 0; other reprs need
-/// not decode.
+/// Zero does not decode, so `Option`'s `None` takes repr 0, wherever the value's range lies; other
+/// reprs need not decode.
 #[derive(Debug)]
 pub enum ZeroNiche {}
 

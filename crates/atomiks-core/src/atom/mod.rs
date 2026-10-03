@@ -5,6 +5,7 @@ mod ptr;
 mod scalar;
 
 use crate::primitive::{AddSub, Bitwise, CompareExchange, Primitive};
+use crate::range::ReprRange;
 use crate::validity::{Partial, Total, Validity};
 
 /// A value that packs into one atomic word: stored as its [`Repr`](Atom::Repr), and decoded on
@@ -17,7 +18,8 @@ use crate::validity::{Partial, Total, Validity};
 /// # Safety
 /// For every value `v`:
 ///
-/// - `to_repr(v)`'s unsigned bits lie within `MIN_REPR..=MAX_REPR`;
+/// - `to_repr(v)`'s unsigned bits lie in [`REPRS`](Atom::REPRS), the range wrapping at the repr's
+///   width;
 /// - `to_repr(v)` decodes, as `v`;
 /// - `from_repr` is a function of its repr alone: whether, and as what, a repr decodes never
 ///   changes;
@@ -33,7 +35,7 @@ use crate::validity::{Partial, Total, Validity};
 /// # extern crate atomiks_core as atomiks;
 ///
 /// use atomiks::ordering::{Acquire, Release};
-/// use atomiks::{Atom, Atomic};
+/// use atomiks::{Atom, Atomic, ReprRange};
 ///
 /// /// The side of the book an order rests on.
 /// #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -42,14 +44,13 @@ use crate::validity::{Partial, Total, Validity};
 ///     Ask,
 /// }
 ///
-/// // SAFETY: `to_repr` gives 0 or 1, within `MIN_REPR..=MAX_REPR`, and `from_repr` decodes each as
-/// // the side it came from, by the repr alone; the default `from_repr_unchecked` unwraps
-/// // `from_repr`; `Partial`, the default validity, promises no other repr; and a `Side` holds no
-/// // data, so it may cross threads.
+/// // SAFETY: `to_repr` gives 0 or 1, within `REPRS`, and `from_repr` decodes each as the side it
+/// // came from, by the repr alone; the default `from_repr_unchecked` unwraps `from_repr`;
+/// // `Partial`, the default validity, promises no other repr; and a `Side` holds no data, so it
+/// // may cross threads.
 /// const unsafe impl Atom for Side {
 ///     type Repr = u8;
-///     const MIN_REPR: u128 = 0;
-///     const MAX_REPR: u128 = 1;
+///     const REPRS: ReprRange<u8> = ReprRange::new(0, 1);
 ///     fn to_repr(self) -> u8 {
 ///         match self {
 ///             Self::Bid => 0,
@@ -65,7 +66,7 @@ use crate::validity::{Partial, Total, Validity};
 ///     }
 /// }
 ///
-/// // The side of the last fill, or `None` before the first: `None` takes repr 2, past `MAX_REPR`.
+/// // The side of the last fill, or `None` before the first: `None` takes repr 2, past `REPRS`.
 /// static LAST_FILL: Atomic<Option<Side>> = Atomic::new(None);
 ///
 /// LAST_FILL.store(Some(Side::Ask), Release);
@@ -91,11 +92,12 @@ pub const unsafe trait Atom: Copy {
     type Repr: const Primitive + CompareExchange;
     /// Which reprs decode.
     type Validity: const Validity = Partial;
-    /// No repr `to_repr` returns lies below it, as unsigned bits.
-    const MIN_REPR: u128;
-    /// No repr `to_repr` returns lies above it, as unsigned bits; its bit length is the value's
-    /// width as a field of a packed type.
-    const MAX_REPR: u128;
+    /// A range of the repr's unsigned bits that holds every repr `to_repr` returns, and may wrap
+    /// through zero: an `i8` from -1 to 1 runs from `0xFF` through zero to `0x01`.
+    ///
+    /// `Option`'s `None` takes a repr outside it, or zero where the validity says zero does not
+    /// decode.
+    const REPRS: ReprRange<Self::Repr>;
     /// The repr this value is.
     fn to_repr(self) -> Self::Repr;
     /// The value `repr` encodes, or `None` for a repr no value encodes.

@@ -3,7 +3,7 @@
 #![feature(const_trait_impl)]
 
 use atomiks_core::ordering::{Acquire, Release};
-use atomiks_core::{Atom, Atomic};
+use atomiks_core::{Atom, Atomic, ReprRange};
 
 /// The side of the book an order rests on.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -12,14 +12,12 @@ enum Side {
     Ask,
 }
 
-// SAFETY: `to_repr` gives 0 or 1, within `MIN_REPR..=MAX_REPR`, and `from_repr` decodes each as the
-// side it came from, by the repr alone; the default `from_repr_unchecked` unwraps `from_repr`;
-// `Partial`, the default validity, promises no other repr; and a `Side` holds no data, so it may
-// cross threads.
+// SAFETY: `to_repr` gives 0 or 1, within `REPRS`, and `from_repr` decodes each as the side it came
+// from, by the repr alone; the default `from_repr_unchecked` unwraps `from_repr`; `Partial`, the
+// default validity, promises no other repr; and a `Side` holds no data, so it may cross threads.
 const unsafe impl Atom for Side {
     type Repr = u8;
-    const MIN_REPR: u128 = 0;
-    const MAX_REPR: u128 = 1;
+    const REPRS: ReprRange<u8> = ReprRange::new(0, 1);
     fn to_repr(self) -> u8 {
         match self {
             Self::Bid => 0,

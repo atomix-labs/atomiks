@@ -1,4 +1,4 @@
-error[E0080]: evaluation panicked: `Option<u64>`: its values fill every repr of `u64`, so `None` has none left: use a type with a spare repr, such as `NonZero<u64>`
+error[E0080]: evaluation panicked: `Option<u64>`: its range holds every repr of `u64`, so `None` has none left: use a type with a spare repr, such as `NonZero<u64>`
  --> src/atom/option.rs
   |
   |             None => <T::Repr as Primitive>::from_bits(const { none_repr::<T>() }),
@@ -7,13 +7,13 @@ error[E0080]: evaluation panicked: `Option<u64>`: its values fill every repr of 
 note: inside `atomiks_core::atom::option::none_repr::<u64>`
  --> src/atom/option.rs
   |
-  | /             refuse_option::<T>(
-  | |                 &Message::new()
-  | |                     .text("its values fill every repr of `")
-  | |                     .name(type_name::<T::Repr>(), rest.len().saturating_add(FRAME_LEN))
-  | |                     .text(rest),
-  | |             );
-  | |_____________^
+  | /         refuse_option::<T>(
+  | |             &Message::new()
+  | |                 .text("its range holds every repr of `")
+  | |                 .name(type_name::<T::Repr>(), rest.len().saturating_add(FRAME_LEN))
+  | |                 .text(rest),
+  | |         );
+  | |_________^
 note: inside `atomiks_core::atom::option::refuse_option::<u64>`
  --> src/atom/option.rs
   |
@@ -24,17 +24,7 @@ note: inside `atomiks_core::atom::option::refuse_option::<u64>`
   | |             .text(close)
   | |             .text(advice),
   | |     )
-  | |_____^
-note: inside `atomiks_core::message::refuse`
- --> $RUST/core/src/panic.rs
-  |
-  |         $crate::panicking::panic_display(&$arg);
-  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the failure occurred here
-  |
- ::: src/message.rs
-  |
-  |     panic!("{}", message.as_str())
-  |     ------------------------------ in this macro invocation
+  | |_____^ the failure occurred here
 
 note: erroneous constant encountered
  --> src/atom/option.rs

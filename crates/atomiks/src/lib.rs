@@ -8,9 +8,9 @@
 //! # Types
 //!
 //! - **The atomic.** [`Atomic<T>`](Atomic), with an alias per primitive, such as [`AtomicU64`].
-//! - **Values.** [`Atom`] encodes a value as its repr and back, and its [`validity`] says which
-//!   reprs decode; [`AtomAdd`], [`AtomOrd`] and [`AtomBitwise`] add the read-modify-writes that
-//!   mean something for it.
+//! - **Values.** [`Atom`] encodes a value as its repr and back, its [`ReprRange`] says which reprs
+//!   it takes and its [`validity`] which decode; [`AtomAdd`], [`AtomOrd`] and [`AtomBitwise`] add
+//!   the read-modify-writes that mean something for it.
 //! - **Orderings.** The [`ordering`] types, each accepted only where it means something, and the
 //!   [`fence`](fn@fence) and [`compiler_fence`] they order.
 //! - **Primitives.** [`Primitive`], [`ExactBits`] where the bits are the whole value, and what the
@@ -98,7 +98,8 @@ pub use atomiks_core::model;
 pub use atomiks_core::{
     Atom, AtomAdd, AtomBitwise, AtomOrd, Atomic, AtomicBool, AtomicI8, AtomicI16, AtomicI32,
     AtomicI64, AtomicIsize, AtomicPtr, AtomicU8, AtomicU16, AtomicU32, AtomicU64, AtomicUsize,
-    ExactBits, FetchBitwise, Load, MinMax, Primitive, Store, Swap, compiler_fence, fence,
+    ExactBits, FetchBitwise, Load, MinMax, Primitive, ReprRange, Store, Swap, compiler_fence,
+    fence,
 };
 #[cfg(any(
     target_arch = "aarch64",
