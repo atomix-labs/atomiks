@@ -9,6 +9,7 @@ use crate::ordering::{LoadOrdering, Ordering, Relaxed, StoreOrdering};
 use crate::primitive::{CellAccess, CellOps, Integer, Load, Primitive, Store, Swap};
 use crate::validity::Validity;
 
+mod exclusive;
 mod ops;
 mod ptr;
 
@@ -16,15 +17,19 @@ pub use self::ptr::AtomicPtr;
 
 /// A value of `T` shared between threads through one atomic word.
 ///
-/// Each operation is one atomic instruction on `T`'s repr, decoded on the way out, except
-/// [`update`](Self::update), [`try_update`](Self::try_update) and [`store_rmw`](Self::store_rmw),
-/// which are compare-exchange loops. That holds in an optimized build, and on `aarch64` with LSE:
-/// [`and`](Self::and) says what `x86_64` compiles unoptimized, and on `aarch64` without LSE a
-/// read-modify-write is an outline call or an LL/SC pair. An operation the target lacks for the
-/// repr does not exist ([`Load`], [`Store`], [`Swap`], [`FetchBitwise`](crate::FetchBitwise),
-/// [`MinMax`](crate::MinMax)), and a capability ([`AtomAdd`](crate::AtomAdd),
-/// [`AtomOrd`](crate::AtomOrd), [`AtomBitwise`](crate::AtomBitwise)) gates each read-modify-write
-/// that means something only on some values.
+/// Each operation through `&self` is one atomic instruction on `T`'s repr, decoded on the way
+/// out, except [`update`](Self::update), [`try_update`](Self::try_update) and
+/// [`store_rmw`](Self::store_rmw), which are compare-exchange loops. That holds in an optimized
+/// build, and on `aarch64` with LSE: [`and`](Self::and) says what `x86_64` compiles unoptimized,
+/// and on `aarch64` without LSE a read-modify-write is an outline call or an LL/SC pair. An
+/// operation the target lacks for the repr does not exist ([`Load`], [`Store`], [`Swap`],
+/// [`FetchBitwise`](crate::FetchBitwise), [`MinMax`](crate::MinMax)), and a capability
+/// ([`AtomAdd`](crate::AtomAdd), [`AtomOrd`](crate::AtomOrd), [`AtomBitwise`](crate::AtomBitwise))
+/// gates each read-modify-write that means something only on some values.
+///
+/// [`new`](Self::new) and [`into_inner`](Self::into_inner) need `T: const Atom`, so generic
+/// run-time code builds one with [`From`] and reads it back with [`get`](Self::get); a const
+/// caller of `get` or [`set`](Self::set) needs `const_trait_impl`.
 ///
 /// # Examples
 /// ```
@@ -45,12 +50,13 @@ pub use self::ptr::AtomicPtr;
 /// ```
 #[repr(transparent)]
 pub struct Atomic<T: Atom> {
-    // INVARIANT: holds a repr that decodes: one `to_repr` returned, or one a read-modify-write
-    // left, which either needs `Total` (add, the bitwise operations, the pointer offsets), keeps
-    // one of its operands (max, min), or leaves the repr as it was (`load_rmw`, which writes zero
-    // only over zero, on an integer repr, whose exchange compares every bit). Its writers are this
-    // module and its submodules, and whoever writes through `as_ptr` or `from_ptr`, whose
-    // contracts keep it.
+    // INVARIANT: holds a repr that decodes: one `to_repr` returned; one a read-modify-write left,
+    // which either needs `Total` (add, the bitwise operations, the pointer offsets), keeps one of
+    // its operands (max, min), or leaves the repr as it was (`load_rmw`, which writes zero only
+    // over zero, on an integer repr, whose exchange compares every bit); or any repr written
+    // through `get_mut`, whose `Total` bound makes every one decode. Its writers are this module
+    // and its submodules, whoever writes through `get_mut`'s place, and whoever writes through
+    // `as_ptr` or `from_ptr`, whose contracts keep it.
     /// The cell holding `T`'s repr: the validity's wrapper around the primitive's cell.
     cell: <T::Validity as Validity>::Cell<T::Repr>,
     /// The type of the value the repr encodes.
@@ -127,7 +133,7 @@ impl<T: Atom> Atomic<T> {
 
     /// The value, consuming the atomic.
     #[cfg(not(loom))]
-    #[expect(unsafe_code, reason = "as `decode`, which is not const")]
+    #[expect(unsafe_code, reason = "decodes a repr read from the cell")]
     #[inline]
     #[must_use]
     pub const fn into_inner(self) -> T
@@ -136,7 +142,7 @@ impl<T: Atom> Atomic<T> {
     {
         let repr = T::Repr::from_cell(T::Validity::into_inner::<T::Repr>(self.cell));
         // SAFETY: by the field INVARIANT, the repr read from the cell decodes.
-        unsafe { T::from_repr_unchecked(repr) }
+        unsafe { Self::decode(repr) }
     }
 
     /// The value, consuming the atomic.
@@ -162,7 +168,10 @@ impl<T: Atom> Atomic<T> {
     /// `repr` decodes: it was read from the cell.
     #[expect(unsafe_code, reason = "a repr read from the cell needs no `from_repr` check")]
     #[inline]
-    unsafe fn decode(repr: T::Repr) -> T {
+    const unsafe fn decode(repr: T::Repr) -> T
+    where
+        T: [const] Atom,
+    {
         // SAFETY: the caller's repr decodes.
         unsafe { T::from_repr_unchecked(repr) }
     }
