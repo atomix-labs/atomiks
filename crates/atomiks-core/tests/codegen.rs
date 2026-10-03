@@ -1,9 +1,10 @@
 //! What each operation lowers to, per target, read from the assembly of `tests/codegen`.
 //!
-//! The fixture builds with the repository's CPU floor and, on `aarch64`, with LSE2 too. Each
-//! operation is the instructions and barriers its name promises, with no compare-exchange loop but
-//! `update`'s; each target refuses each operation it lacks: `x86_64` those only `aarch64` has, and
-//! `aarch64`'s floor the 128-bit ones it has no instruction for.
+//! The fixture builds for Linux and macOS with the repository's CPU floor and, on `aarch64` Linux,
+//! with LSE2 too. Each operation is the instructions and barriers its name promises, with no
+//! compare-exchange loop but `update`'s; each target refuses each operation it lacks: `x86_64`
+//! those only `aarch64` has, and `aarch64` Linux's floor the 128-bit ones it has no instruction
+//! for.
 
 // Miri cannot run the compiler, and loom's atomics are not what ships.
 #![cfg(on_hardware)]
@@ -28,7 +29,9 @@ mod tests {
     use Lowering::{InOrder, Only, Retry};
 
     const AARCH64_LINUX: &str = "aarch64-unknown-linux-gnu";
+    const AARCH64_MACOS: &str = "aarch64-apple-darwin";
     const X86_64_LINUX: &str = "x86_64-unknown-linux-gnu";
+    const X86_64_MACOS: &str = "x86_64-apple-darwin";
 
     /// Each function of the fixture on `aarch64` that lowers the same with LSE2 as without.
     const AARCH64: &[(&str, Lowering)] = &[
@@ -75,7 +78,7 @@ mod tests {
         ("u128_update", Retry(&["caspa", "caspal"])),
     ];
 
-    /// The rest on `aarch64` with LSE2 (`neoverse-v1`).
+    /// The rest on `aarch64` with LSE2: `neoverse-v1` on Linux, and macOS's floor, `apple-m1`.
     ///
     /// A 128-bit load or store is `ldp` or `stp` with the barriers its ordering needs, and an
     /// Acquire load is `ldapr`.
@@ -91,7 +94,8 @@ mod tests {
         ("u128_update", Retry(&["ldp", "dmb ishld", "caspal"])),
     ];
 
-    /// Each function of the fixture on `x86_64` with the `x86-64-v3` floor (AVX).
+    /// Each function of the fixture on `x86_64` with the `x86-64-v3` floor (AVX), Linux's and
+    /// macOS's.
     const X86_64: &[(&str, Lowering)] = &[
         ("u64_load", Only(&["movq", "retq"])),
         ("u64_store", Only(&["movq", "retq"])),
@@ -193,6 +197,35 @@ mod tests {
         fs::read_to_string(&file).expect("rustc wrote the assembly where `--emit` named")
     }
 
+    /// How `target`'s assembly is written: Mach-O on macOS, ELF on Linux.
+    struct Syntax {
+        /// What starts a comment: `#` on `x86_64`; on `aarch64`, where `#` marks an immediate, `;`
+        /// in Mach-O and `//` in ELF.
+        comment: &'static str,
+        /// What a symbol's name starts with: `_` in Mach-O.
+        symbol: &'static str,
+        /// Whether each function keeps a frame record, as macOS's `x86_64` ABI asks: no cost of
+        /// the operation, so not counted.
+        frame_record: bool,
+    }
+
+    /// The syntax of `target`'s assembly.
+    fn syntax(target: &str) -> Syntax {
+        let macos = target.ends_with("-apple-darwin");
+        let x86_64 = target.starts_with("x86_64");
+        Syntax {
+            comment: if x86_64 {
+                "#"
+            } else if macos {
+                ";"
+            } else {
+                "//"
+            },
+            symbol: if macos { "_" } else { "" },
+            frame_record: macos && x86_64,
+        }
+    }
+
     /// One line of a function's assembly.
     enum Line {
         /// A branch target.
@@ -202,18 +235,24 @@ mod tests {
         Instruction { mnemonic: String, branch: Option<String> },
     }
 
-    /// The labels and instructions of the function `name` in `target`'s assembly.
+    /// The labels and instructions of the function `name` in `target`'s assembly, which ends, in
+    /// ELF and Mach-O alike, at its `.cfi_endproc`.
     fn function(target: &str, assembly: &str, name: &str) -> Vec<Line> {
-        // The assembler's comment: `#` in x86_64's syntax, `//` on aarch64, where `#` marks an
-        // immediate.
-        let comment = if target.starts_with("x86_64") { "#" } else { "//" };
+        let syntax = syntax(target);
         let mut lines = assembly
             .lines()
-            .map(|line| line.split_once(comment).map_or(line, |(code, _)| code).trim());
-        let start = format!("{name}:");
+            .map(|line| line.split_once(syntax.comment).map_or(line, |(code, _)| code).trim());
+        let start = format!("{}{name}:", syntax.symbol);
         assert!(lines.any(|line| line == start), "{target}: the assembly has `{name}`");
         let mut function = Vec::new();
-        for line in lines.take_while(|line| !line.starts_with(".Lfunc_end")) {
+        for line in lines.take_while(|line| *line != ".cfi_endproc") {
+            let words: Vec<&str> = line.split_whitespace().collect();
+            if syntax.frame_record
+                && [["pushq", "%rbp"].as_slice(), &["movq", "%rsp,", "%rbp"], &["popq", "%rbp"]]
+                    .contains(&words.as_slice())
+            {
+                continue;
+            }
             if let Some(label) = line.strip_suffix(':') {
                 function.push(Line::Label(label.to_owned()));
                 continue;
@@ -267,6 +306,13 @@ mod tests {
     fn assert_no_unnamed_cost(target: &str, name: &str, lines: &[Line], lowering: &Lowering) {
         let (InOrder(wanted) | Only(wanted) | Retry(wanted)) = *lowering;
         let retries = matches!(lowering, Retry(_));
+        let local: Vec<&str> = lines
+            .iter()
+            .filter_map(|line| match line {
+                Line::Label(label) => Some(label.as_str()),
+                Line::Instruction { .. } => None,
+            })
+            .collect();
         let mut labels = Vec::new();
         let mut mnemonics = Vec::new();
         let mut branches_back = 0_usize;
@@ -274,7 +320,7 @@ mod tests {
             match line {
                 Line::Label(label) => labels.push(label.as_str()),
                 Line::Instruction { mnemonic, branch } => {
-                    let leaves = branch.as_deref().is_some_and(|to| !to.starts_with(".L"));
+                    let leaves = branch.as_deref().is_some_and(|to| !local.contains(&to));
                     assert!(
                         !leaves
                             && !mnemonic.starts_with("call")
@@ -316,9 +362,10 @@ mod tests {
     /// The tables together list each function once.
     fn lowers_as_expected(target: &str, cpu: Option<&str>, expected: &[&[(&str, Lowering)]]) {
         let assembly = assembly(target, cpu);
+        let symbol = syntax(target).symbol;
         let mut found: Vec<&str> = assembly
             .lines()
-            .filter_map(|line| line.trim().strip_prefix(".type")?.trim().strip_suffix(",@function"))
+            .filter_map(|line| line.trim().strip_prefix(".globl")?.trim().strip_prefix(symbol))
             .collect();
         found.sort_unstable();
         let mut named: Vec<&str> =
@@ -370,8 +417,18 @@ mod tests {
     }
 
     #[test]
+    fn aarch64_macos_lowers_each_operation_to_its_instruction() {
+        lowers_as_expected(AARCH64_MACOS, None, &[AARCH64, AARCH64_LSE2]);
+    }
+
+    #[test]
     fn x86_64_lowers_each_operation_to_its_instruction() {
         lowers_as_expected(X86_64_LINUX, None, &[X86_64]);
+    }
+
+    #[test]
+    fn x86_64_macos_lowers_each_operation_to_its_instruction() {
+        lowers_as_expected(X86_64_MACOS, None, &[X86_64]);
     }
 
     #[test]
