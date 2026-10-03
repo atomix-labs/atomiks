@@ -383,8 +383,8 @@ impl<T: Atom> Atomic<T> {
 
     /// The repr's address, for interop.
     ///
-    /// Every access through it while the atomic is shared is atomic, and a write
-    /// leaves a repr [`from_repr`](Atom::from_repr) decodes.
+    /// Every access through it while the atomic is shared is atomic and of the repr's width, and a
+    /// write leaves a repr [`from_repr`](Atom::from_repr) decodes.
     #[cfg(not(loom))]
     #[inline]
     #[must_use]

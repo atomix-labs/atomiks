@@ -21,7 +21,7 @@ pub struct AcqRel;
 /// operation and fence that all threads agree on.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
 pub struct SeqCst;
-/// A fence that orders earlier stores before later ones, and nothing else.
+/// A [`fence`](fn@crate::fence) that orders earlier stores before later ones, and nothing else.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
 pub struct StoreStore;
 
@@ -63,7 +63,7 @@ pub impl(crate) trait FenceOrdering: Copy {
     /// narrowest that covers it.
     #[doc(hidden)]
     const CORE_FENCE: CoreOrdering;
-    /// Whether `fence` emits the store-store barrier rather than `CORE_FENCE`'s.
+    /// Whether `fence` emits `aarch64`'s store-store barrier rather than `CORE_FENCE`'s.
     #[doc(hidden)]
     const IS_STORE_STORE: bool = false;
 }
