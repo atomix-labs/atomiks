@@ -139,6 +139,9 @@ mod tests {
         has_auto_traits::<Atomic<T>>();
     }
 
+    // A pointer is neither `Send` nor `Sync`, so only `Atomic`'s own impls give its atomic either.
+    const _: () = has_auto_traits::<Atomic<*mut u8>>();
+
     #[test]
     fn an_atomic_is_send_sync_and_ref_unwind_safe_whatever_its_value() {
         atomic_has_auto_traits::<u64>();

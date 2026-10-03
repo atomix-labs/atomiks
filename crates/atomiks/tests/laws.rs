@@ -282,45 +282,52 @@ mod tests {
         total::<Option<NonNull<u8>>>(pointer)
     }
 
-    #[test]
-    fn every_byte_obeys_the_laws() -> Result<(), TestCaseError> {
-        for bits in 0..=u128::from(u8::MAX) {
-            narrow_integer_laws(bits, bits.wrapping_add(1))?;
-            let byte = u8::from_bits(bits);
-            canonical::<()>(byte)?;
-            canonical::<PhantomData<str>>(byte)?;
-            canonical::<Option<()>>(byte)?;
-            canonical::<Option<Option<()>>>(byte)?;
-            canonical::<Option<PhantomData<str>>>(byte)?;
+    /// Panics with the broken law's message, where `laws` broke one.
+    #[track_caller]
+    fn holds(laws: Result<(), TestCaseError>) {
+        if let Err(broken) = laws {
+            panic!("{broken}");
         }
-        for value in [false, true] {
-            total::<bool>(value)?;
-            round_trips(value)?;
-        }
-        zero_decodes::<()>()?;
-        zero_decodes::<PhantomData<str>>()?;
-        zero_decodes::<Option<()>>()?;
-        round_trips(())?;
-        round_trips(PhantomData::<str>)?;
-        round_trips(Some(()))?;
-        round_trips(None::<()>)?;
-        round_trips(None::<Option<()>>)
     }
 
     #[test]
-    fn every_edge_obeys_the_laws() -> Result<(), TestCaseError> {
+    fn every_byte_obeys_the_laws() {
+        for bits in 0..=u128::from(u8::MAX) {
+            holds(narrow_integer_laws(bits, bits.wrapping_add(1)));
+            let byte = u8::from_bits(bits);
+            holds(canonical::<()>(byte));
+            holds(canonical::<PhantomData<str>>(byte));
+            holds(canonical::<Option<()>>(byte));
+            holds(canonical::<Option<Option<()>>>(byte));
+            holds(canonical::<Option<PhantomData<str>>>(byte));
+        }
+        for value in [false, true] {
+            holds(total::<bool>(value));
+            holds(round_trips(value));
+        }
+        holds(zero_decodes::<()>());
+        holds(zero_decodes::<PhantomData<str>>());
+        holds(zero_decodes::<Option<()>>());
+        holds(round_trips(()));
+        holds(round_trips(PhantomData::<str>));
+        holds(round_trips(Some(())));
+        holds(round_trips(None::<()>));
+        holds(round_trips(None::<Option<()>>));
+    }
+
+    #[test]
+    fn every_edge_obeys_the_laws() {
         for bits in edges(&CHAR_EDGES) {
-            narrow_integer_laws(bits, bits.wrapping_sub(1))?;
-            char_laws(bits, char::MAX)?;
-            float_laws(bits)?;
-            pointer_laws(bits)?;
+            holds(narrow_integer_laws(bits, bits.wrapping_sub(1)));
+            holds(char_laws(bits, char::MAX));
+            holds(float_laws(bits));
+            holds(pointer_laws(bits));
             #[cfg(any(
                 target_arch = "aarch64",
                 all(target_arch = "x86_64", target_feature = "cmpxchg16b")
             ))]
-            wide_laws(bits, bits.wrapping_sub(1))?;
+            holds(wide_laws(bits, bits.wrapping_sub(1)));
         }
-        Ok(())
     }
 
     #[test]

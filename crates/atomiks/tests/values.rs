@@ -129,6 +129,41 @@ mod tests {
         assert!(constant.load(Relaxed).is_null(), "a *const too");
     }
 
+    /// A ticket number, never zero, whose `Atom` impl keeps the default `from_repr_unchecked`.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    struct Ticket(NonZero<u32>);
+
+    // SAFETY: the repr is the ticket's number, never zero, so within `1..=MAX_REPR`; `from_repr`
+    // decodes exactly the nonzero reprs, each as the ticket it numbers; the default unchecked
+    // decode unwraps `from_repr`; `Partial` promises nothing; a number may cross threads.
+    #[expect(unsafe_code, reason = "an `Atom` impl promises what loads rely on")]
+    unsafe impl Atom for Ticket {
+        type Repr = u32;
+        const MIN_REPR: u128 = 1;
+        const MAX_REPR: u128 = 0xFFFF_FFFF;
+        fn to_repr(self) -> u32 {
+            self.0.get()
+        }
+        fn from_repr(repr: u32) -> Option<Self> {
+            NonZero::new(repr).map(Self)
+        }
+    }
+
+    #[test]
+    fn the_default_unchecked_decode_reads_back_each_ticket() {
+        let ticket = |number| Ticket(NonZero::new(number).expect("ticket numbers start at 1"));
+        let next = Atomic::from(ticket(1));
+        assert_eq!(next.load(Acquire), ticket(1), "a load decodes the ticket built");
+        next.store(ticket(2), Release);
+        assert_eq!(next.swap(ticket(3), AcqRel), ticket(2), "a swap, the ticket stored");
+        assert_eq!(
+            next.compare_exchange(ticket(3), ticket(4), AcqRel, Acquire),
+            Ok(ticket(3)),
+            "a compare-exchange, the ticket swapped in"
+        );
+        assert_eq!(next.load(Relaxed), ticket(4), "and a load, the ticket exchanged in");
+    }
+
     #[test]
     fn exclusive_access_encodes_as_the_atomic_operations_do() {
         let mut owner = Atomic::<Option<NonZero<u64>>>::new(None);

@@ -1,0 +1,28 @@
+//! A range past its primitive's would put `None` at a repr the primitive cannot hold, so `None`
+//! would wrap onto another repr.
+
+#![feature(const_trait_impl)]
+
+use atomiks::{Atom, Atomic};
+
+/// No value: its range lies past its repr.
+#[derive(Clone, Copy)]
+enum Never {}
+
+const unsafe impl Atom for Never {
+    type Repr = u8;
+    const MIN_REPR: u128 = 301;
+    const MAX_REPR: u128 = 400;
+    fn to_repr(self) -> u8 {
+        match self {}
+    }
+    fn from_repr(_: u8) -> Option<Self> {
+        None
+    }
+}
+
+static SLOT: Atomic<Option<Never>> = Atomic::new(None);
+
+fn main() {
+    let _ = &SLOT;
+}
