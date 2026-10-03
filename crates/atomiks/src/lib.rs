@@ -52,6 +52,9 @@ extern crate std;
 
 mod atom;
 mod atomic;
+pub mod cell;
+mod fence;
+pub mod hint;
 mod message;
 pub mod ordering;
 mod primitive;
@@ -67,6 +70,7 @@ pub use crate::atomic::{
     all(target_arch = "x86_64", target_feature = "cmpxchg16b")
 ))]
 pub use crate::atomic::{AtomicI128, AtomicU128};
+pub use crate::fence::{compiler_fence, fence};
 #[doc(hidden)]
 pub use crate::primitive::{Bitwise, CellAccess, CellOps, FetchAdd};
 pub use crate::primitive::{FetchBitwise, Integer, Load, MinMax, Primitive, Store, Swap};
