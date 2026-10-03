@@ -9,13 +9,13 @@ miri := "MIRIFLAGS='-Zmiri-strict-provenance -Zmiri-isolation-error=warn-nobackt
 # x86-64 goes through `RUSTFLAGS`, which replaces the floor. Only the models run: a doctest fails
 # under loom, whose atomics exist only inside a model, with no `const` `new` and no `from_ptr`.
 
-# Lints atomiks under loom on aarch64, and on x86_64 with the floor and x86-64; runs the models.
+# Lints every crate under loom on aarch64, and on x86_64 with the floor and x86-64; runs the models.
 [metadata("rust")]
 check-loom:
-    cargo clippy -p atomiks --all-targets {{ loom }} --target aarch64-unknown-linux-gnu -- -D warnings
-    cargo clippy -p atomiks --all-targets {{ loom }} --target x86_64-unknown-linux-gnu -- -D warnings
-    RUSTFLAGS='--cfg loom -C target-cpu=x86-64' cargo clippy -p atomiks --all-targets --features loom --target x86_64-unknown-linux-gnu --target-dir target/loom-x86-64 -- -D warnings
-    cargo test -p atomiks {{ loom }} --test model
+    cargo clippy --workspace --all-targets {{ loom }} --target aarch64-unknown-linux-gnu -- -D warnings
+    cargo clippy --workspace --all-targets {{ loom }} --target x86_64-unknown-linux-gnu -- -D warnings
+    RUSTFLAGS='--cfg loom -C target-cpu=x86-64' cargo clippy --workspace --all-targets --features loom --target x86_64-unknown-linux-gnu --target-dir target/loom-x86-64 -- -D warnings
+    cargo test -p atomiks-core {{ loom }} --test model
 
 # x86_64's floor has AVX; x86-64-v2 has `cmpxchg16b` but no AVX; x86-64 has neither, so no 128-bit
 # atomics. The last two go through `RUSTFLAGS`, which replaces the floor.
@@ -31,11 +31,11 @@ check-targets:
 # Checks the codegen fixture's formatting, which `cargo fmt --all` misses: it is its own workspace.
 [metadata("rust")]
 check-codegen-fmt:
-    rustfmt --check crates/atomiks/tests/codegen/src/lib.rs
+    rustfmt --check crates/atomiks-core/tests/codegen/src/lib.rs
 
 # Formats the codegen fixture.
 fix-codegen-fmt:
-    rustfmt crates/atomiks/tests/codegen/src/lib.rs
+    rustfmt crates/atomiks-core/tests/codegen/src/lib.rs
 
 # x86_64's floor has AVX; x86-64-v2's 128-bit load is a compare-exchange.
 
@@ -43,9 +43,9 @@ fix-codegen-fmt:
 [metadata("rust")]
 nightly-miri:
     rustup component add miri
-    {{ miri }} cargo miri test -p atomiks --target aarch64-unknown-linux-gnu
-    {{ miri }} cargo miri test -p atomiks --target x86_64-unknown-linux-gnu
-    {{ miri }} RUSTFLAGS='-C target-cpu=x86-64-v2' cargo miri test -p atomiks --target x86_64-unknown-linux-gnu --target-dir target/miri-x86-64-v2
+    {{ miri }} cargo miri test --workspace --target aarch64-unknown-linux-gnu
+    {{ miri }} cargo miri test --workspace --target x86_64-unknown-linux-gnu
+    {{ miri }} RUSTFLAGS='-C target-cpu=x86-64-v2' cargo miri test --workspace --target x86_64-unknown-linux-gnu --target-dir target/miri-x86-64-v2
 
 # >>> devset: just >>>
 # Each active profile's recipes.

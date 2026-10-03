@@ -12,11 +12,14 @@ repository   = "https://github.com/atomix-labs/atomiks"
 
 [workspace.dependencies]
 # external
+cfg_aliases        = { version = "0.2.2" }
 loom               = { version = "0.7" }
 proptest           = { version = "1.11", default-features = false, features = ["std"] }
 tracing            = { version = "0.1.44", default-features = false, features = ["std"] }
 tracing-subscriber = { version = "0.3.23", default-features = false, features = ["env-filter", "fmt"] }
 trybuild           = { version = "1.0" }
+# internal
+atomiks-core = { path = "crates/atomiks-core", version = "0.1.0", default-features = false }
 
 [workspace.lints]
 

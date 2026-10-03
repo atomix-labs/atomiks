@@ -1,6 +1,6 @@
 [package]
 name                   = "atomiks"
-description            = "typed atomics for any value that fits one atomic word."
+description            = "typed atomics for any value that fits one atomic word, and the locks built on them."
 version.workspace      = true
 edition.workspace      = true
 rust-version.workspace = true
@@ -10,18 +10,11 @@ repository.workspace   = true
 
 [features]
 default = []
-loom    = ["dep:loom", "dep:tracing", "dep:tracing-subscriber"]
+loom    = ["atomiks-core/loom"]
 
 [lints]
 workspace = true
 
-[dev-dependencies]
-# external
-proptest = { workspace = true }
-trybuild = { workspace = true }
-
-[target.'cfg(loom)'.dependencies]
-# external
-loom               = { workspace = true, optional = true }
-tracing            = { workspace = true, optional = true }
-tracing-subscriber = { workspace = true, optional = true }
+[dependencies]
+# internal
+atomiks-core = { workspace = true }
