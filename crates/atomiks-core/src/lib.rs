@@ -55,10 +55,11 @@
 
 #[cfg(all(loom, not(feature = "loom")))]
 compile_error!(concat!(
-    "atomiks: `--cfg loom` needs the `loom` feature: pass `--features atomiks/loom`, or depend \
-     with `[target.'cfg(loom)'.dependencies] atomiks = { version = \"",
+    "atomiks: `--cfg loom` needs the `loom` feature: depend with `[target.'cfg(loom)'.dependencies] \
+     atomiks = { version = \"",
     env!("CARGO_PKG_VERSION"),
-    "\", features = [\"loom\"] }`"
+    "\", features = [\"loom\"] }`, or pass `--features atomiks/loom`, or `atomiks-core/loom` \
+     where atomiks-core is the dependency"
 ));
 
 // The loom model of a 128-bit cell keeps its table in `std`; `alloc` only where that model is.

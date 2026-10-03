@@ -10,13 +10,13 @@ fn main() {
         // A 16-byte load and store with no compare-exchange: LSE2's, or AVX's.
         wide_load_store: { all(wide, any(target_feature = "lse2", target_feature = "avx")) },
         // x86_64 with no `cmpxchg16b`, where a refusal of a 128-bit value names the CPU it needs.
-        no_cmpxchg16b: { all(target_arch = "x86_64", not(target_feature = "cmpxchg16b")) },
+        x86_64_without_cmpxchg16b: { all(target_arch = "x86_64", not(target_feature = "cmpxchg16b")) },
         // The 128-bit cell is core's `AtomicU128`, which loom does not model.
         core_atomic_u128: { all(target_arch = "aarch64", not(loom)) },
+        // Neither loom's model nor Miri's interpreter: the atomics are the CPU's, and a test can
+        // run cargo.
+        on_hardware: { not(any(loom, miri)) },
         // `fence(StoreStore)` is `dmb ishst`, an `asm!` that neither loom nor Miri runs.
-        dmb_ishst: { all(target_arch = "aarch64", not(any(loom, miri))) },
-        // A test builds its fixtures with cargo, which Miri cannot run, and from what ships, not
-        // from loom's model of it.
-        compiles_fixtures: { not(any(loom, miri)) },
+        dmb_ishst: { all(target_arch = "aarch64", on_hardware) },
     }
 }

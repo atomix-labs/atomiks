@@ -64,9 +64,9 @@ What a change here keeps, beyond what the checks hold it to.
 - Imports, never paths: neither a body nor an attribute names `core::`,
   `crate::` or another crate's path. A doc link may.
 - A cfg that repeats is one alias in `crates/atomiks-core/build.rs`, as `wide`
-  is. rustdoc names an alias as it is written, so `lib.rs` hides each one from
-  the badges, and a public item one gates writes its condition out in a
-  `doc(cfg)`.
+  is. rustdoc names an alias as it is written, so `lib.rs` hides each alias a
+  public item uses from the badges, and a public type writes its condition out
+  in a `doc(cfg)`.
 - Every name is whole words, never a fragment such as `at`, `by` or `held`.
 - The facade has no code of its own: it re-exports each item by name, and an
   item `atomiks-core` makes public is re-exported in the same change.

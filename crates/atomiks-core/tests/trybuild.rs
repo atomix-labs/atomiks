@@ -2,7 +2,7 @@
 //! message.
 
 // Loom's cells exist only inside a model, and Miri cannot run the compiler.
-#![cfg(compiles_fixtures)]
+#![cfg(on_hardware)]
 
 #[cfg(test)]
 mod tests {

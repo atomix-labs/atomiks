@@ -6,7 +6,7 @@
 //! `aarch64`'s floor the 128-bit ones it has no instruction for.
 
 // Miri cannot run the compiler, and loom's atomics are not what ships.
-#![cfg(compiles_fixtures)]
+#![cfg(on_hardware)]
 
 #[cfg(test)]
 mod tests {

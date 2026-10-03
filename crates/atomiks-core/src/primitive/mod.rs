@@ -46,7 +46,7 @@ macro_rules! primitive {
             label = "expected `bool`, an integer or a `*mut T`"
         )]
         #[cfg_attr(
-            no_cmpxchg16b,
+            x86_64_without_cmpxchg16b,
             diagnostic::on_unimplemented(
                 note = "a 128-bit integer needs `cmpxchg16b` on x86_64: build with `-C target-cpu=x86-64-v2` or newer"
             )
@@ -102,7 +102,7 @@ pub impl(crate) const trait ExactBits: [const] Primitive {
     label = "expected `bool`, an integer or a `*mut T`"
 )]
 #[cfg_attr(
-    no_cmpxchg16b,
+    x86_64_without_cmpxchg16b,
     diagnostic::on_unimplemented(
         note = "a 128-bit integer needs `cmpxchg16b` on x86_64: build with `-C target-cpu=x86-64-v2` or newer"
     )
