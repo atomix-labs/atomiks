@@ -142,6 +142,9 @@ impl<T: Atom> Atomic<T> {
     }
 
     /// The value, consuming the atomic.
+    ///
+    /// Needs a `const` [`Atom`] impl, as [`new`](Self::new) does; with any other impl, read the
+    /// value back with [`get`](Self::get).
     #[cfg(not(loom))]
     #[expect(unsafe_code, reason = "decodes a repr read from the cell")]
     #[inline]
