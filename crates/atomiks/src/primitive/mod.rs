@@ -149,6 +149,22 @@ pub impl(crate) trait FetchAdd: CellOps {
     fn fetch_sub(cell: &Self::Cell, delta: Self, order: CoreOrdering) -> Self;
 }
 
+/// A pointer primitive whose offsets, by elements or by bytes, need no compare-exchange loop:
+/// `lock xadd` on `x86_64`, `ldadd` on `aarch64` (without LSE, an outline call or an LL/SC pair).
+///
+/// Each keeps the pointer's provenance. Loom's pointer cell has no arithmetic, so under loom each
+/// offset is a compare-exchange loop.
+pub(crate) trait PtrOffset: CellOps {
+    /// Offsets the pointer by `count` elements, wrapping, and returns the pointer before.
+    fn fetch_ptr_add(cell: &Self::Cell, count: usize, order: CoreOrdering) -> Self;
+    /// Offsets the pointer back by `count` elements, wrapping, and returns the pointer before.
+    fn fetch_ptr_sub(cell: &Self::Cell, count: usize, order: CoreOrdering) -> Self;
+    /// Offsets the pointer by `bytes`, wrapping, and returns the pointer before.
+    fn fetch_byte_add(cell: &Self::Cell, bytes: usize, order: CoreOrdering) -> Self;
+    /// Offsets the pointer back by `bytes`, wrapping, and returns the pointer before.
+    fn fetch_byte_sub(cell: &Self::Cell, bytes: usize, order: CoreOrdering) -> Self;
+}
+
 /// A primitive whose and, or, xor and not need no compare-exchange loop once an optimized build
 /// discards the value before: `lock or` on `x86_64`, `ldset` on `aarch64` (without LSE, an outline
 /// call or an LL/SC pair).

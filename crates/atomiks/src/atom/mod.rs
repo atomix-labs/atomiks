@@ -1,5 +1,7 @@
 //! A value storable in an atomic, and which read-modify-writes mean something on it.
 
+mod option;
+mod ptr;
 mod scalar;
 
 use crate::primitive::{Bitwise, CellOps, FetchAdd, Primitive};

@@ -8,7 +8,9 @@ use core::sync::atomic::Ordering as CoreOrdering;
 #[cfg(loom)]
 use loom::sync::atomic;
 
-use super::{Bitwise, CellAccess, CellOps, FetchAdd, Integer, Load, Primitive, Store, Swap};
+use super::{
+    Bitwise, CellAccess, CellOps, FetchAdd, Integer, Load, Primitive, PtrOffset, Store, Swap,
+};
 #[cfg(target_arch = "aarch64")]
 use super::{FetchBitwise, MinMax};
 
@@ -268,6 +270,63 @@ const impl<T> Primitive for *mut T {
     #[inline]
     fn is_bits(self, bits: u128) -> bool {
         bits == 0 && self.is_null()
+    }
+}
+
+#[cfg(not(loom))]
+impl<T> PtrOffset for *mut T {
+    #[inline]
+    fn fetch_ptr_add(cell: &Self::Cell, count: usize, order: CoreOrdering) -> Self {
+        cell.fetch_ptr_add(count, order)
+    }
+    #[inline]
+    fn fetch_ptr_sub(cell: &Self::Cell, count: usize, order: CoreOrdering) -> Self {
+        cell.fetch_ptr_sub(count, order)
+    }
+    #[inline]
+    fn fetch_byte_add(cell: &Self::Cell, bytes: usize, order: CoreOrdering) -> Self {
+        cell.fetch_byte_add(bytes, order)
+    }
+    #[inline]
+    fn fetch_byte_sub(cell: &Self::Cell, bytes: usize, order: CoreOrdering) -> Self {
+        cell.fetch_byte_sub(bytes, order)
+    }
+}
+
+// Loom's pointer cell has no arithmetic.
+#[cfg(loom)]
+impl<T> PtrOffset for *mut T {
+    #[inline]
+    fn fetch_ptr_add(cell: &Self::Cell, count: usize, order: CoreOrdering) -> Self {
+        offset_in_loop(cell, order, |seen| seen.wrapping_add(count))
+    }
+    #[inline]
+    fn fetch_ptr_sub(cell: &Self::Cell, count: usize, order: CoreOrdering) -> Self {
+        offset_in_loop(cell, order, |seen| seen.wrapping_sub(count))
+    }
+    #[inline]
+    fn fetch_byte_add(cell: &Self::Cell, bytes: usize, order: CoreOrdering) -> Self {
+        offset_in_loop(cell, order, |seen| seen.wrapping_byte_add(bytes))
+    }
+    #[inline]
+    fn fetch_byte_sub(cell: &Self::Cell, bytes: usize, order: CoreOrdering) -> Self {
+        offset_in_loop(cell, order, |seen| seen.wrapping_byte_sub(bytes))
+    }
+}
+
+/// Applies `offset` to the pointer in a compare-exchange loop, and returns the pointer before.
+#[cfg(loom)]
+fn offset_in_loop<T, F: Fn(*mut T) -> *mut T>(
+    cell: &atomic::AtomicPtr<T>, order: CoreOrdering, offset: F,
+) -> *mut T {
+    // ORDERING: `order` on the exchange that lands, whose read is the pointer returned; Relaxed on
+    // every other read, which is only compared.
+    let mut seen = cell.load(CoreOrdering::Relaxed);
+    loop {
+        match cell.compare_exchange_weak(seen, offset(seen), order, CoreOrdering::Relaxed) {
+            Ok(before) => return before,
+            Err(found) => seen = found,
+        }
     }
 }
 
