@@ -14,12 +14,12 @@
 <!-- dprint-ignore-end -->
 <!-- <<< devset: project <<< -->
 
-atomiks is a workspace of Rust crates for sharing state between threads. Its
-first crate, `atomiks`, gives any value that fits one atomic word a typed
-atomic: integers, `NonZero`s, `char`s, floats, pointers, and `Option`s that
-spend a spare bit pattern on `None`, with orderings checked at compile time and
-every operation the instruction its name promises. It is in early development,
-and no crate is released yet.
+atomiks is a workspace of Rust crates for sharing state between threads. The
+`atomiks` crate gives any value that fits one atomic word a typed atomic:
+integers, `NonZero`s, `char`s, floats, pointers, and `Option`s that spend a
+spare bit pattern on `None`, with orderings checked at compile time and every
+operation the instruction its name promises. It re-exports `atomiks-core`, which
+holds them. It is in early development, and no crate is released yet.
 
 ## Documentation
 
@@ -37,7 +37,7 @@ Either [the MIT License][mit] or [the Apache License, Version 2.0][apache], at
 your option.
 
 [book]: https://atomix-labs.github.io/atomiks/
-[changelog]: CHANGELOG.md
-[contributing]: CONTRIBUTING.md
-[mit]: LICENSE-MIT
-[apache]: LICENSE-APACHE
+[changelog]: https://github.com/atomix-labs/atomiks/blob/main/CHANGELOG.md
+[contributing]: https://github.com/atomix-labs/atomiks/blob/main/CONTRIBUTING.md
+[mit]: https://github.com/atomix-labs/atomiks/blob/main/LICENSE-MIT
+[apache]: https://github.com/atomix-labs/atomiks/blob/main/LICENSE-APACHE
