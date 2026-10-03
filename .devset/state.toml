@@ -39,9 +39,21 @@ decision = "written"
 exact = "9ccdf435877abe0b89c73c81ff6f3b32ec371f502eaef1e62dd71bd1e1286e2b"
 canonical = "9ccdf435877abe0b89c73c81ff6f3b32ec371f502eaef1e62dd71bd1e1286e2b"
 
+[files.".claude/skills/drawing-the-logo/SKILL.md"]
+exact = "5f19eb08f80b7a659848893da7d029f1de4163f21013eb82451d42cc804dc947"
+canonical = "5f19eb08f80b7a659848893da7d029f1de4163f21013eb82451d42cc804dc947"
+
+[files.".claude/skills/drawing-the-logo/scripts/draw.py"]
+exact = "208bc5f70ccca475c18da227153b122822866fdf7f6df67537164f16540a04fc"
+canonical = "208bc5f70ccca475c18da227153b122822866fdf7f6df67537164f16540a04fc"
+
 [files.".claude/skills/editing-cargo-manifests/SKILL.md"]
-exact = "dea9a4c6f5fe3dc22bd2611e3994153cab60c001fd558721848f1d8dc40643e2"
-canonical = "dea9a4c6f5fe3dc22bd2611e3994153cab60c001fd558721848f1d8dc40643e2"
+exact = "14c5954bb4c93259b2c8210171e9dca76d27cca6d5be7cf5c58face1212fca9c"
+canonical = "14c5954bb4c93259b2c8210171e9dca76d27cca6d5be7cf5c58face1212fca9c"
+
+[files.".claude/skills/editing-cargo-manifests/references/publishing.md"]
+exact = "805d581c052e100af99c4611aeb465044c5765bdd8885b4073dd962b34b65d61"
+canonical = "805d581c052e100af99c4611aeb465044c5765bdd8885b4073dd962b34b65d61"
 
 [files.".claude/skills/editing-cargo-manifests/references/sources.md"]
 exact = "225679cb4054f7eb0d15e904228103d89b07fe34c68d3d0b7aacebfd9c96ed6b"
@@ -59,13 +71,17 @@ canonical = "0f9d1987e1fc16785a8e445a7b774dbc73c64e8fe841e8910ba9d130ebe8c7b9"
 exact = "7baa60eaed457e424d6694b65bfc598a4cb8383088efe307c88a61c525af68e9"
 canonical = "7baa60eaed457e424d6694b65bfc598a4cb8383088efe307c88a61c525af68e9"
 
+[files.".claude/skills/preparing-a-release-for-open-source/SKILL.md"]
+exact = "746bd3680dea679795420c3ea6974254cc026b4d5d20bbbf4a8ed8aca2861c4f"
+canonical = "746bd3680dea679795420c3ea6974254cc026b4d5d20bbbf4a8ed8aca2861c4f"
+
 [files.".claude/skills/review-names/SKILL.md"]
 exact = "da66972488e301ae6a750c85c0dbe96348cb87df9a4a9e0767a6c61589637111"
 canonical = "da66972488e301ae6a750c85c0dbe96348cb87df9a4a9e0767a6c61589637111"
 
 [files.".claude/skills/review-rust/SKILL.md"]
-exact = "3009d3d311d9638551f539ac1330a0128d1662f55278fa46cbf2a950dbb1d157"
-canonical = "3009d3d311d9638551f539ac1330a0128d1662f55278fa46cbf2a950dbb1d157"
+exact = "85d02a2207c96ba2ebc4c2a7efb6e818de40ef8bdd9eaf0936cf1ffe34b1c555"
+canonical = "85d02a2207c96ba2ebc4c2a7efb6e818de40ef8bdd9eaf0936cf1ffe34b1c555"
 
 [files.".claude/skills/review-security/SKILL.md"]
 exact = "4bfae0104f6225f46e12ad25fece1e026a2a0904666b67fea62f07ae324a1462"
@@ -84,12 +100,12 @@ exact = "2bc04fdf0e90f515c6f0774c0d89002aafa1b100ff63c826eaa2ec737e7a9ce1"
 canonical = "2bc04fdf0e90f515c6f0774c0d89002aafa1b100ff63c826eaa2ec737e7a9ce1"
 
 [files.".claude/skills/tuning-rust-performance/references/allocation.md"]
-exact = "9943452e5a1260d04ce1034a2f747f89f1345e4a5647bd24155f3c2177165bb7"
-canonical = "9943452e5a1260d04ce1034a2f747f89f1345e4a5647bd24155f3c2177165bb7"
+exact = "5d500e6f7b506187df382b91d02cafb1515620ba3d337da6c7ce17c7270ae112"
+canonical = "5d500e6f7b506187df382b91d02cafb1515620ba3d337da6c7ce17c7270ae112"
 
 [files.".claude/skills/tuning-rust-performance/references/codegen.md"]
-exact = "8ed15797423071d4eacfebc07a22d4a2e9f63c7db57f48fc9acf840b9c4ace39"
-canonical = "8ed15797423071d4eacfebc07a22d4a2e9f63c7db57f48fc9acf840b9c4ace39"
+exact = "ccf4a97be2846d54a2562d8aa0a0f72fe91aac2fc1f048d6c06f2cd464f236bb"
+canonical = "ccf4a97be2846d54a2562d8aa0a0f72fe91aac2fc1f048d6c06f2cd464f236bb"
 
 [files.".claude/skills/tuning-rust-performance/references/data-layout.md"]
 exact = "2413cc20b60ce66e1a8205f70c4ab96c8b93a1d2a1d59c8ddc3941084de0f32c"
@@ -108,8 +124,8 @@ exact = "6b3c2229064b56f590e367f23d6bdfe1464b8c68be9ce2ac97f33a146a3def71"
 canonical = "6b3c2229064b56f590e367f23d6bdfe1464b8c68be9ce2ac97f33a146a3def71"
 
 [files.".claude/skills/using-devset/SKILL.md"]
-exact = "1b58e22f094fc69b393afe5ad006e4c801799970f8ebf89a26e689a43b9a9a1a"
-canonical = "1b58e22f094fc69b393afe5ad006e4c801799970f8ebf89a26e689a43b9a9a1a"
+exact = "76bd0e2921620997ce87ae94edacf744a1f471a6d419d3bd29527ec32b178307"
+canonical = "76bd0e2921620997ce87ae94edacf744a1f471a6d419d3bd29527ec32b178307"
 
 [files.".claude/skills/writing-prose/SKILL.md"]
 exact = "120dbace7272c424a2877a6d0dc02b8d7fcbac4c3260c8461e130b437580cddc"
@@ -152,16 +168,16 @@ exact = "e43d45100e5670583012e3a0162c86b67b1f13f2d3880cc0313624316b551ad6"
 canonical = "e43d45100e5670583012e3a0162c86b67b1f13f2d3880cc0313624316b551ad6"
 
 [files.".claude/skills/writing-readmes/SKILL.md"]
-exact = "4dec46b896fefaa80147e83b5829e659affe0dbd0c0123f22e40ac9d0165f437"
-canonical = "4dec46b896fefaa80147e83b5829e659affe0dbd0c0123f22e40ac9d0165f437"
+exact = "b3bbbe1d19d224e05167c17ba96181dd44be7f4e712a932e35b515f9a911a942"
+canonical = "b3bbbe1d19d224e05167c17ba96181dd44be7f4e712a932e35b515f9a911a942"
 
 [files.".claude/skills/writing-readmes/references/sources.md"]
 exact = "d39d8d8ead7d8d9dd7f88926b9ec50f526390de89968fd8b3f0a282c88c1ec6a"
 canonical = "d39d8d8ead7d8d9dd7f88926b9ec50f526390de89968fd8b3f0a282c88c1ec6a"
 
 [files.".claude/skills/writing-readmes/references/templates.md"]
-exact = "756cf40ee660d948edffcb491fcbeb47220153e8d7767ba32b1b0796b6cd7d4d"
-canonical = "756cf40ee660d948edffcb491fcbeb47220153e8d7767ba32b1b0796b6cd7d4d"
+exact = "152622dba93f0eebc0f03da00ed290165fe823a69342e233abca4a71082a829e"
+canonical = "152622dba93f0eebc0f03da00ed290165fe823a69342e233abca4a71082a829e"
 
 [files.".claude/skills/writing-rust-tests/SKILL.md"]
 exact = "97c3dc5b220f68b8b1067fb55205be8418f384ad917e94cd104be0549dcf8146"
@@ -176,8 +192,8 @@ exact = "110802c7c6dfacc961dfab8d1f3646785e42a79ceb2ddf7859047a122b3737b2"
 canonical = "110802c7c6dfacc961dfab8d1f3646785e42a79ceb2ddf7859047a122b3737b2"
 
 [files.".claude/skills/writing-rust-tests/references/properties.md"]
-exact = "d1a0fca34911dffa0079c8802e15b711f56062d9b91f9ea5ddb9285cbb414d81"
-canonical = "d1a0fca34911dffa0079c8802e15b711f56062d9b91f9ea5ddb9285cbb414d81"
+exact = "039e9e7a4a5e820eeb163aae2bfed8e8f7f866bcd2eac4c344a809a8123d0636"
+canonical = "039e9e7a4a5e820eeb163aae2bfed8e8f7f866bcd2eac4c344a809a8123d0636"
 
 [files.".claude/skills/writing-rust-tests/references/running.md"]
 exact = "84bf7f7d1cf20ac5195dc19b5f0dbe19c44c646d46afdd36e4ab7acd7d33e8a5"
@@ -192,76 +208,80 @@ exact = "d9311080d92d8f014689b6ed22538a5a7db3f078a422afafdfc56981295dda9f"
 canonical = "d9311080d92d8f014689b6ed22538a5a7db3f078a422afafdfc56981295dda9f"
 
 [files.".claude/skills/writing-rust/SKILL.md"]
-exact = "38ecadef800415f0532247788c5722f8d40ed25770a8224ad699abded6f4db47"
-canonical = "38ecadef800415f0532247788c5722f8d40ed25770a8224ad699abded6f4db47"
+exact = "5e0d08827e3a28e8d20ce6ff316ff8a368ef11886fbfc64bdfd0566be838abfe"
+canonical = "5e0d08827e3a28e8d20ce6ff316ff8a368ef11886fbfc64bdfd0566be838abfe"
 
 [files.".claude/skills/writing-rust/references/api-design.md"]
-exact = "ab92b6375b5c2efef48ea9510e8b3ca754de6ca75268bf6a4fb820023b4e0549"
-canonical = "ab92b6375b5c2efef48ea9510e8b3ca754de6ca75268bf6a4fb820023b4e0549"
+exact = "92538d27758285d4c842296f7cb90646b5defba6184c319f9f42e0f22ce2532b"
+canonical = "92538d27758285d4c842296f7cb90646b5defba6184c319f9f42e0f22ce2532b"
 
 [files.".claude/skills/writing-rust/references/errors.md"]
-exact = "0d1c2c1e25a61aaecd19b0c29ac647cf7fdae9a0a0d7607ca60b81c85a996bed"
-canonical = "0d1c2c1e25a61aaecd19b0c29ac647cf7fdae9a0a0d7607ca60b81c85a996bed"
+exact = "afde231c9e0340034c4678a9bcc339906b6ae26183a1081d771cf38cff442a90"
+canonical = "afde231c9e0340034c4678a9bcc339906b6ae26183a1081d771cf38cff442a90"
 
 [files.".claude/skills/writing-rust/references/layout.md"]
-exact = "b115c55a94beb5a5ac73c48ee145b881a0a4d896857061683b610b5c79bd7916"
-canonical = "b115c55a94beb5a5ac73c48ee145b881a0a4d896857061683b610b5c79bd7916"
+exact = "538936cc34484d429239b9bfea8f77ce0eb45fa5cf9c65a15aeb838ff6e494d9"
+canonical = "538936cc34484d429239b9bfea8f77ce0eb45fa5cf9c65a15aeb838ff6e494d9"
 
 [files.".claude/skills/writing-rust/references/lints.md"]
 exact = "7244a75cac7bc1a143b0627b539eeb3479144ddf14f5d7351ba1273a66a528f8"
 canonical = "7244a75cac7bc1a143b0627b539eeb3479144ddf14f5d7351ba1273a66a528f8"
 
 [files.".claude/skills/writing-rust/references/naming.md"]
-exact = "1bb0a3dac781cb51fd721b0385945b9fd628a80a1c318af2e52e0ee56339c61d"
-canonical = "1bb0a3dac781cb51fd721b0385945b9fd628a80a1c318af2e52e0ee56339c61d"
+exact = "c5394d489793c5eb0903eec4c0c52b4db3f65128c3986ba19c8f4fa27bdea2d4"
+canonical = "c5394d489793c5eb0903eec4c0c52b4db3f65128c3986ba19c8f4fa27bdea2d4"
 
 [files.".claude/skills/writing-rust/references/ownership.md"]
 exact = "2d2472338be0aa8ca747e88c9877b7a77a8132600b87ec82ce8ed6818b48be86"
 canonical = "2d2472338be0aa8ca747e88c9877b7a77a8132600b87ec82ce8ed6818b48be86"
 
 [files.".claude/skills/writing-rust/references/sources.md"]
-exact = "3b54afbf440e387df6e1fa175504479fed6c2ce194debb12882f467d5c76815c"
-canonical = "3b54afbf440e387df6e1fa175504479fed6c2ce194debb12882f467d5c76815c"
+exact = "52877f28fb093f5e40dea5597741b0bab6fa9d190ef4196e54980589e00d5b31"
+canonical = "52877f28fb093f5e40dea5597741b0bab6fa9d190ef4196e54980589e00d5b31"
 
 [files.".claude/skills/writing-rustdoc/SKILL.md"]
-exact = "b4da6819e3b98a0d4ff8a11558af5ae9ea62a3663ce5fbb022ea6a0a33af7fcc"
-canonical = "b4da6819e3b98a0d4ff8a11558af5ae9ea62a3663ce5fbb022ea6a0a33af7fcc"
+exact = "c68769e9ecf052dc1022bbcdcb8393e45169ea130b1036edf347d69ecc757a89"
+canonical = "c68769e9ecf052dc1022bbcdcb8393e45169ea130b1036edf347d69ecc757a89"
 
 [files.".claude/skills/writing-rustdoc/references/comments.md"]
-exact = "abd492dec3e25642553548bfefe59cf51ce3a828a886a8cb39beb5412999572a"
-canonical = "abd492dec3e25642553548bfefe59cf51ce3a828a886a8cb39beb5412999572a"
+exact = "59ea17b1284048d45b164478be40604f70ee8caf1360288cca31bb394a463380"
+canonical = "59ea17b1284048d45b164478be40604f70ee8caf1360288cca31bb394a463380"
 
 [files.".claude/skills/writing-rustdoc/references/exemplars.md"]
-exact = "207dcd3072d4a653e8c23dc7b0aeef86473a5ddfc708a1dd4b77e8dda5856ae5"
-canonical = "207dcd3072d4a653e8c23dc7b0aeef86473a5ddfc708a1dd4b77e8dda5856ae5"
+exact = "dfdc69c4fb47f1439616b3ba62a6e4625401564e4d955e3a081c1986be55e855"
+canonical = "dfdc69c4fb47f1439616b3ba62a6e4625401564e4d955e3a081c1986be55e855"
 
 [files.".claude/skills/writing-rustdoc/references/sources.md"]
 exact = "33fb98b4db8f4823d4f702dc1fab4b6deff69f9a247688ea85b4fd5c87d88f65"
 canonical = "33fb98b4db8f4823d4f702dc1fab4b6deff69f9a247688ea85b4fd5c87d88f65"
 
 [files.".claude/skills/writing-rustdoc/references/style.md"]
-exact = "74112e5c8b7b6dd418118b5f7afcd4b8dd000ffaad58f831bf8e45227805c8d4"
-canonical = "74112e5c8b7b6dd418118b5f7afcd4b8dd000ffaad58f831bf8e45227805c8d4"
+exact = "473bbc2b78c3f8e0a450f75a8c0cc03d2d2f9753c11adf330ea92a9f6185ceea"
+canonical = "473bbc2b78c3f8e0a450f75a8c0cc03d2d2f9753c11adf330ea92a9f6185ceea"
 
 [files.".claude/skills/writing-rustdoc/references/templates.md"]
-exact = "a83557a0c97fee48d5a8cb5207943b3b86f544074554fa100054c0e3adc9e096"
-canonical = "a83557a0c97fee48d5a8cb5207943b3b86f544074554fa100054c0e3adc9e096"
+exact = "1410ad69b5d67ebe1405bcf887f903a0867b8e1e3ef05e4c806990d741a16317"
+canonical = "1410ad69b5d67ebe1405bcf887f903a0867b8e1e3ef05e4c806990d741a16317"
 
 [files.".claude/skills/writing-rustdoc/references/tooling.md"]
-exact = "c32eb62a964d206cbf1403e3821d95851c5ded3bb893c17c473f26af44c13fb8"
-canonical = "c32eb62a964d206cbf1403e3821d95851c5ded3bb893c17c473f26af44c13fb8"
+exact = "160385ec243cc977259b7a93ed6b4c4daa4d54ee6b5f07c95f201ab11bbc7ee9"
+canonical = "160385ec243cc977259b7a93ed6b4c4daa4d54ee6b5f07c95f201ab11bbc7ee9"
 
 [files.".claude/skills/writing-rustdoc/scripts/doc-audit.sh"]
 exact = "223285eb4be23bfddc569131303b627b41e3b594386b0b3e94e5a2a2a7bf7f5b"
 canonical = "223285eb4be23bfddc569131303b627b41e3b594386b0b3e94e5a2a2a7bf7f5b"
 
 [files.".claude/skills/writing-rustdoc/scripts/doc-inventory.py"]
-exact = "4afd46c92fab57b3675d5e54de839c3818d35c1dd58ca9e4551a0ea3a6ee55e0"
-canonical = "4afd46c92fab57b3675d5e54de839c3818d35c1dd58ca9e4551a0ea3a6ee55e0"
+exact = "7d3d1fde033f55c44977215b504ba32ca8b93becbb559d6c613df4b3a10f1fe0"
+canonical = "7d3d1fde033f55c44977215b504ba32ca8b93becbb559d6c613df4b3a10f1fe0"
 
 [files.".claude/skills/writing-the-book/SKILL.md"]
-exact = "453707c9f9ecc041501aa0601dc6dc8606d4604e56f550f137fd57bf71ee5f7b"
-canonical = "453707c9f9ecc041501aa0601dc6dc8606d4604e56f550f137fd57bf71ee5f7b"
+exact = "533ebaa0b7629577e36b4a0cfff1744fd1cb0aca2ce0712ba477382b8881977a"
+canonical = "533ebaa0b7629577e36b4a0cfff1744fd1cb0aca2ce0712ba477382b8881977a"
+
+[files.".claude/skills/writing-the-book/references/library-book.md"]
+exact = "864e543678c693be3c246585c9ba1008ac7b11bfc90d836f158fe7cadae1de1d"
+canonical = "864e543678c693be3c246585c9ba1008ac7b11bfc90d836f158fe7cadae1de1d"
 
 [files.".claude/skills/writing-unsafe-rust/SKILL.md"]
 exact = "e3c5962c629dc69527c7ef19ace30279240b78d68d56e165d44f47beb41666eb"
@@ -404,8 +424,8 @@ exact = "badcb39b58a8dae35da9f2a8daa9f11ff3e1a78db95f9571ca76df5626d682cc"
 canonical = "badcb39b58a8dae35da9f2a8daa9f11ff3e1a78db95f9571ca76df5626d682cc"
 
 [files.".github/dependabot.yml"]
-exact = "a3b46f6af5470e1bd191784a760f51862dca4b30d4e76e5b99e49fedad7f375d"
-canonical = "a3b46f6af5470e1bd191784a760f51862dca4b30d4e76e5b99e49fedad7f375d"
+exact = "5ba93fdee95e2f39e397130e8961ddc75812633cef4104ab2088aed863b37053"
+canonical = "5ba93fdee95e2f39e397130e8961ddc75812633cef4104ab2088aed863b37053"
 policy = "merge"
 
 [files.".github/pull_request_template.md"]
@@ -426,24 +446,24 @@ exact = "59b882fbad94e0849b341b823a212d4f11b1877eb919150310479114d4359829"
 canonical = "59b882fbad94e0849b341b823a212d4f11b1877eb919150310479114d4359829"
 
 [files.".github/workflows/bump.yml"]
-exact = "2e6a5ad7a240c5860e3feef7028a9bfe2e3e035df8c599192945077d24efacf2"
-canonical = "2e6a5ad7a240c5860e3feef7028a9bfe2e3e035df8c599192945077d24efacf2"
+exact = "4f9535f05582c06ebfda55436604e791657a9d825f60e6f7a8606b2f88f59834"
+canonical = "4f9535f05582c06ebfda55436604e791657a9d825f60e6f7a8606b2f88f59834"
 
 [files.".github/workflows/check.yml"]
-exact = "a0a3ef511b25ec1ccb0019bf0b6f6c6be9d0a00287e73fa15c80a4cafd2dd47a"
-canonical = "a0a3ef511b25ec1ccb0019bf0b6f6c6be9d0a00287e73fa15c80a4cafd2dd47a"
+exact = "ebb6644035f66b0b95ffcf4f8971424e758225cc9dd15ba8bcbc05f61ded9fd3"
+canonical = "ebb6644035f66b0b95ffcf4f8971424e758225cc9dd15ba8bcbc05f61ded9fd3"
 
 [files.".github/workflows/labels.yml"]
 exact = "3b09611ae913272ce0f0efd481b67c53106acb54fc0f0d6b1fa1d2536da83351"
 canonical = "3b09611ae913272ce0f0efd481b67c53106acb54fc0f0d6b1fa1d2536da83351"
 
 [files.".github/workflows/nightly.yml"]
-exact = "69fee0fcb143cbe264cc46138f38d81b3def66630dd6c7c769649a36713e40da"
-canonical = "69fee0fcb143cbe264cc46138f38d81b3def66630dd6c7c769649a36713e40da"
+exact = "df5f52a24b526e2c7fa764de4fa213d175008bb31c2f2f4aaa1f8824f8dbc7ad"
+canonical = "df5f52a24b526e2c7fa764de4fa213d175008bb31c2f2f4aaa1f8824f8dbc7ad"
 
 [files.".github/workflows/title.yml"]
-exact = "075361af1418e1f331c9eaeaec8c028958a9afa510b677ae881d63b06221832c"
-canonical = "075361af1418e1f331c9eaeaec8c028958a9afa510b677ae881d63b06221832c"
+exact = "0e50a75d68dafc871a1ceff09da823a2169c550e1ba277e5e374cb2929e093bc"
+canonical = "0e50a75d68dafc871a1ceff09da823a2169c550e1ba277e5e374cb2929e093bc"
 
 [files.".github/workflows/watch.yml"]
 exact = "924c85f281df0e944b28a753b81f6f536b3c6d5f192ca27aed6c75af5b57280a"
@@ -550,8 +570,8 @@ exact = "e5d1bf0bfde89c21dbe14fd07589416386c2810f5836e89f4f6befd39fc73143"
 canonical = "e5d1bf0bfde89c21dbe14fd07589416386c2810f5836e89f4f6befd39fc73143"
 
 [files.".just/rust-doc.py"]
-exact = "95f7c581d64fbd2878b747dca8daef6fb99a655d42d86fb23f0dd7daa2f6729e"
-canonical = "95f7c581d64fbd2878b747dca8daef6fb99a655d42d86fb23f0dd7daa2f6729e"
+exact = "20e0f5777b831a97f4efe40c290704a6c304ea803af0981e4b815bb6183c0cf2"
+canonical = "20e0f5777b831a97f4efe40c290704a6c304ea803af0981e4b815bb6183c0cf2"
 
 [files.".just/rust-fmt.just"]
 exact = "aedbb96af3066ea64851f190c37afc8f536e85aae24584cda9b2ce684a77cbf1"
@@ -795,6 +815,7 @@ canonical = "d21a7c0b3dca1668b2034fcc68496382da99b43af977b7a1903e617a8644904e"
 scope = "keys"
 exact = "c1b77d647da73c905c644a3a19b8a36ef0578ac036852adbd559ebe858d32b43"
 canonical = "c1b77d647da73c905c644a3a19b8a36ef0578ac036852adbd559ebe858d32b43"
+policy = "merge"
 
 [parts.".claude/settings.json".agents]
 scope = "keys"
