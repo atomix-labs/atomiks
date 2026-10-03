@@ -299,58 +299,53 @@ mod x86_64 {
         }
 
         /// The AVX 16-byte load.
+        ///
+        /// A comparison chain, not a `match`: `Ordering` is non-exhaustive, and its callers,
+        /// `Atomic::load` and `read_for_rmw`, pass only a `LoadOrdering`'s, so the last branch is
+        /// `SeqCst`'s.
         #[cfg(target_feature = "avx")]
         #[expect(unsafe_code, reason = "the 16-byte atomic load of the cell's own bits")]
-        #[expect(
-            clippy::wildcard_enum_match_arm,
-            reason = "the last arm is SeqCst's, and `Ordering` is non-exhaustive"
-        )]
         #[inline]
         pub(super) fn load(&self, order: CoreOrdering) -> u128 {
             let bits = self.bits.get().cast_const();
-            match order {
+            if order == CoreOrdering::Relaxed {
                 // SAFETY: `bits` is valid and aligned to 16, and every shared access is atomic (the
                 // field INVARIANT).
-                CoreOrdering::Relaxed => unsafe {
-                    atomic_load::<u128, { AtomicOrdering::Relaxed }, false>(bits)
-                },
+                unsafe { atomic_load::<u128, { AtomicOrdering::Relaxed }, false>(bits) }
+            } else if order == CoreOrdering::Acquire {
                 // SAFETY: as the Relaxed load.
-                CoreOrdering::Acquire => unsafe {
-                    atomic_load::<u128, { AtomicOrdering::Acquire }, false>(bits)
-                },
-                // Its callers, `Atomic::load` and `read_for_rmw`, pass only a `LoadOrdering`'s, so
-                // this is SeqCst; `Ordering` is non-exhaustive, and SeqCst covers the rest.
+                unsafe { atomic_load::<u128, { AtomicOrdering::Acquire }, false>(bits) }
+            } else {
                 // SAFETY: as the Relaxed load.
-                _ => unsafe { atomic_load::<u128, { AtomicOrdering::SeqCst }, false>(bits) },
+                unsafe { atomic_load::<u128, { AtomicOrdering::SeqCst }, false>(bits) }
             }
         }
 
         /// The AVX 16-byte store.
+        ///
+        /// A comparison chain, as the load is: its caller, `Atomic::store`, passes only a
+        /// `StoreOrdering`'s, so the last branch is `SeqCst`'s.
         #[cfg(target_feature = "avx")]
         #[expect(unsafe_code, reason = "the 16-byte atomic store to the cell's own bits")]
-        #[expect(
-            clippy::wildcard_enum_match_arm,
-            reason = "the last arm is SeqCst's, and `Ordering` is non-exhaustive"
-        )]
         #[inline]
         pub(super) fn store(&self, value: u128, order: CoreOrdering) {
             let bits = self.bits.get();
-            match order {
+            if order == CoreOrdering::Relaxed {
                 // SAFETY: `bits` is valid and aligned to 16, and every shared access is atomic (the
                 // field INVARIANT).
-                CoreOrdering::Relaxed => unsafe {
+                unsafe {
                     atomic_store::<u128, { AtomicOrdering::Relaxed }, false>(bits, value);
-                },
+                }
+            } else if order == CoreOrdering::Release {
                 // SAFETY: as the Relaxed store.
-                CoreOrdering::Release => unsafe {
+                unsafe {
                     atomic_store::<u128, { AtomicOrdering::Release }, false>(bits, value);
-                },
-                // Its caller, `Atomic::store`, passes only a `StoreOrdering`'s, so this is SeqCst;
-                // `Ordering` is non-exhaustive, and SeqCst covers the rest.
+                }
+            } else {
                 // SAFETY: as the Relaxed store.
-                _ => unsafe {
+                unsafe {
                     atomic_store::<u128, { AtomicOrdering::SeqCst }, false>(bits, value);
-                },
+                }
             }
         }
     }
