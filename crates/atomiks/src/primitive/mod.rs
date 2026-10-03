@@ -6,7 +6,7 @@ use core::marker::Destruct;
 use core::panic::RefUnwindSafe;
 use core::sync::atomic::Ordering as CoreOrdering;
 
-mod native;
+mod narrow;
 #[cfg(any(target_arch = "aarch64", all(target_arch = "x86_64", target_feature = "cmpxchg16b")))]
 mod wide;
 
@@ -70,26 +70,27 @@ primitive!([const] CellAccess);
 #[cfg(loom)]
 primitive!(CellAccess);
 
-/// An integer primitive, or `bool`: one whose bits pack into a field of a wider word.
+/// A primitive whose bits are its whole value: `bool` or an integer, never a pointer, whose
+/// provenance its bits do not hold. `Primitive::IS_BITS_EXACT` is true exactly for these.
 ///
 /// Only atomiks implements it.
 #[diagnostic::on_unimplemented(
-    message = "`{Self}` is not an integer primitive",
+    message = "`{Self}` is not a primitive whose bits are its whole value",
     label = "expected `bool` or an integer",
     note = "a pointer has a pure-read `load` on every target: call it rather than `load_rmw`"
 )]
-pub impl(crate) const trait Integer: [const] Primitive {
+pub impl(crate) const trait ExactBits: [const] Primitive {
     /// The value as unsigned bits: an integer's two's complement, `bool`'s 0 or 1.
     #[doc(hidden)]
     fn to_bits(self) -> u128;
 }
 
-/// The operations every primitive's cell has.
+/// The compare-exchange every primitive's cell has, and the read that starts a loop of them.
 ///
 /// Every operation here and in the capabilities below takes the `core` spelling of an atomiks
 /// ordering its caller's bound admits, so `core` never refuses one.
 #[doc(hidden)]
-pub impl(crate) trait CellOps: Primitive {
+pub impl(crate) trait CompareExchange: Primitive {
     /// The first read of an update loop: a load where there is one, else a compare-exchange.
     fn read_for_rmw(cell: &Self::Cell, order: CoreOrdering) -> Self;
     /// Writes `new` if the cell holds `current`; returns the value before, `Ok` if `current`.
@@ -111,7 +112,7 @@ pub impl(crate) trait CellOps: Primitive {
     note = "a 128-bit load is one instruction with FEAT_LSE2 (aarch64: `-C target-cpu=neoverse-v1` or newer) or AVX (x86_64: `-C target-cpu=x86-64-v3`)",
     note = "to accept a load that writes the cache line, call `load_rmw`"
 )]
-pub impl(crate) trait Load: CellOps {
+pub impl(crate) trait Load: CompareExchange {
     /// Reads the cell.
     #[doc(hidden)]
     fn load(cell: &Self::Cell, order: CoreOrdering) -> Self;
@@ -126,7 +127,7 @@ pub impl(crate) trait Load: CellOps {
     note = "a 128-bit store is one instruction with FEAT_LSE2 (aarch64: `-C target-cpu=neoverse-v1` or newer) or AVX (x86_64: `-C target-cpu=x86-64-v3`)",
     note = "to accept a compare-exchange loop, call `store_rmw`"
 )]
-pub impl(crate) trait Store: CellOps {
+pub impl(crate) trait Store: CompareExchange {
     /// Writes `value` to the cell.
     #[doc(hidden)]
     fn store(cell: &Self::Cell, value: Self, order: CoreOrdering);
@@ -140,7 +141,7 @@ pub impl(crate) trait Store: CellOps {
     label = "this exchange would be a compare-exchange loop",
     note = "atomiks has no 128-bit exchange: call `update` with `|_| new`, a compare-exchange loop that returns the value before"
 )]
-pub impl(crate) trait Swap: CellOps {
+pub impl(crate) trait Swap: CompareExchange {
     /// Writes `value` to the cell, and returns the value before.
     #[doc(hidden)]
     fn swap(cell: &Self::Cell, value: Self, order: CoreOrdering) -> Self;
@@ -149,7 +150,7 @@ pub impl(crate) trait Swap: CellOps {
 /// A primitive whose wrapping add and subtract need no compare-exchange loop: `lock xadd` on
 /// `x86_64`, `ldadd` on `aarch64` (without LSE, an outline call or an LL/SC pair).
 #[doc(hidden)]
-pub impl(crate) trait FetchAdd: CellOps {
+pub impl(crate) trait AddSub: CompareExchange {
     /// Adds `delta`, wrapping, and returns the value before.
     fn fetch_add(cell: &Self::Cell, delta: Self, order: CoreOrdering) -> Self;
     /// Subtracts `delta`, wrapping, and returns the value before.
@@ -161,7 +162,7 @@ pub impl(crate) trait FetchAdd: CellOps {
 ///
 /// Each keeps the pointer's provenance. Loom's pointer cell has no arithmetic, so under loom each
 /// offset is a compare-exchange loop.
-pub(crate) trait PtrOffset: CellOps {
+pub(crate) trait PtrOffset: CompareExchange {
     /// Offsets the pointer by `count` elements, wrapping, and returns the pointer before.
     fn fetch_ptr_add(cell: &Self::Cell, count: usize, order: CoreOrdering) -> Self;
     /// Offsets the pointer back by `count` elements, wrapping, and returns the pointer before.
@@ -176,7 +177,7 @@ pub(crate) trait PtrOffset: CellOps {
 /// discards the value before: `lock or` on `x86_64`, `ldset` on `aarch64` (without LSE, an outline
 /// call or an LL/SC pair).
 #[doc(hidden)]
-pub impl(crate) trait Bitwise: CellOps {
+pub impl(crate) trait Bitwise: CompareExchange {
     /// Applies `& value`, and returns the value before.
     fn fetch_and(cell: &Self::Cell, value: Self, order: CoreOrdering) -> Self;
     /// Applies `| value`, and returns the value before.
@@ -227,7 +228,7 @@ pub impl(crate) trait FetchBitwise: Bitwise {}
     label = "this would be a compare-exchange loop",
     note = "to accept a compare-exchange loop, call `update`"
 )]
-pub impl(crate) trait MinMax: CellOps {
+pub impl(crate) trait MinMax: CompareExchange {
     /// Keeps the larger, and returns the value before.
     #[doc(hidden)]
     fn fetch_max(cell: &Self::Cell, value: Self, order: CoreOrdering) -> Self;

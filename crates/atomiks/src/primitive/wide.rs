@@ -17,12 +17,12 @@ use core::ptr;
 use core::sync::atomic::Ordering as CoreOrdering;
 
 #[cfg(not(loom))]
-use super::{CellAccess, CellOps};
-use super::{Integer, Primitive};
+use super::{CellAccess, CompareExchange};
+use super::{ExactBits, Primitive};
 #[cfg(all(any(target_feature = "lse2", target_feature = "avx"), not(loom)))]
 use super::{Load, Store};
 
-/// Implements `Primitive` and `Integer` for 128-bit integers.
+/// Implements `Primitive` and `ExactBits` for 128-bit integers.
 macro_rules! wide_bits {
     ($($int:ty),+) => {$(
         const impl Primitive for $int {
@@ -36,7 +36,7 @@ macro_rules! wide_bits {
                 self.to_bits() == bits
             }
         }
-        const impl Integer for $int {
+        const impl ExactBits for $int {
             #[inline]
             fn to_bits(self) -> u128 {
                 self.wrapping_cast()
@@ -134,7 +134,7 @@ macro_rules! cells {
                 cell.as_ptr().cast()
             }
         }
-        impl CellOps for $int {
+        impl CompareExchange for $int {
             #[inline]
             fn read_for_rmw(cell: &Wide, order: CoreOrdering) -> Self {
                 $from(cell.read_for_rmw(order))
@@ -374,7 +374,7 @@ mod modelled {
 
     use loom::sync::atomic::AtomicUsize;
 
-    use crate::primitive::{CellAccess, CellOps};
+    use crate::primitive::{CellAccess, CompareExchange};
     #[cfg(any(target_feature = "lse2", target_feature = "avx"))]
     use crate::primitive::{Load, Store};
 
@@ -429,7 +429,7 @@ mod modelled {
                     cell.index.with_mut(|place| *place = index);
                 }
             }
-            impl CellOps for $int {
+            impl CompareExchange for $int {
                 #[inline]
                 fn read_for_rmw(cell: &Wide, order: CoreOrdering) -> Self {
                     $from(lookup(cell.index.load(order)))

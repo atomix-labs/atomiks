@@ -5,12 +5,12 @@ use core::marker::PhantomData;
 use core::panic::{RefUnwindSafe, UnwindSafe};
 
 use crate::atom::Atom;
-use crate::ordering::{LoadOrdering, Ordering, Relaxed, StoreOrdering};
-use crate::primitive::{CellAccess, CellOps, Integer, Load, Primitive, Store, Swap};
+use crate::ordering::{LoadOrdering, Relaxed, RmwOrdering, StoreOrdering};
+use crate::primitive::{CellAccess, CompareExchange, ExactBits, Load, Primitive, Store, Swap};
 use crate::validity::Validity;
 
+mod capability;
 mod exclusive;
-mod ops;
 mod ptr;
 
 pub use self::ptr::AtomicPtr;
@@ -195,7 +195,7 @@ impl<T: Atom> Atomic<T> {
     /// Writes `value`, and returns the value before.
     #[expect(unsafe_code, reason = "decodes a repr read from the cell")]
     #[inline]
-    pub fn swap<O: Ordering>(&self, value: T, order: O) -> T
+    pub fn swap<O: RmwOrdering>(&self, value: T, order: O) -> T
     where
         T::Repr: Swap,
     {
@@ -224,7 +224,7 @@ impl<T: Atom> Atomic<T> {
     /// ```
     #[expect(unsafe_code, reason = "decodes a repr read from the cell")]
     #[inline]
-    pub fn compare_exchange<S: Ordering, F: LoadOrdering>(
+    pub fn compare_exchange<S: RmwOrdering, F: LoadOrdering>(
         &self, current: T, new: T, success: S, failure: F,
     ) -> Result<T, T> {
         let _ = (success, failure);
@@ -245,7 +245,7 @@ impl<T: Atom> Atomic<T> {
     /// The value the exchange read, when it is not `current` or the exchange failed spuriously.
     #[expect(unsafe_code, reason = "decodes a repr read from the cell")]
     #[inline]
-    pub fn compare_exchange_weak<S: Ordering, F: LoadOrdering>(
+    pub fn compare_exchange_weak<S: RmwOrdering, F: LoadOrdering>(
         &self, current: T, new: T, success: S, failure: F,
     ) -> Result<T, T> {
         let _ = (success, failure);
@@ -285,7 +285,7 @@ impl<T: Atom> Atomic<T> {
     /// ```
     #[expect(unsafe_code, reason = "decodes a repr read from the cell")]
     #[inline]
-    pub fn update<S: Ordering, F: LoadOrdering, U: FnMut(T) -> T>(
+    pub fn update<S: RmwOrdering, F: LoadOrdering, U: FnMut(T) -> T>(
         &self, set_order: S, fetch_order: F, mut f: U,
     ) -> T {
         let _ = (set_order, fetch_order);
@@ -320,7 +320,7 @@ impl<T: Atom> Atomic<T> {
     /// ```
     #[expect(unsafe_code, reason = "decodes a repr read from the cell")]
     #[inline]
-    pub fn try_update<S: Ordering, F: LoadOrdering, U: FnMut(T) -> Option<T>>(
+    pub fn try_update<S: RmwOrdering, F: LoadOrdering, U: FnMut(T) -> Option<T>>(
         &self, set_order: S, fetch_order: F, mut f: U,
     ) -> Result<T, T> {
         let _ = (set_order, fetch_order);
@@ -338,21 +338,21 @@ impl<T: Atom> Atomic<T> {
         }
     }
 
-    /// Reads the value with a compare-exchange, for an [`Integer`] repr without [`Load`].
+    /// Reads the value with a compare-exchange, for an [`ExactBits`] repr without [`Load`].
     ///
     /// The exchange takes the cache line exclusive and writes it, so it faults on read-only memory.
     #[expect(unsafe_code, reason = "decodes a repr read from the cell")]
     #[inline]
     pub fn load_rmw<O: LoadOrdering>(&self, order: O) -> T
     where
-        T::Repr: Integer,
+        T::Repr: ExactBits,
     {
         let _ = order;
         let zero = T::Repr::from_bits(0);
         // It writes zero only over zero, and an integer's exchange compares every bit, so the repr
         // stays as it was, whether or not zero decodes. A pointer's compares only the address, so
         // over address zero it would write a null without the pointer's provenance: hence
-        // `Integer`, which costs nothing, as every pointer has a `Load`.
+        // `ExactBits`, which costs nothing, as every pointer has a `Load`.
         match T::Repr::compare_exchange(self.primitive_cell(), zero, zero, O::CORE, O::CORE) {
             // SAFETY: by the field INVARIANT, the repr read from the cell decodes.
             Ok(current) | Err(current) => unsafe { T::from_repr_unchecked(current) },

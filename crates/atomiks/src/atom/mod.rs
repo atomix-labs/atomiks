@@ -4,7 +4,7 @@ mod option;
 mod ptr;
 mod scalar;
 
-use crate::primitive::{Bitwise, CellOps, FetchAdd, Primitive};
+use crate::primitive::{AddSub, Bitwise, CompareExchange, Primitive};
 use crate::validity::{Partial, Total, Validity};
 
 /// A value that packs into one atomic word: stored as its [`Repr`](Atom::Repr), and decoded on
@@ -23,10 +23,12 @@ use crate::validity::{Partial, Total, Validity};
 ///   changes;
 /// - `from_repr_unchecked(r)` returns the value `from_repr(r)` does, for every `r` that decodes;
 /// - [`Validity`](Atom::Validity) is truthful: every repr it promises decodes, and for
-///   [`ZeroNiche`](crate::validity::ZeroNiche) and [`TotalButZero`](crate::validity::TotalButZero),
-///   zero does not;
+///   [`ZeroNiche`] and [`TotalZeroNiche`], zero does not;
 /// - `v` may move to another thread, whatever `Self`'s auto traits say: `Atomic<Self>` is `Send`
 ///   and `Sync`.
+///
+/// [`ZeroNiche`]: crate::validity::ZeroNiche
+/// [`TotalZeroNiche`]: crate::validity::TotalZeroNiche
 #[diagnostic::on_unimplemented(
     message = "`{Self}` cannot be stored in an atomic",
     label = "not `Atom`",
@@ -41,7 +43,7 @@ use crate::validity::{Partial, Total, Validity};
 #[expect(unsafe_code, reason = "loads decode without a check, trusting the impl")]
 pub const unsafe trait Atom: Copy {
     /// The primitive the value is stored as.
-    type Repr: const Primitive + CellOps;
+    type Repr: const Primitive + CompareExchange;
     /// Which reprs decode.
     type Validity: const Validity = Partial;
     /// No repr `to_repr` returns lies below it, as unsigned bits.
@@ -74,7 +76,7 @@ pub const unsafe trait Atom: Copy {
     note = "for a newtype of a type that has it, derive it: `#[derive(AtomAdd)]`",
     note = "to change the value in a compare-exchange loop, call `update`"
 )]
-pub trait AtomAdd: Atom<Validity = Total, Repr: FetchAdd> {}
+pub trait AtomAdd: Atom<Validity = Total, Repr: AddSub> {}
 
 /// The repr's own (signed or unsigned) order is the value's [`Ord`].
 ///

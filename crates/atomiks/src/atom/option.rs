@@ -7,9 +7,9 @@ use crate::message::{Message, refuse};
 use crate::primitive::Primitive;
 use crate::validity::Validity;
 
-/// What `refuse_option` writes around its advice once `T`'s name is cut to `…`, so an advice that
-/// names a repr leaves room for it.
-const FRAME: usize = "`Option<…>`: ".len();
+/// The length of what `refuse_option` writes around its advice once `T`'s name is cut to `…`, so
+/// an advice that names a repr leaves room for it.
+const FRAME_LEN: usize = "`Option<…>`: ".len();
 
 /// Refuses the build of `Option<T>` with `advice`.
 ///
@@ -54,7 +54,7 @@ const fn none_repr<T: Atom>() -> u128 {
             refuse_option::<T>(
                 &Message::new()
                     .text("its values fill every repr of `")
-                    .name(type_name::<T::Repr>(), rest.len().saturating_add(FRAME))
+                    .name(type_name::<T::Repr>(), rest.len().saturating_add(FRAME_LEN))
                     .text(rest),
             );
         }
@@ -67,7 +67,7 @@ const fn none_repr<T: Atom>() -> u128 {
                 .text("`None` would take repr ")
                 .number(none)
                 .text(", which `")
-                .name(type_name::<T::Repr>(), rest.len().saturating_add(FRAME))
+                .name(type_name::<T::Repr>(), rest.len().saturating_add(FRAME_LEN))
                 .text(rest),
         );
     }

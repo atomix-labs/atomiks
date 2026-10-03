@@ -21,7 +21,7 @@ note: required by a bound in `atomiks::Atomic::<T>::swap`
   |
   | impl<T: Atom> Atomic<T> {
 ...
-  |     pub fn swap<O: Ordering>(&self, value: T, order: O) -> T
+  |     pub fn swap<O: RmwOrdering>(&self, value: T, order: O) -> T
   |     where
   |         T::Repr: Swap,
   |                  ^^^^ required by this bound in `Atomic::<T>::swap`

@@ -10,7 +10,7 @@ note: inside `atomiks::atom::option::none_repr::<u64>`
   | /             refuse_option::<T>(
   | |                 &Message::new()
   | |                     .text("its values fill every repr of `")
-  | |                     .name(type_name::<T::Repr>(), rest.len().saturating_add(FRAME))
+  | |                     .name(type_name::<T::Repr>(), rest.len().saturating_add(FRAME_LEN))
   | |                     .text(rest),
   | |             );
   | |_____________^

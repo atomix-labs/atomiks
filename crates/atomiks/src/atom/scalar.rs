@@ -4,7 +4,7 @@ use core::marker::PhantomData;
 use core::num::{NonZero, Saturating, Wrapping};
 
 use super::{Atom, AtomAdd, AtomBitwise, AtomOrd};
-use crate::validity::{Total, TotalButZero, ZeroValid};
+use crate::validity::{Total, TotalZeroNiche, ZeroValid};
 
 /// Implements `Atom` for integers, and the capabilities listed.
 macro_rules! integers {
@@ -97,7 +97,7 @@ macro_rules! nonzero {
         #[expect(unsafe_code, reason = "an `Atom` impl promises what loads rely on")]
         const unsafe impl Atom for NonZero<$int> {
             type Repr = $int;
-            type Validity = TotalButZero;
+            type Validity = TotalZeroNiche;
             const MIN_REPR: u128 = 1;
             const MAX_REPR: u128 = <$int as Atom>::MAX_REPR;
             #[inline]

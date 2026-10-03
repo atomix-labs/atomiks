@@ -25,12 +25,14 @@ pub struct SeqCst;
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
 pub struct StoreStore;
 
-/// An ordering a read-modify-write may take.
+/// An ordering a read-modify-write may take: every ordering but [`StoreStore`], which
+/// only a fence takes.
 #[diagnostic::on_unimplemented(
-    message = "`{Self}` is not an ordering",
-    label = "expected `Relaxed`, `Acquire`, `Release`, `AcqRel` or `SeqCst` from `atomiks::ordering`"
+    message = "`{Self}` is not a read-modify-write ordering",
+    label = "expected `Relaxed`, `Acquire`, `Release`, `AcqRel` or `SeqCst` from `atomiks::ordering`",
+    note = "`StoreStore` orders a fence, and nothing else"
 )]
-pub impl(crate) trait Ordering: Copy {
+pub impl(crate) trait RmwOrdering: Copy {
     /// The ordering as `core` (and loom) spell it.
     #[doc(hidden)]
     const CORE: CoreOrdering;
@@ -42,7 +44,7 @@ pub impl(crate) trait Ordering: Copy {
     label = "expected `Relaxed`, `Acquire` or `SeqCst` from `atomiks::ordering`",
     note = "`Release` and `AcqRel` order a store, and a load has none"
 )]
-pub impl(crate) trait LoadOrdering: Ordering {}
+pub impl(crate) trait LoadOrdering: RmwOrdering {}
 
 /// An ordering a store may take.
 #[diagnostic::on_unimplemented(
@@ -50,7 +52,7 @@ pub impl(crate) trait LoadOrdering: Ordering {}
     label = "expected `Relaxed`, `Release` or `SeqCst` from `atomiks::ordering`",
     note = "`Acquire` and `AcqRel` order a load, and a store has none"
 )]
-pub impl(crate) trait StoreOrdering: Ordering {}
+pub impl(crate) trait StoreOrdering: RmwOrdering {}
 
 /// An ordering a fence may take.
 #[diagnostic::on_unimplemented(
@@ -77,7 +79,7 @@ macro_rules! core_orderings {
     )+};
 }
 
-core_orderings!(Ordering::CORE: Relaxed, Acquire, Release, AcqRel, SeqCst);
+core_orderings!(RmwOrdering::CORE: Relaxed, Acquire, Release, AcqRel, SeqCst);
 core_orderings!(FenceOrdering::CORE_FENCE: Acquire, Release, AcqRel, SeqCst);
 
 impl FenceOrdering for StoreStore {
