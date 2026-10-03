@@ -149,7 +149,7 @@ impl<T: Atom> Atomic<T> {
     {
         let repr = T::Repr::from_cell(T::Validity::into_inner::<T::Repr>(self.cell));
         // SAFETY: by the field INVARIANT, the repr read from the cell decodes.
-        unsafe { Self::decode(repr) }
+        unsafe { T::from_repr_unchecked(repr) }
     }
 
     /// The value, consuming the atomic.
@@ -160,27 +160,13 @@ impl<T: Atom> Atomic<T> {
     pub fn into_inner(self) -> T {
         let repr = T::Repr::from_cell(T::Validity::into_inner::<T::Repr>(self.cell));
         // SAFETY: by the field INVARIANT, the repr read from the cell decodes.
-        unsafe { Self::decode(repr) }
+        unsafe { T::from_repr_unchecked(repr) }
     }
 
     /// The primitive's cell, inside the validity's wrapper.
     #[inline]
     const fn primitive_cell(&self) -> &<T::Repr as CellAccess>::Cell {
         T::Validity::get_ref::<T::Repr>(&self.cell)
-    }
-
-    /// Decodes `repr` without [`from_repr`](Atom::from_repr)'s check.
-    ///
-    /// # Safety
-    /// `repr` decodes: it was read from the cell.
-    #[expect(unsafe_code, reason = "a repr read from the cell needs no `from_repr` check")]
-    #[inline]
-    const unsafe fn decode(repr: T::Repr) -> T
-    where
-        T: [const] Atom,
-    {
-        // SAFETY: the caller's repr decodes.
-        unsafe { T::from_repr_unchecked(repr) }
     }
 
     /// Reads the value.
@@ -193,7 +179,7 @@ impl<T: Atom> Atomic<T> {
         let _ = order;
         let repr = T::Repr::load(self.primitive_cell(), O::CORE);
         // SAFETY: by the field INVARIANT, the repr read from the cell decodes.
-        unsafe { Self::decode(repr) }
+        unsafe { T::from_repr_unchecked(repr) }
     }
 
     /// Writes `value`.
@@ -216,7 +202,7 @@ impl<T: Atom> Atomic<T> {
         let _ = order;
         let before = T::Repr::swap(self.primitive_cell(), value.to_repr(), O::CORE);
         // SAFETY: by the field INVARIANT, the repr read from the cell decodes.
-        unsafe { Self::decode(before) }
+        unsafe { T::from_repr_unchecked(before) }
     }
 
     /// Writes `new` if the value is `current`, and returns the value before.
@@ -245,9 +231,9 @@ impl<T: Atom> Atomic<T> {
         let cell = self.primitive_cell();
         match T::Repr::compare_exchange(cell, current.to_repr(), new.to_repr(), S::CORE, F::CORE) {
             // SAFETY: by the field INVARIANT, the repr read from the cell decodes.
-            Ok(before) => Ok(unsafe { Self::decode(before) }),
+            Ok(before) => Ok(unsafe { T::from_repr_unchecked(before) }),
             // SAFETY: as above.
-            Err(found) => Err(unsafe { Self::decode(found) }),
+            Err(found) => Err(unsafe { T::from_repr_unchecked(found) }),
         }
     }
 
@@ -272,9 +258,9 @@ impl<T: Atom> Atomic<T> {
             F::CORE,
         ) {
             // SAFETY: by the field INVARIANT, the repr read from the cell decodes.
-            Ok(before) => Ok(unsafe { Self::decode(before) }),
+            Ok(before) => Ok(unsafe { T::from_repr_unchecked(before) }),
             // SAFETY: as above.
-            Err(found) => Err(unsafe { Self::decode(found) }),
+            Err(found) => Err(unsafe { T::from_repr_unchecked(found) }),
         }
     }
 
@@ -307,10 +293,10 @@ impl<T: Atom> Atomic<T> {
         let mut seen = T::Repr::read_for_rmw(cell, F::CORE);
         loop {
             // SAFETY: by the field INVARIANT, the repr read from the cell decodes.
-            let next = f(unsafe { Self::decode(seen) }).to_repr();
+            let next = f(unsafe { T::from_repr_unchecked(seen) }).to_repr();
             match T::Repr::compare_exchange_weak(cell, seen, next, S::CORE, F::CORE) {
                 // SAFETY: as above.
-                Ok(before) => return unsafe { Self::decode(before) },
+                Ok(before) => return unsafe { T::from_repr_unchecked(before) },
                 Err(found) => seen = found,
             }
         }
@@ -342,11 +328,11 @@ impl<T: Atom> Atomic<T> {
         let mut seen = T::Repr::read_for_rmw(cell, F::CORE);
         loop {
             // SAFETY: by the field INVARIANT, the repr read from the cell decodes.
-            let current = unsafe { Self::decode(seen) };
+            let current = unsafe { T::from_repr_unchecked(seen) };
             let Some(next) = f(current) else { return Err(current) };
             match T::Repr::compare_exchange_weak(cell, seen, next.to_repr(), S::CORE, F::CORE) {
                 // SAFETY: as above.
-                Ok(before) => return Ok(unsafe { Self::decode(before) }),
+                Ok(before) => return Ok(unsafe { T::from_repr_unchecked(before) }),
                 Err(found) => seen = found,
             }
         }
@@ -369,7 +355,7 @@ impl<T: Atom> Atomic<T> {
         // `Integer`, which costs nothing, as every pointer has a `Load`.
         match T::Repr::compare_exchange(self.primitive_cell(), zero, zero, O::CORE, O::CORE) {
             // SAFETY: by the field INVARIANT, the repr read from the cell decodes.
-            Ok(current) | Err(current) => unsafe { Self::decode(current) },
+            Ok(current) | Err(current) => unsafe { T::from_repr_unchecked(current) },
         }
     }
 

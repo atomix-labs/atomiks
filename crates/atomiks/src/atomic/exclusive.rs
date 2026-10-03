@@ -21,7 +21,7 @@ impl<T: Atom> Atomic<T> {
     {
         let repr = T::Repr::get(T::Validity::get_mut::<T::Repr>(&mut self.cell));
         // SAFETY: by the field INVARIANT, the repr read from the cell decodes.
-        unsafe { Self::decode(repr) }
+        unsafe { T::from_repr_unchecked(repr) }
     }
 
     /// The value, read without an atomic operation.
@@ -32,7 +32,7 @@ impl<T: Atom> Atomic<T> {
     pub fn get(&mut self) -> T {
         let repr = T::Repr::get(T::Validity::get_mut::<T::Repr>(&mut self.cell));
         // SAFETY: by the field INVARIANT, the repr read from the cell decodes.
-        unsafe { Self::decode(repr) }
+        unsafe { T::from_repr_unchecked(repr) }
     }
 
     /// Writes `value` without an atomic operation.

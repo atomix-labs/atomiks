@@ -44,7 +44,7 @@ impl<T: Atom> Atomic<T> {
         let _ = order;
         let before = T::Repr::fetch_add(self.primitive_cell(), delta, O::CORE);
         // SAFETY: by the field INVARIANT, the repr read from the cell decodes.
-        unsafe { Self::decode(before) }
+        unsafe { T::from_repr_unchecked(before) }
     }
 
     /// Subtracts `delta` from the repr, wrapping, and returns the value before.
@@ -58,7 +58,7 @@ impl<T: Atom> Atomic<T> {
         let _ = order;
         let before = T::Repr::fetch_sub(self.primitive_cell(), delta, O::CORE);
         // SAFETY: by the field INVARIANT, the repr read from the cell decodes.
-        unsafe { Self::decode(before) }
+        unsafe { T::from_repr_unchecked(before) }
     }
 
     /// Keeps the larger of `value` and the current value: [`fetch_max`](Self::fetch_max)
@@ -100,7 +100,7 @@ impl<T: Atom> Atomic<T> {
         let _ = order;
         let before = T::Repr::fetch_max(self.primitive_cell(), value.to_repr(), O::CORE);
         // SAFETY: by the field INVARIANT, the repr read from the cell decodes.
-        unsafe { Self::decode(before) }
+        unsafe { T::from_repr_unchecked(before) }
     }
 
     /// Keeps the smaller of `value` and the current value, and returns the value before.
@@ -116,7 +116,7 @@ impl<T: Atom> Atomic<T> {
         let _ = order;
         let before = T::Repr::fetch_min(self.primitive_cell(), value.to_repr(), O::CORE);
         // SAFETY: by the field INVARIANT, the repr read from the cell decodes.
-        unsafe { Self::decode(before) }
+        unsafe { T::from_repr_unchecked(before) }
     }
 
     /// Applies `& value`: [`fetch_and`](Self::fetch_and) with the value before discarded.
@@ -179,7 +179,7 @@ impl<T: Atom> Atomic<T> {
         let _ = order;
         let before = T::Repr::fetch_and(self.primitive_cell(), value.to_repr(), O::CORE);
         // SAFETY: by the field INVARIANT, the repr read from the cell decodes.
-        unsafe { Self::decode(before) }
+        unsafe { T::from_repr_unchecked(before) }
     }
 
     /// Applies `| value`, and returns the value before.
@@ -195,7 +195,7 @@ impl<T: Atom> Atomic<T> {
         let _ = order;
         let before = T::Repr::fetch_or(self.primitive_cell(), value.to_repr(), O::CORE);
         // SAFETY: by the field INVARIANT, the repr read from the cell decodes.
-        unsafe { Self::decode(before) }
+        unsafe { T::from_repr_unchecked(before) }
     }
 
     /// Applies `^ value`, and returns the value before.
@@ -211,7 +211,7 @@ impl<T: Atom> Atomic<T> {
         let _ = order;
         let before = T::Repr::fetch_xor(self.primitive_cell(), value.to_repr(), O::CORE);
         // SAFETY: by the field INVARIANT, the repr read from the cell decodes.
-        unsafe { Self::decode(before) }
+        unsafe { T::from_repr_unchecked(before) }
     }
 
     /// Inverts every bit, and returns the value before.
@@ -227,6 +227,6 @@ impl<T: Atom> Atomic<T> {
         let _ = order;
         let before = T::Repr::fetch_not(self.primitive_cell(), O::CORE);
         // SAFETY: by the field INVARIANT, the repr read from the cell decodes.
-        unsafe { Self::decode(before) }
+        unsafe { T::from_repr_unchecked(before) }
     }
 }
