@@ -56,6 +56,8 @@ pub mod cell;
 mod fence;
 pub mod hint;
 mod message;
+#[cfg(loom)]
+pub mod model;
 pub mod ordering;
 mod primitive;
 pub mod validity;
@@ -74,3 +76,10 @@ pub use crate::fence::{compiler_fence, fence};
 #[doc(hidden)]
 pub use crate::primitive::{Bitwise, CellAccess, CellOps, FetchAdd};
 pub use crate::primitive::{FetchBitwise, Integer, Load, MinMax, Primitive, Store, Swap};
+
+/// The loom this crate models with, so a downstream model uses the same copy.
+#[cfg(loom)]
+#[doc(hidden)]
+pub mod __private {
+    pub use loom;
+}
