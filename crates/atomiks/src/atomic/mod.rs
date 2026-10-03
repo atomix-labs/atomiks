@@ -6,10 +6,13 @@ use core::panic::{RefUnwindSafe, UnwindSafe};
 
 use crate::atom::Atom;
 use crate::ordering::{LoadOrdering, Ordering, Relaxed, StoreOrdering};
-use crate::primitive::{CellAccess, CellOps, Load, Primitive, Store, Swap};
+use crate::primitive::{CellAccess, CellOps, Integer, Load, Primitive, Store, Swap};
 use crate::validity::Validity;
 
 mod ops;
+mod ptr;
+
+pub use self::ptr::AtomicPtr;
 
 /// A value of `T` shared between threads through one atomic word.
 ///
@@ -45,8 +48,9 @@ pub struct Atomic<T: Atom> {
     // INVARIANT: holds a repr that decodes: one `to_repr` returned, or one a read-modify-write
     // left, which either needs `Total` (add, the bitwise operations, the pointer offsets), keeps
     // one of its operands (max, min), or leaves the repr as it was (`load_rmw`, which writes zero
-    // only over zero). Its writers are this module and its submodules, and whoever writes through
-    // `as_ptr` or `from_ptr`, whose contracts keep it.
+    // only over zero, on an integer repr, whose exchange compares every bit). Its writers are this
+    // module and its submodules, and whoever writes through `as_ptr` or `from_ptr`, whose
+    // contracts keep it.
     /// The cell holding `T`'s repr: the validity's wrapper around the primitive's cell.
     cell: <T::Validity as Validity>::Cell<T::Repr>,
     /// The type of the value the repr encodes.
@@ -332,15 +336,21 @@ impl<T: Atom> Atomic<T> {
         }
     }
 
-    /// Reads the value with a compare-exchange, for a primitive without [`Load`].
+    /// Reads the value with a compare-exchange, for an [`Integer`] repr without [`Load`].
     ///
     /// The exchange takes the cache line exclusive and writes it, so it faults on read-only memory.
     #[expect(unsafe_code, reason = "decodes a repr read from the cell")]
     #[inline]
-    pub fn load_rmw<O: LoadOrdering>(&self, order: O) -> T {
+    pub fn load_rmw<O: LoadOrdering>(&self, order: O) -> T
+    where
+        T::Repr: Integer,
+    {
         let _ = order;
         let zero = T::Repr::from_bits(0);
-        // It writes zero only over zero, so the repr stays as it was, whether or not zero decodes.
+        // It writes zero only over zero, and an integer's exchange compares every bit, so the repr
+        // stays as it was, whether or not zero decodes. A pointer's compares only the address, so
+        // over address zero it would write a null without the pointer's provenance: hence
+        // `Integer`, which costs nothing, as every pointer has a `Load`.
         match T::Repr::compare_exchange(self.primitive_cell(), zero, zero, O::CORE, O::CORE) {
             // SAFETY: by the field INVARIANT, the repr read from the cell decodes.
             Ok(current) | Err(current) => unsafe { Self::decode(current) },
