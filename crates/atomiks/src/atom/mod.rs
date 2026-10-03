@@ -42,8 +42,9 @@ use crate::validity::{Partial, Total, Validity};
 /// }
 ///
 /// // SAFETY: `to_repr` gives 0 or 1, within `MIN_REPR..=MAX_REPR`, and `from_repr` decodes each as
-/// // the side it came from, by the repr alone; `Partial`, the default validity, promises no other
-/// // repr; and a `Side` holds no data, so it may cross threads.
+/// // the side it came from, by the repr alone; the default `from_repr_unchecked` unwraps
+/// // `from_repr`; `Partial`, the default validity, promises no other repr; and a `Side` holds no
+/// // data, so it may cross threads.
 /// const unsafe impl Atom for Side {
 ///     type Repr = u8;
 ///     const MIN_REPR: u128 = 0;
@@ -75,7 +76,7 @@ use crate::validity::{Partial, Total, Validity};
 #[diagnostic::on_unimplemented(
     message = "`{Self}` cannot be stored in an atomic",
     label = "not `Atom`",
-    note = "for a type of your own, keep each promise of its `# Safety` section in a `const unsafe impl Atom for {Self}`, which needs `#![feature(const_trait_impl)]`"
+    note = "for a type of your own, keep each promise of `Atom`'s `# Safety` section in a `const unsafe impl Atom for {Self}`, which needs `#![feature(const_trait_impl)]`"
 )]
 #[cfg_attr(
     all(target_arch = "x86_64", not(target_feature = "cmpxchg16b")),
