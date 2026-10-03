@@ -17,14 +17,17 @@ check-loom:
     RUSTFLAGS='--cfg loom -C target-cpu=x86-64' cargo clippy --workspace --all-targets --features loom --target x86_64-unknown-linux-gnu --target-dir target/loom-x86-64 -- -D warnings
     cargo test -p atomiks-core {{ loom }} --test model
 
-# x86_64's floor has AVX; x86-64-v2 has `cmpxchg16b` but no AVX; x86-64 has neither, so no 128-bit
-# atomics. The last two go through `RUSTFLAGS`, which replaces the floor.
+# macOS's aarch64 floor has LSE2, which Linux's lacks. x86_64's floor has AVX; x86-64-v2 has
+# `cmpxchg16b` but no AVX; x86-64 has neither, so no 128-bit atomics. The last two go through
+# `RUSTFLAGS`, which replaces the floor.
 
-# Lints every crate for aarch64, and for x86_64 with the floor, x86-64-v2 and x86-64.
+# Lints every crate for aarch64 and x86_64 on Linux and macOS, and x86_64 with x86-64-v2 and x86-64.
 [metadata("rust")]
 check-targets:
     cargo clippy --workspace --all-targets --all-features --target aarch64-unknown-linux-gnu -- -D warnings
+    cargo clippy --workspace --all-targets --all-features --target aarch64-apple-darwin -- -D warnings
     cargo clippy --workspace --all-targets --all-features --target x86_64-unknown-linux-gnu -- -D warnings
+    cargo clippy --workspace --all-targets --all-features --target x86_64-apple-darwin -- -D warnings
     RUSTFLAGS='-C target-cpu=x86-64-v2' cargo clippy --workspace --all-targets --all-features --target x86_64-unknown-linux-gnu --target-dir target/x86-64-v2 -- -D warnings
     RUSTFLAGS='-C target-cpu=x86-64' cargo clippy --workspace --all-targets --all-features --target x86_64-unknown-linux-gnu --target-dir target/x86-64 -- -D warnings
 
@@ -37,13 +40,16 @@ check-codegen-fmt:
 fix-codegen-fmt:
     rustfmt crates/atomiks-core/tests/codegen/src/lib.rs
 
-# x86_64's floor has AVX; x86-64-v2's 128-bit load is a compare-exchange.
+# macOS's aarch64 floor has LSE2, whose 128-bit load is `ldp`; Linux's floor reads with a
+# compare-exchange. x86_64's floor has AVX; x86-64-v2's 128-bit load is a compare-exchange. x86_64
+# macOS builds as x86_64 Linux does.
 
-# Runs the tests under Miri on aarch64, and on x86_64 with the floor and x86-64-v2.
+# Runs the tests under Miri on aarch64 Linux and macOS, and on x86_64 with the floor and x86-64-v2.
 [metadata("rust")]
 nightly-miri:
     rustup component add miri
     {{ miri }} cargo miri test --workspace --target aarch64-unknown-linux-gnu
+    {{ miri }} cargo miri test --workspace --target aarch64-apple-darwin
     {{ miri }} cargo miri test --workspace --target x86_64-unknown-linux-gnu
     {{ miri }} RUSTFLAGS='-C target-cpu=x86-64-v2' cargo miri test --workspace --target x86_64-unknown-linux-gnu --target-dir target/miri-x86-64-v2
 
