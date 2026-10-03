@@ -14,6 +14,22 @@
     integer_casts
 )]
 #![cfg_attr(not(loom), feature(const_atomic))]
+#![cfg_attr(
+    any(target_arch = "aarch64", all(target_arch = "x86_64", target_feature = "cmpxchg16b")),
+    feature(f128)
+)]
+#![cfg_attr(all(target_arch = "aarch64", not(loom)), feature(integer_atomics))]
+#![cfg_attr(
+    all(target_arch = "x86_64", target_feature = "cmpxchg16b", target_feature = "avx", not(loom)),
+    feature(core_intrinsics)
+)]
+#![cfg_attr(
+    all(target_arch = "x86_64", target_feature = "cmpxchg16b", target_feature = "avx", not(loom)),
+    expect(
+        internal_features,
+        reason = "the AVX 16-byte load and store are core's atomic intrinsics"
+    )
+)]
 // A loom build is a model of this one, not a target of its own: no badge names it.
 #![doc(auto_cfg(hide(loom)))]
 
@@ -24,6 +40,15 @@ compile_error!(concat!(
     env!("CARGO_PKG_VERSION"),
     "\", features = [\"loom\"] }`"
 ));
+
+// The loom model of a 128-bit cell keeps its table in `std`; `alloc` only where that model is.
+#[cfg(all(
+    loom,
+    any(target_arch = "aarch64", all(target_arch = "x86_64", target_feature = "cmpxchg16b"))
+))]
+extern crate alloc;
+#[cfg(loom)]
+extern crate std;
 
 mod atom;
 mod atomic;
@@ -37,6 +62,11 @@ pub use crate::atomic::{
     Atomic, AtomicBool, AtomicI8, AtomicI16, AtomicI32, AtomicI64, AtomicIsize, AtomicPtr,
     AtomicU8, AtomicU16, AtomicU32, AtomicU64, AtomicUsize,
 };
+#[cfg(any(
+    target_arch = "aarch64",
+    all(target_arch = "x86_64", target_feature = "cmpxchg16b")
+))]
+pub use crate::atomic::{AtomicI128, AtomicU128};
 #[doc(hidden)]
 pub use crate::primitive::{Bitwise, CellAccess, CellOps, FetchAdd};
 pub use crate::primitive::{FetchBitwise, Integer, Load, MinMax, Primitive, Store, Swap};

@@ -173,6 +173,8 @@ macro_rules! floats {
 }
 
 floats!(f16: u16, f32: u32, f64: u64);
+#[cfg(any(target_arch = "aarch64", all(target_arch = "x86_64", target_feature = "cmpxchg16b")))]
+floats!(f128: u128);
 
 /// Implements `Atom` for zero-width values: one value, whose repr is zero.
 macro_rules! zero_width {
@@ -242,3 +244,20 @@ wrappers! {
     Wrapping: [AtomAdd, AtomOrd, AtomBitwise];
     Saturating: [AtomOrd, AtomBitwise];
 }
+
+// The 128-bit integers and their `NonZero`s, where a 16-byte compare-exchange exists. atomiks
+// offers no 128-bit add, bitwise operation, max or min, so they have no `AtomAdd` or
+// `AtomBitwise`, and `AtomOrd` brings no `max` or `min`: `update` is each one's loop.
+#[cfg(any(target_arch = "aarch64", all(target_arch = "x86_64", target_feature = "cmpxchg16b")))]
+integers! { [AtomOrd] u128, i128 }
+#[cfg(any(target_arch = "aarch64", all(target_arch = "x86_64", target_feature = "cmpxchg16b")))]
+nonzero!(u128, i128);
+
+// The 128-bit ranges, checked by the compiler: only here does `MAX_REPR` shift by zero.
+#[cfg(any(target_arch = "aarch64", all(target_arch = "x86_64", target_feature = "cmpxchg16b")))]
+const _: () = {
+    assert!(<u128 as Atom>::MAX_REPR == u128::MAX, "u128's repr spans 128 bits");
+    assert!(<i128 as Atom>::MAX_REPR == u128::MAX, "i128's spans 128, as unsigned bits");
+    assert!(<NonZero<u128> as Atom>::MIN_REPR == 1, "NonZero<u128>'s lowest repr is 1");
+    assert!(<NonZero<u128> as Atom>::MAX_REPR == u128::MAX, "and its highest u128::MAX");
+};

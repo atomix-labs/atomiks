@@ -52,11 +52,12 @@ pub use self::ptr::AtomicPtr;
 pub struct Atomic<T: Atom> {
     // INVARIANT: holds a repr that decodes: one `to_repr` returned; one a read-modify-write left,
     // which either needs `Total` (add, the bitwise operations, the pointer offsets), keeps one of
-    // its operands (max, min), or leaves the repr as it was (`load_rmw`, which writes zero only
-    // over zero, on an integer repr, whose exchange compares every bit); or any repr written
-    // through `get_mut`, whose `Total` bound makes every one decode. Its writers are this module
-    // and its submodules, whoever writes through `get_mut`'s place, and whoever writes through
-    // `as_ptr` or `from_ptr`, whose contracts keep it.
+    // its operands (max, min), or leaves the repr as it was (`load_rmw`, and a 128-bit
+    // `read_for_rmw` without `Load`, each a compare-exchange of zero for zero, on an integer repr,
+    // whose exchange compares every bit); or any repr written through `get_mut`, whose `Total`
+    // bound makes every one decode. Its writers are this module and its submodules, whoever writes
+    // through `get_mut`'s place, and whoever writes through `as_ptr` or `from_ptr`, whose
+    // contracts keep it.
     /// The cell holding `T`'s repr: the validity's wrapper around the primitive's cell.
     cell: <T::Validity as Validity>::Cell<T::Repr>,
     /// The type of the value the repr encodes.
@@ -90,6 +91,12 @@ pub type AtomicI32 = Atomic<i32>;
 pub type AtomicI64 = Atomic<i64>;
 /// An atomic `isize`.
 pub type AtomicIsize = Atomic<isize>;
+/// An atomic `u128`.
+#[cfg(any(target_arch = "aarch64", all(target_arch = "x86_64", target_feature = "cmpxchg16b")))]
+pub type AtomicU128 = Atomic<u128>;
+/// An atomic `i128`.
+#[cfg(any(target_arch = "aarch64", all(target_arch = "x86_64", target_feature = "cmpxchg16b")))]
+pub type AtomicI128 = Atomic<i128>;
 
 // SAFETY: every shared access is one atomic operation on the cell, and `Atom` declares the value
 // may cross threads as its repr.
