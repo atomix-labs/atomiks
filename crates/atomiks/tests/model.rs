@@ -248,8 +248,7 @@ mod tests {
         });
     }
 
-    /// A write and a read through loom's cell guards: the calls `tests/cell.rs` makes on the native
-    /// cell.
+    /// A write and a read through loom's cell guards: the calls `tests/cell.rs` makes off loom.
     ///
     /// The calls are the same, `get_mut`, `get` and `deref`, so the two cannot drift apart unseen.
     #[test]
@@ -300,7 +299,10 @@ mod tests {
         });
     }
 
-    #[cfg(any(target_arch = "aarch64", target_feature = "cmpxchg16b"))]
+    #[cfg(any(
+        target_arch = "aarch64",
+        all(target_arch = "x86_64", target_feature = "cmpxchg16b")
+    ))]
     mod wide {
         use core::sync::atomic::{AtomicU64 as CoreAtomicU64, Ordering as CoreOrdering};
 
@@ -352,7 +354,7 @@ mod tests {
             publish(|word| word.store_rmw(HIGH, Release));
         }
 
-        /// A wide `update`'s first read carries `fetch_order` (natively, without `Load`, it is a
+        /// A wide `update`'s first read carries `fetch_order` (off loom, without `Load`, it is a
         /// compare-exchange; under loom, a load), so `f` may read what was written before the value
         /// it sees.
         #[test]
