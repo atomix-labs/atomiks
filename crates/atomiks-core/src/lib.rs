@@ -68,6 +68,8 @@ extern crate alloc;
 #[cfg(loom)]
 extern crate std;
 
+#[doc(hidden)]
+pub mod __private;
 mod atom;
 mod atomic;
 pub mod cell;

@@ -34,6 +34,21 @@ pub impl(crate) const trait Validity {
     /// Whether an `Option`'s `None` must take the zero repr, which no value takes.
     #[doc(hidden)]
     const NONE_TAKES_ZERO: bool;
+    /// Whether this validity promises that every repr decodes: [`Total`] alone.
+    #[doc(hidden)]
+    const PROMISES_EVERY_REPR_DECODES: bool;
+    /// Whether this validity promises that the zero repr decodes: [`Total`] and [`ZeroValid`].
+    #[doc(hidden)]
+    const PROMISES_ZERO_DECODES: bool;
+    /// What this validity promises of the zero repr alone: [`ZeroValid`] where it decodes, else
+    /// [`Partial`].
+    #[doc(hidden)]
+    type ZeroValidity: const Validity;
+    /// What a value of a field with this validity, beside fields whose zero validity is `V`'s,
+    /// promises of zero: `V`'s zero validity where this one's zero decodes, else [`Partial`]. So
+    /// a generic derived value's validity nests it over its fields.
+    #[doc(hidden)]
+    type ZeroValidityWith<V: Validity>: const Validity;
     /// Wraps a primitive's cell.
     #[doc(hidden)]
     fn wrap<R: CellAccess>(cell: R::Cell) -> Self::Cell<R>;
@@ -85,6 +100,10 @@ const impl Validity for Total {
     // A canonical `Total` value leaves no repr for `None`; only a non-canonical impl reaches here.
     type Optional = Partial;
     const NONE_TAKES_ZERO: bool = false;
+    const PROMISES_EVERY_REPR_DECODES: bool = true;
+    const PROMISES_ZERO_DECODES: bool = true;
+    type ZeroValidity = ZeroValid;
+    type ZeroValidityWith<V: Validity> = V::ZeroValidity;
     #[inline]
     fn wrap<R: CellAccess>(cell: R::Cell) -> R::Cell {
         cell
@@ -103,13 +122,20 @@ const impl Validity for Total {
     }
 }
 
-/// Implements `Validity` for each kind whose cell is opaque.
+/// Implements `Validity` for each kind whose cell is opaque, which some repr does not decode.
 macro_rules! opaque {
-    ($($kind:ident => $optional:ident, $none_takes_zero:literal);+ $(;)?) => {$(
+    ($(
+        $kind:ident => $optional:ident, $none_takes_zero:literal, $zero_decodes:literal,
+        $zero_validity:ident, $zero_validity_with:ty
+    );+ $(;)?) => {$(
         const impl Validity for $kind {
             type Cell<R: CellAccess> = Opaque<R::Cell>;
             type Optional = $optional;
             const NONE_TAKES_ZERO: bool = $none_takes_zero;
+            const PROMISES_EVERY_REPR_DECODES: bool = false;
+            const PROMISES_ZERO_DECODES: bool = $zero_decodes;
+            type ZeroValidity = $zero_validity;
+            type ZeroValidityWith<V: Validity> = $zero_validity_with;
             #[inline]
             fn wrap<R: CellAccess>(cell: R::Cell) -> Opaque<R::Cell> {
                 Opaque(cell)
@@ -130,11 +156,13 @@ macro_rules! opaque {
     )+};
 }
 
+// Each kind: its `Option`'s validity, whether `None` takes zero, whether zero decodes, its
+// `ZeroValidity`, and its `ZeroValidityWith<V>`.
 opaque! {
-    TotalZeroNiche => Total, true;
-    ZeroValid => ZeroValid, false;
-    ZeroNiche => ZeroValid, true;
-    Partial => Partial, false;
+    TotalZeroNiche => Total, true, false, Partial, Partial;
+    ZeroValid => ZeroValid, false, true, ZeroValid, V::ZeroValidity;
+    ZeroNiche => ZeroValid, true, false, Partial, Partial;
+    Partial => Partial, false, false, Partial, Partial;
 }
 
 #[cfg(test)]
@@ -151,6 +179,77 @@ mod tests {
         optional_is::<ZeroValid, ZeroValid>();
         optional_is::<ZeroNiche, ZeroValid>();
         optional_is::<Partial, Partial>();
+    }
+
+    /// Compiles only where `V` promises of zero what `Z` does.
+    const fn zero_validity_is<V: Validity<ZeroValidity = Z>, Z: Validity>() {}
+
+    /// Compiles only where a field of validity `V` beside fields of `W` promises of zero what `Z`
+    /// does.
+    const fn zero_validity_with_is<
+        V: Validity<ZeroValidityWith<W> = Z>,
+        W: Validity,
+        Z: Validity,
+    >() {
+    }
+
+    #[test]
+    fn zero_validity_keeps_only_whether_zero_decodes() {
+        zero_validity_is::<Total, ZeroValid>();
+        zero_validity_is::<TotalZeroNiche, Partial>();
+        zero_validity_is::<ZeroValid, ZeroValid>();
+        zero_validity_is::<ZeroNiche, Partial>();
+        zero_validity_is::<Partial, Partial>();
+    }
+
+    /// Checks `zero_validity_with_is` for each row: a field's validity, then its zero validity
+    /// beside fields of each kind, in the order of `Total`, `TotalZeroNiche`, `ZeroValid`,
+    /// `ZeroNiche` and `Partial`.
+    macro_rules! meet {
+        ($($field:ident => $($zero:ident),+;)+) => {$(
+            meet!(@row $field => [Total, TotalZeroNiche, ZeroValid, ZeroNiche, Partial] [$($zero),+]);
+        )+};
+        (@row $field:ident => [$($beside:ident),+] [$($zero:ident),+]) => {
+            $(zero_validity_with_is::<$field, $beside, $zero>();)+
+        };
+    }
+
+    #[test]
+    fn a_zero_decodes_beside_others_only_where_each_decodes() {
+        meet! {
+            Total => ZeroValid, Partial, ZeroValid, Partial, Partial;
+            TotalZeroNiche => Partial, Partial, Partial, Partial, Partial;
+            ZeroValid => ZeroValid, Partial, ZeroValid, Partial, Partial;
+            ZeroNiche => Partial, Partial, Partial, Partial, Partial;
+            Partial => Partial, Partial, Partial, Partial, Partial;
+        }
+    }
+
+    #[test]
+    fn every_repr_decodes_for_total_alone_and_zero_for_total_and_zero_valid() {
+        const {
+            assert!(
+                Total::PROMISES_EVERY_REPR_DECODES && Total::PROMISES_ZERO_DECODES,
+                "Total: every repr"
+            );
+            assert!(
+                !TotalZeroNiche::PROMISES_EVERY_REPR_DECODES
+                    && !TotalZeroNiche::PROMISES_ZERO_DECODES,
+                "TotalZeroNiche: every repr but zero"
+            );
+            assert!(
+                !ZeroValid::PROMISES_EVERY_REPR_DECODES && ZeroValid::PROMISES_ZERO_DECODES,
+                "ZeroValid: zero, and no other promised"
+            );
+            assert!(
+                !ZeroNiche::PROMISES_EVERY_REPR_DECODES && !ZeroNiche::PROMISES_ZERO_DECODES,
+                "ZeroNiche: not zero"
+            );
+            assert!(
+                !Partial::PROMISES_EVERY_REPR_DECODES && !Partial::PROMISES_ZERO_DECODES,
+                "Partial: nothing promised"
+            );
+        }
     }
 
     #[test]

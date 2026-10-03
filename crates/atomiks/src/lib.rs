@@ -92,6 +92,8 @@
 // target of its own, and the 128-bit atomics write out the condition `wide` stands for.
 #![doc(auto_cfg(hide(loom, wide)))]
 
+#[doc(hidden)]
+pub use atomiks_core::__private;
 #[cfg(loom)]
 #[doc(inline)]
 pub use atomiks_core::model;

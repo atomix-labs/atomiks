@@ -1,10 +1,13 @@
-//! [`ReprRange`], the reprs a value takes, and the math of a range of numbers of any width that
-//! wraps through zero.
+//! [`ReprRange`], the reprs a value takes, the math of a range of numbers of any width that wraps
+//! through zero, and how a packed value lays out its fields.
+
+mod layout;
 
 use core::any::type_name;
 use core::fmt;
 use core::marker::PhantomData;
 
+pub use self::layout::{FieldLayout, NicheLayout};
 use crate::message::{Message, refuse};
 use crate::primitive::Primitive;
 
@@ -127,6 +130,63 @@ impl<R: Primitive> ReprRange<R> {
         self.span().contains(bits)
     }
 
+    /// How a packed value stores a field of this range: unsigned, or two's complement where that is
+    /// narrower, unsigned on a tie; the repr's whole width where the range wraps both through zero
+    /// and through the signed numbers' ends.
+    #[doc(hidden)]
+    #[inline]
+    #[must_use]
+    pub const fn field_layout(self) -> FieldLayout {
+        self.span().field_layout()
+    }
+
+    /// The narrowest range that holds each of `bits`, reprs as unsigned bits, such as an enum's
+    /// discriminants: every repr of `R` but the longest run, counted round through zero, that holds
+    /// none of them.
+    ///
+    /// Where runs tie, the one through zero is left out, so the range runs from the smallest of
+    /// `bits` to the largest; else the lowest. Bits above `R`'s width are dropped first, and
+    /// duplicates count once. `bits` is left sorted, by a heapsort that passes over bits already in
+    /// order, so a constant evaluates thousands of discriminants in `k log k` steps.
+    ///
+    /// # Panics
+    /// Where `bits` is empty, since a range holds at least one repr; in a constant, the build fails
+    /// instead.
+    #[doc(hidden)]
+    #[inline]
+    #[must_use]
+    #[track_caller]
+    pub const fn enclosing(bits: &mut [u128]) -> Self {
+        let Some(span) = Span::enclosing(bits, R::BITS) else {
+            refuse_call::<R>(
+                &Message::new().text("enclosing(&mut [])"),
+                &Message::new().text("no bits to enclose, and a range holds at least one repr"),
+            );
+        };
+        Self::from_bounds(span.start, span.end)
+    }
+
+    /// The range of a packed value, of repr `R`, whose top field holds the reprs of `field` at
+    /// `offset`, beside any bits below it.
+    ///
+    /// Named for the one field that decides it, the last of nonzero width: the fields below it fill
+    /// the low bits, and a range, which has no holes, holds their every pattern, so the value's
+    /// range is the field's moved up to `offset`, its low bits all clear at its start and all set
+    /// at its end. Above the field, the value's bits extend it as its [`FieldLayout`] reads it
+    /// back: with zeros, or with copies of its top bit where it is signed, so the range may wrap.
+    ///
+    /// Where the field wraps both through zero and through the signed numbers' ends, it takes its
+    /// repr's every bit, and the range is every repr up to the field's end; at `R`'s top bit that
+    /// is exact, and the range wraps as the field does. Bits past `R`'s width are dropped, not
+    /// refused: the derive refuses a value wider than its repr where it checks the width, once.
+    #[doc(hidden)]
+    #[inline]
+    #[must_use]
+    pub const fn from_top_field<F: Primitive>(field: ReprRange<F>, offset: u32) -> Self {
+        let span = Span::from_top_field(field.span(), offset, R::BITS);
+        Self::from_bounds(span.start, span.end)
+    }
+
     /// The smallest range that holds this one and `bits`, a repr's unsigned bits: grown down to
     /// them or up to them, whichever adds fewer reprs, down on a tie.
     #[inline]
@@ -137,7 +197,7 @@ impl<R: Primitive> ReprRange<R> {
     }
 
     /// The repr beside the range that `Option`'s `None` takes where the range alone decides, as
-    /// [`Span::spare_for_none`] picks it, or `None` where the range is full.
+    /// [`Span::grown_by`] picks one, or `None` where the range is full.
     #[inline]
     #[must_use]
     pub(crate) const fn spare_for_none(self) -> Option<u128> {
@@ -149,11 +209,8 @@ impl<R: Primitive> ReprRange<R> {
     #[inline]
     #[must_use]
     const fn from_bounds(start: u128, end: u128) -> Self {
-        let span = Span { start, end, width: R::BITS };
-        if span.is_full() {
-            return Self { start: 0, end: span.largest(), marker: PhantomData };
-        }
-        Self { start, end, marker: PhantomData }
+        let span = Span { start, end, width: R::BITS }.normalized();
+        Self { start: span.start, end: span.end, marker: PhantomData }
     }
 
     /// The range as a span of `R::BITS`-bit numbers.
@@ -258,6 +315,22 @@ impl Span {
         self.end.wrapping_add(1) & self.largest() == self.start
     }
 
+    /// How many numbers of the width lie outside the span.
+    #[inline]
+    #[must_use]
+    const fn spare_count(self) -> u128 {
+        // The span holds one number more than `end - start`, modulo the width.
+        let largest = self.largest();
+        largest.wrapping_sub(self.end.wrapping_sub(self.start) & largest)
+    }
+
+    /// The span, from zero where it holds every number, as a [`ReprRange`] keeps it.
+    #[inline]
+    #[must_use]
+    const fn normalized(self) -> Self {
+        if self.is_full() { Self { start: 0, end: self.largest(), ..self } } else { self }
+    }
+
     /// Whether `bits` lie in the span: never where they are wider than it.
     #[inline]
     #[must_use]
@@ -283,37 +356,49 @@ impl Span {
         if up < down { Self { end: bits, ..self } } else { Self { start: bits, ..self } }
     }
 
-    /// The number `Option`'s `None` takes beside the span, or `None` where the span is full.
-    ///
-    /// Zero where it is beside the span; else, where the span starts at zero, the number after its
-    /// end; else whichever of the number before its start and the one after its end leaves the
-    /// narrower field, the one before on a tie.
+    /// The number `Option`'s `None` takes beside the span, as [`grown_by`](Self::grown_by) picks
+    /// one, or `None` where the span is full.
     #[inline]
     #[must_use]
     const fn spare_for_none(self) -> Option<u128> {
-        if self.is_full() {
-            return None;
+        match self.grown_by(1) {
+            Some((_, none)) => Some(none),
+            None => None,
         }
-        // Not full, a span that starts at 1 or ends at the largest number does not wrap.
-        if self.start == 1 || self.end == self.largest() {
-            return Some(0);
-        }
-        let above = self.end.wrapping_add(1);
-        if self.start == 0 {
-            return Some(above);
-        }
-        let below = self.start.wrapping_sub(1);
-        let narrower_above =
-            Self { end: above, ..self }.field_width() < Self { start: below, ..self }.field_width();
-        Some(if narrower_above { above } else { below })
     }
 
-    /// The fewest bits a field takes to hold each number of the span: unsigned, or two's
-    /// complement where that is narrower; the whole width where the span wraps both through zero
-    /// and through the signed numbers' ends.
+    /// The span grown by `count` numbers beside it, and the first of them, each next one after it;
+    /// `None` where fewer than `count` lie outside.
+    ///
+    /// They go below the start or above the end, whichever leaves the narrower field; on a tie, to
+    /// the side that puts one number alone at zero, then to the side whose span does not wrap, then
+    /// below. So `Option`'s `None` takes zero where it is beside the span, and the number after the
+    /// end of a span from zero.
     #[inline]
     #[must_use]
-    const fn field_width(self) -> u32 {
+    const fn grown_by(self, count: u128) -> Option<(Self, u128)> {
+        if self.spare_count() < count {
+            return None;
+        }
+        let largest = self.largest();
+        let below = Self { start: self.start.wrapping_sub(count) & largest, ..self };
+        let above = Self { end: self.end.wrapping_add(count) & largest, ..self };
+        let after_end = self.end.wrapping_add(1) & largest;
+        let (below_width, above_width) = (below.field_layout().width, above.field_layout().width);
+        let goes_above = if below_width != above_width {
+            above_width < below_width
+        } else if count == 1 && (below.start == 0) != (after_end == 0) {
+            after_end == 0
+        } else {
+            below.wraps() && !above.wraps()
+        };
+        Some(if goes_above { (above, after_end) } else { (below, below.start) })
+    }
+
+    /// How a packed value stores a field of the span's numbers, as [`ReprRange::field_layout`].
+    #[inline]
+    #[must_use]
+    const fn field_layout(self) -> FieldLayout {
         let first = sign_extend(self.start, self.width);
         let last = sign_extend(self.end, self.width);
         let signed = if first > last {
@@ -323,8 +408,134 @@ impl Span {
             if low > high { low } else { high }
         };
         let unsigned = if self.wraps() { self.width } else { bit_length(self.end) };
-        if signed < unsigned { signed } else { unsigned }
+        if signed < unsigned {
+            FieldLayout { width: signed, signed: true }
+        } else {
+            FieldLayout { width: unsigned, signed: false }
+        }
     }
+
+    /// The narrowest span of `width`-bit numbers that holds each of `bits`, which it masks to the
+    /// width and sorts, as [`ReprRange::enclosing`]; `None` where `bits` is empty.
+    #[inline]
+    #[must_use]
+    const fn enclosing(bits: &mut [u128], width: u32) -> Option<Self> {
+        let largest = mask(width);
+        let mut rest: &mut [u128] = bits;
+        while let [number, after @ ..] = rest {
+            *number &= largest;
+            rest = after;
+        }
+        sort(bits);
+        let (Some(&smallest), Some(&greatest)) = (bits.first(), bits.last()) else {
+            return None;
+        };
+        // First the run from the greatest round through zero to the smallest, so a tie leaves the
+        // span from the smallest to the greatest; then the run between each pair of neighbours.
+        let mut run = smallest.wrapping_sub(greatest).wrapping_sub(1) & largest;
+        let (mut start, mut end) = (smallest, greatest);
+        let mut rest: &[u128] = bits;
+        while let [low, after @ ..] = rest {
+            rest = after;
+            let [high, ..] = *rest else { break };
+            let between = if high == *low { 0 } else { high.wrapping_sub(*low).wrapping_sub(1) };
+            if between > run {
+                (start, end, run) = (high, *low, between);
+            }
+        }
+        Some(Self { start, end, width })
+    }
+
+    /// The span of a packed value `width` bits wide whose top field holds `field`'s numbers at
+    /// `offset`, as [`ReprRange::from_top_field`].
+    #[inline]
+    #[must_use]
+    const fn from_top_field(field: Self, offset: u32, width: u32) -> Self {
+        let layout = field.field_layout();
+        let field_end = offset.saturating_add(layout.width);
+        let (first, last) = if layout.signed {
+            (
+                sign_extend(field.start, field.width).cast_unsigned(),
+                sign_extend(field.end, field.width).cast_unsigned(),
+            )
+        } else if field.wraps() && field_end < width {
+            // An unsigned field that wraps takes its repr's every bit, and with zeros above it,
+            // the value's numbers lie on both sides of a run that no one span leaves out.
+            return Self { start: 0, end: mask(field_end), width };
+        } else {
+            (field.start, field.end)
+        };
+        let largest = mask(width);
+        Self {
+            start: first.unbounded_shl(offset) & largest,
+            end: (last.unbounded_shl(offset) | mask(offset)) & largest,
+            width,
+        }
+    }
+}
+
+/// Sorts `values` ascending, in place: one pass where they ascend already, as a fieldless enum's
+/// implicit discriminants do, else a heapsort, whose `k log k` steps sort 16,384 descending values
+/// within const eval's step limit, where an insertion sort's run out before 512.
+const fn sort(values: &mut [u128]) {
+    if is_ascending(values) {
+        return;
+    }
+    let count = values.len();
+    let mut root = count.wrapping_div(2);
+    while root > 0 {
+        root = root.wrapping_sub(1);
+        sift_down(values, root, count);
+    }
+    let mut end = count;
+    while end > 1 {
+        end = end.wrapping_sub(1);
+        values.swap(0, end);
+        sift_down(values, 0, end);
+    }
+}
+
+/// Whether `values` ascend.
+const fn is_ascending(values: &[u128]) -> bool {
+    let mut rest = values;
+    while let [low, after @ ..] = rest {
+        if let [high, ..] = after
+            && *low > *high
+        {
+            return false;
+        }
+        rest = after;
+    }
+    true
+}
+
+/// Moves the value at `root` down the max-heap `values[..end]`, whose subtrees below it are heaps,
+/// until no child is above it; `end` lies within `values`.
+///
+/// It indexes, since through `get` and `swap` the sort runs out of const eval's steps before 8,192
+/// descending values.
+#[expect(
+    clippy::indexing_slicing,
+    reason = "each index is below `end`, which lies within `values`"
+)]
+const fn sift_down(values: &mut [u128], mut root: usize, end: usize) {
+    let value = values[root];
+    loop {
+        // A slice of `u128` holds fewer than `usize::MAX / 16` values, so a child's index never
+        // wraps.
+        let left = root.wrapping_mul(2).wrapping_add(1);
+        if left >= end {
+            break;
+        }
+        let right = left.wrapping_add(1);
+        let child = if right < end && values[right] > values[left] { right } else { left };
+        if values[child] <= value {
+            break;
+        }
+        values[root] = values[child];
+        root = child;
+    }
+    values[root] = value;
 }
 
 /// The low `width` bits set: none for 0, all 128 for 128 or more.
