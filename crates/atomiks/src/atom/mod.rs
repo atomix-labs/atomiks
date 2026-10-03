@@ -32,7 +32,7 @@ use crate::validity::{Partial, Total, Validity};
 #[diagnostic::on_unimplemented(
     message = "`{Self}` cannot be stored in an atomic",
     label = "not `Atom`",
-    note = "for a type of your own, derive it: `#[derive(Atom)]`"
+    note = "for a type of your own, implement it with `unsafe impl Atom for {Self}`, keeping each promise of its `# Safety` section"
 )]
 #[cfg_attr(
     all(target_arch = "x86_64", not(target_feature = "cmpxchg16b")),
@@ -73,7 +73,7 @@ pub const unsafe trait Atom: Copy {
 #[diagnostic::on_unimplemented(
     message = "`{Self}` has no atomic add",
     label = "`add`, `sub`, `fetch_add` and `fetch_sub` need `AtomAdd`",
-    note = "for a newtype of a type that has it, derive it: `#[derive(AtomAdd)]`",
+    note = "for a newtype of a type that has it, implement it: `impl AtomAdd for {Self} {{}}`",
     note = "to change the value in a compare-exchange loop, call `update`"
 )]
 pub trait AtomAdd: Atom<Validity = Total, Repr: AddSub> {}
@@ -85,7 +85,7 @@ pub trait AtomAdd: Atom<Validity = Total, Repr: AddSub> {}
 #[diagnostic::on_unimplemented(
     message = "`{Self}` has no atomic maximum or minimum",
     label = "`max`, `min`, `fetch_max` and `fetch_min` need `AtomOrd`",
-    note = "for a newtype of a type that has it, derive it: `#[derive(AtomOrd)]`",
+    note = "for a newtype of a type that has it, implement it: `impl AtomOrd for {Self} {{}}`",
     note = "to change the value in a compare-exchange loop, call `update`"
 )]
 pub trait AtomOrd: Atom + Ord {}
@@ -96,7 +96,7 @@ pub trait AtomOrd: Atom + Ord {}
 #[diagnostic::on_unimplemented(
     message = "`{Self}` has no atomic bitwise operations",
     label = "`and`, `or`, `xor`, `not` and their `fetch_` forms need `AtomBitwise`",
-    note = "for a newtype of a type that has it, derive it: `#[derive(AtomBitwise)]`",
+    note = "for a newtype of a type that has it, implement it: `impl AtomBitwise for {Self} {{}}`",
     note = "to change the value in a compare-exchange loop, call `update`"
 )]
 pub trait AtomBitwise: Atom<Validity = Total, Repr: Bitwise> {}

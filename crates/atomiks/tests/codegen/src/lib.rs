@@ -2,7 +2,11 @@
 //!
 //! The operations only `aarch64` has build there, or anywhere with the `aarch64-only` feature, for
 //! the test that `x86_64` refuses each; the `aarch64-refused` feature adds a probe of each
-//! capability `aarch64`'s floor lacks for 128 bits, for the test that it refuses them.
+//! capability `aarch64`'s floor lacks for 128 bits (load, store, exchange, maximum), for the test
+//! that it refuses them.
+//!
+//! The empty `[workspace]` in its manifest makes it a workspace of its own: the repository's does
+//! not list it, and the test builds it alone.
 
 #![no_std]
 
