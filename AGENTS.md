@@ -39,10 +39,10 @@ with the profile, on `devset update`. Never edit `.devset/`.
 
 A Cargo workspace of two crates under `crates/`: `atomiks-core` holds the typed
 atomic (`Atom`, `Atomic`, the orderings, validity, the primitives, the fences,
-the cell and the loom seam), and the facade `atomiks` re-exports it. Later
-phases add `atomiks-derive`, behind the facade's `derive` feature, and
-`atomiks-lock`. Each inherits its version, edition, licence and lints from the
-root `Cargo.toml`. The book is under `docs/`. The toolchain is the nightly
+the cell and the loom seam), and the facade `atomiks` re-exports it. Each
+inherits its version, edition, licence and lints from the root `Cargo.toml`.
+`atomiks-derive`, behind the facade's `derive` feature, and `atomiks-lock` are
+yet to be written. The book is under `docs/`. The toolchain is the nightly
 `rust-toolchain.toml` pins, which the crates need for their nightly features;
 the CPU floor, x86-64-v3 and aarch64 with LSE, is `.cargo/config.toml`'s. The
 tools are the versions `.config/mise/` pins. The justfile's top section holds
@@ -63,9 +63,10 @@ What a change here keeps, beyond what the checks hold it to.
   is one macro or helper.
 - Imports, never paths: neither a body nor an attribute names `core::`,
   `crate::` or another crate's path. A doc link may.
-- A cfg that repeats is one alias in `atomiks-core/build.rs`, as `wide` is.
-  rustdoc names an alias as it is written, so `lib.rs` hides each one from the
-  badges, and a public item one gates writes its condition out in a `doc(cfg)`.
+- A cfg that repeats is one alias in `crates/atomiks-core/build.rs`, as `wide`
+  is. rustdoc names an alias as it is written, so `lib.rs` hides each one from
+  the badges, and a public item one gates writes its condition out in a
+  `doc(cfg)`.
 - Every name is whole words, never a fragment such as `at`, `by` or `held`.
 - The facade has no code of its own: it re-exports each item by name, and an
   item `atomiks-core` makes public is re-exported in the same change.

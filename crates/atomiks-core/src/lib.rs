@@ -19,6 +19,8 @@
 //!
 //! # Crate Features
 //!
+//! None is on by default.
+//!
 //! | Feature | Adds                                                     |
 //! | ------- | -------------------------------------------------------- |
 //! | `loom`  | loom's types under `--cfg loom`; nothing without the cfg |
@@ -47,8 +49,8 @@
         reason = "the AVX 16-byte load and store are core's atomic intrinsics"
     )
 )]
-// A loom build is a model of this one, not a target of its own: no badge names it. Nor does an
-// alias `build.rs` declares, which an item writes out where its badge needs one.
+// No badge names `loom` or an alias `build.rs` declares: a loom build is a model of this one, not
+// a target of its own, and an item writes out an alias's condition where its badge needs one.
 #![doc(auto_cfg(hide(loom, wide, wide_load_store)))]
 
 #[cfg(all(loom, not(feature = "loom")))]

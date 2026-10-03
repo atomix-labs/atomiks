@@ -3,9 +3,6 @@
 use cfg_aliases::cfg_aliases;
 
 /// Declares each alias, with the `check-cfg` that lets rustc know it.
-///
-/// rustdoc would name an alias in a badge, so `lib.rs` hides `wide` and `wide_load_store` from the
-/// badges, and writes `wide` out again in a `doc(cfg)` on the 128-bit atomics.
 fn main() {
     cfg_aliases! {
         // A 16-byte compare-exchange: aarch64's, or x86_64's `cmpxchg16b`.

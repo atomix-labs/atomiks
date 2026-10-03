@@ -18,8 +18,9 @@ atomiks is a workspace of Rust crates for sharing state between threads. The
 `atomiks` crate gives any value that fits one atomic word a typed atomic:
 integers, `NonZero`s, `char`s, floats, pointers, and `Option`s that spend a
 spare bit pattern on `None`, with orderings checked at compile time and every
-operation the instruction its name promises. It re-exports `atomiks-core`, which
-holds them. It is in early development, and no crate is released yet.
+operation the instruction its name promises. `atomiks-core` holds the typed
+atomic, and `atomiks` re-exports it. atomiks is in early development, and no
+crate is released yet.
 
 ## Documentation
 

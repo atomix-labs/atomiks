@@ -7,8 +7,7 @@
 //!
 //! # Types
 //!
-//! - **The atomic.** [`Atomic<T>`](Atomic), with an alias for each primitive, [`AtomicU64`] and the
-//!   rest.
+//! - **The atomic.** [`Atomic<T>`](Atomic), with an alias per primitive, such as [`AtomicU64`].
 //! - **Values.** [`Atom`] encodes a value as its repr and back, and its [`validity`] says which
 //!   reprs decode; [`AtomAdd`], [`AtomOrd`] and [`AtomBitwise`] add the read-modify-writes that
 //!   mean something for it.
@@ -69,14 +68,16 @@
 //!
 //! # Crate Features
 //!
+//! None is on by default.
+//!
 //! | Feature | Adds                                                     |
 //! | ------- | -------------------------------------------------------- |
 //! | `loom`  | loom's types under `--cfg loom`; nothing without the cfg |
 
 #![no_std]
 #![feature(doc_cfg)]
-// A loom build is a model of this one, not a target of its own: no badge names it. Nor does
-// atomiks-core's `wide`, whose condition the 128-bit atomics write out.
+// No badge names `loom` or atomiks-core's alias `wide`: a loom build is a model of this one, not a
+// target of its own, and the 128-bit atomics write out the condition `wide` stands for.
 #![doc(auto_cfg(hide(loom, wide)))]
 
 #[cfg(loom)]
