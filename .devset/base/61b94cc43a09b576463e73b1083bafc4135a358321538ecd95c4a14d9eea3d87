@@ -1,0 +1,6 @@
+# mdBook itself is mdbook-tool's; these are the preprocessors the features bring.
+[tools]
+# Built with cargo: its releases carry no binaries.
+"cargo:mdbook-katex" = "0.10.0"
+# Built with cargo: its Linux releases need a newer glibc than many distributions carry.
+"cargo:mdbook-rustdoc-links" = "3.0.2"

@@ -1,0 +1,12 @@
+["advisories","unmaintained"]	"all"
+["advisories","yanked"]	"deny"
+["bans","allow-wildcard-paths"]	true
+["bans","deny"]	[{"name":"typed-builder","reason":"use bon (typestate + fn / method / impl builders)"},{"name":"derive_builder","reason":"use bon (compile-time typestate, not runtime check)"},{"name":"buildstructor","reason":"use bon (buildstructor lags on syn2 / edition 2024)"},{"name":"strum_macros","reason":"depend on strum with features = [\"derive\"]; version-skew otherwise","wrappers":["strum"]},{"name":"enumflags2","reason":"use enumset (forward-compat past 64 variants, FFI repr override)"},{"name":"modular-bitfield","reason":"use bitfield-struct (actively maintained mainstream choice)"},{"name":"shrinkwraprs","reason":"unmaintained; superseded by derive_more"},{"name":"newtype_derive","reason":"legacy custom_derive framework; superseded by derive_more"},{"name":"derive_deref","reason":"superseded by derive_more::Deref"},{"name":"variantly","reason":"unmaintained; superseded by derive_more::IsVariant / TryUnwrap"},{"name":"enum-as-inner","reason":"superseded by derive_more::TryUnwrap (with ref / ref_mut)"},{"name":"derive-getters","reason":"use getset / gset (active + slice-deref support)"},{"name":"derive_setters","reason":"use bon for build flows; fragments call sites otherwise"},{"name":"field_access","reason":"runtime reflection; wrong shape for HFT"},{"name":"amplify_derive","reason":"use derive_more (smaller dependency tree)"},{"name":"delegate-attr","reason":"use delegate (broader adoption, same surface)"},{"name":"async-trait","reason":"no async on the trade path"},{"name":"nix","reason":"use rustix (I/O-safe types, raw Linux syscalls); libc covers the rustix gap"}]
+["bans","multiple-versions"]	"deny"
+["bans","wildcards"]	"deny"
+["licenses","allow"]	["Apache-2.0","BSD-2-Clause","BSD-3-Clause","CC0-1.0","CDLA-Permissive-2.0","ISC","MIT","Unicode-3.0","Zlib"]
+["licenses","private"]	{"ignore":true}
+["licenses","unused-allowed-license"]	"allow"
+["sources","required-git-spec"]	"rev"
+["sources","unknown-git"]	"deny"
+["sources","unknown-registry"]	"deny"

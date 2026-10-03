@@ -1,0 +1,8 @@
+# lychee's settings: https://lychee.cli.rs/usage/config/
+
+# What devset keeps, which links nothing.
+exclude_path = [".devset"]
+
+# A slow or busy server gets a second chance, and a rate limit is no broken link.
+max_retries = 2
+accept      = ["200..=299", "429"]

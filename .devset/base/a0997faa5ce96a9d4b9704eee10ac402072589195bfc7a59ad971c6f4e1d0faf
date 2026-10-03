@@ -1,0 +1,3 @@
+/docs/book/
+# Where the API preprocessor links the API into the book's source as it builds.
+/docs/src/api

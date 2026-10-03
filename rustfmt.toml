@@ -1,0 +1,43 @@
+# rustfmt's options: https://rust-lang.github.io/rustfmt
+
+# Edition pins -----------------------------------------------
+edition       = "2024"
+style_edition = "2024"
+
+# Width & line breaks ----------------------------------------
+max_width            = 100
+use_small_heuristics = "Max"
+fn_params_layout     = "Compressed"
+
+# Imports ----------------------------------------------------
+reorder_imports = true
+reorder_modules = true
+
+# Style polish -----------------------------------------------
+use_field_init_shorthand   = true
+use_try_shorthand          = true
+match_block_trailing_comma = true
+
+# Nightly's own options, which a stable rustfmt warns of -----
+unstable_features = true
+
+# Imports, grouped -------------------------------------------
+imports_granularity = "Module"
+group_imports       = "StdExternalCrate"
+
+# Comments & docs --------------------------------------------
+wrap_comments                = true
+comment_width                = 100
+format_code_in_doc_comments  = true
+doc_comment_code_block_width = 100
+normalize_comments           = true
+normalize_doc_attributes     = true
+
+# Style polish, nightly --------------------------------------
+condense_wildcard_suffixes   = false
+hex_literal_case             = "Upper"
+enum_discrim_align_threshold = 20
+
+# Macros -----------------------------------------------------
+format_macro_matchers  = true
+skip_macro_invocations = ["asm", "global_asm", "naked_asm"]

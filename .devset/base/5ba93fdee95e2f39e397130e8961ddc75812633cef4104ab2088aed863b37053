@@ -1,0 +1,24 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 3
+    commit-message:
+      prefix: ci
+      include: scope
+    groups:
+      actions:
+        patterns: ["*"]
+    # Labels github-labels keeps: without them, Dependabot makes labels of its own.
+    labels: [dependencies, automation]
+    # The workflows devset writes, whose actions move with their profiles, not by Dependabot.
+    exclude-paths:
+      - .github/workflows/bump.yml
+      - .github/workflows/check.yml
+      - .github/workflows/labels.yml
+      - .github/workflows/nightly.yml
+      - .github/workflows/title.yml
+      - .github/workflows/watch.yml

@@ -1,0 +1,10 @@
+# >>> devset: git-attributes >>>
+* text=auto eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.css diff=css
+*.html diff=html
+*.md diff=markdown
+*.py diff=python
+*.rs diff=rust
+# <<< devset: git-attributes <<<

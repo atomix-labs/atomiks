@@ -1,0 +1,21 @@
+error[E0277]: `atomiks_core::ordering::Relaxed` is not a fence ordering
+ --> tests/compile_fail/fence_with_relaxed.rs:7:11
+  |
+7 |     fence(Relaxed);
+  |     ----- ^^^^^^^ expected `Acquire`, `Release`, `AcqRel`, `SeqCst` or `StoreStore` from `atomiks::ordering`
+  |     |
+  |     required by a bound introduced by this call
+  |
+  = help: the trait `FenceOrdering` is not implemented for `atomiks_core::ordering::Relaxed`
+  = note: a `Relaxed` fence orders nothing
+  = help: the following other types implement trait `FenceOrdering`:
+            StoreStore
+            atomiks_core::ordering::AcqRel
+            atomiks_core::ordering::Acquire
+            atomiks_core::ordering::Release
+            atomiks_core::ordering::SeqCst
+note: required by a bound in `atomiks_core::fence`
+ --> src/fence.rs
+  |
+  | pub fn fence<O: FenceOrdering>(order: O) {
+  |                 ^^^^^^^^^^^^^ required by this bound in `fence`

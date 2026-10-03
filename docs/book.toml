@@ -1,0 +1,47 @@
+[book]
+title    = "atomiks"
+language = "en"
+src      = "src"
+
+# A SUMMARY.md entry pointing at a missing file is an error, not a cue to create one.
+[build]
+create-missing = false
+
+[rust]
+edition = "2024"
+
+[output.html]
+default-theme        = "light"
+preferred-dark-theme = "navy"
+git-repository-url   = "https://github.com/atomix-labs/atomiks"
+edit-url-template    = "https://github.com/atomix-labs/atomiks/edit/main/docs/{path}"
+site-url             = "/atomiks/"
+
+# What the book loads: its look, and what each feature brings.
+additional-css = [
+    "vendor/katex/katex.min.css",
+    "theme/palette.css",
+    "theme/prompt.css",
+    "theme/width.css",
+    "theme/details.css",
+    "theme/logo.css",
+]
+additional-js = ["api-link.js"]
+
+[output.html.fold]
+enable = true
+level  = 1
+
+[output.html.search]
+enable          = true
+limit-results   = 30
+use-boolean-and = true
+
+[preprocessor.katex]
+after  = ["links"]
+no-css = true
+
+[preprocessor.rustdoc-links]
+unstable-features = true
+base-url          = "/api"
+fail-on-warnings  = "always"

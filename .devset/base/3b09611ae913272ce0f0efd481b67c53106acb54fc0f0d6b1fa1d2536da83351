@@ -1,0 +1,54 @@
+# Keeps the repository's labels as .github/labels.toml says, on every change to it on main, and
+# labels each pull request: its areas from the files it changes, `breaking` from a `!` after its
+# title's type.
+name: labels
+
+on:
+  push:
+    branches: [main]
+    paths: [.github/labels.toml]
+  # The base's token labels a fork's pull request too. Nothing of the pull request is checked out
+  # or run: its title and files come from the API, and the script from the base.
+  pull_request_target: # zizmor: ignore[dangerous-triggers]
+    types: [opened, edited, reopened, synchronize]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    if: github.event_name != 'pull_request_target'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 -B .just/github-labels/labels.py sync
+
+  label:
+    if: github.event_name == 'pull_request_target'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          PULL: ${{ github.event.pull_request.number }}
+        run: python3 -B .just/github-labels/labels.py label "$PULL"

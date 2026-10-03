@@ -1,0 +1,36 @@
+#:schema https://atomix-labs.github.io/devset/schema/config.json
+# devset applies the profiles below to this directory, and keeps them up to date.
+# The manual: https://atomix-labs.github.io/devset/
+#
+# Where profiles come from, each named once: a git repository at a ref, or a directory.
+#
+#   [sources]
+#   atxp = { git = "https://github.com/atomix-labs/atxp", tag = "v0.15.0" }
+#
+# The profiles to apply, in order, by source and name, with the features to turn on.
+#
+#   [[layers]]
+#   profile  = "atxp/rust"
+#   features = ["docs"]
+
+[sources]
+atxp = { git = "https://github.com/atomix-labs/atxp", tag = "v0.19.1" }
+
+[[layers]]
+profile = "atxp/rust"
+features = ["agents", "nightly", "strict", "oss", "docs"]
+
+[[layers]]
+profile = "atxp/vscode"
+
+[[layers]]
+profile = "atxp/project"
+features = ["devset-badge"]
+
+[[layers]]
+profile = "atxp/github-templates"
+features = ["discussions"]
+
+# Raises the CPU floor for 128-bit atomic loads and stores, and LSE.
+[files.".cargo/config.toml"]
+policy = "merge"

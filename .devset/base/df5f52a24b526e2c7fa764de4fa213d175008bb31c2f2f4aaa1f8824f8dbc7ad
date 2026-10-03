@@ -1,0 +1,98 @@
+# Runs every `nightly-*` recipe each night, each a job of its own: the checks too slow for every
+# change, and those whose inputs change without a commit. With `nightly.skip_unchanged` in
+# .github/automation.json, a night with no commit since the last green one is skipped.
+name: nightly
+
+on:
+  schedule:
+    - cron: "40 1 * * *"
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+env:
+  MISE_LOCKED: "1"
+  # One mise cache for a run: `plan` fills it with every locked tool, and each job after it restores
+  # it, so a changed lock downloads and builds each tool once, not once a job.
+  MISE_CACHE_KEY: "{{cache_key_prefix}}-{{platform}}-{{version}}-{{file_hash}}"
+  # A job whose recipe runs cargo installs the toolchain; any other installs none, and where one
+  # still runs cargo, the toolchain installs as it does.
+  RUSTUP_AUTO_INSTALL: "1"
+
+jobs:
+  plan:
+    # The jobs' own runner, whose image the cache is keyed by.
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 30
+    outputs:
+      recipes: ${{ steps.plan.outputs.recipes }}
+    steps:
+      # Unless the repository skips a night with no commit since the last green one.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: moved
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          # GitHub's API answers a 5xx now and then: each request is tried three more times.
+          retries: 3
+          script: |
+            const { settings } = require(`${process.env.GITHUB_WORKSPACE}/.github/scripts/automation.js`)
+            if (context.eventName !== 'schedule' || !settings().nightly?.skip_unchanged) return true
+            const { data } = await github.rest.actions.listWorkflowRuns({
+              ...context.repo, workflow_id: 'nightly.yml', event: 'schedule', status: 'success', per_page: 1,
+            })
+            return data.workflow_runs[0]?.head_sha !== context.sha
+      # Every locked tool, into the cache the jobs restore.
+      - uses: jdx/mise-action@9149ea85001c7435d5a66bb127d6a1b6227cb0a5 # v5.0.0
+        if: steps.moved.outputs.result == 'true'
+        with:
+          version: 2026.9.13
+          cache_key: ${{ env.MISE_CACHE_KEY }}
+      - id: plan
+        if: steps.moved.outputs.result == 'true'
+        # Each `nightly-*` recipe, and whether it runs cargo: `[metadata("rust")]` above it.
+        run: |
+          recipes=$(just --dump --dump-format json | jq -c '
+            [.recipes | to_entries[] | select(.key | startswith("nightly-"))
+              | {recipe: .key, rust: ([.value.attributes[]? | objects | .metadata // empty | .[]]
+                  | index("rust") != null)}]
+            | sort_by(.recipe)')
+          echo "recipes=$recipes" >> "$GITHUB_OUTPUT"
+
+  run:
+    needs: plan
+    if: needs.plan.outputs.recipes != '[]' && needs.plan.outputs.recipes != ''
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.recipes) }}
+    name: ${{ matrix.recipe }}
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Every locked tool, from the cache `plan` filled.
+      - uses: jdx/mise-action@9149ea85001c7435d5a66bb127d6a1b6227cb0a5 # v5.0.0
+        with:
+          version: 2026.9.13
+          cache_key: ${{ env.MISE_CACHE_KEY }}
+      # The toolchain rust-toolchain.toml names, for a recipe that runs cargo, as `[metadata("rust")]`
+      # says; rust-cache runs rustc to key its cache.
+      - if: matrix.rust && hashFiles('rust-toolchain.toml') != ''
+        run: rustup toolchain install
+      # The build of a recipe that runs cargo, as `[metadata("rust")]` says, saved from the default
+      # branch alone; not `~/.cargo/bin`, which holds only the runner's own rustup.
+      - if: matrix.rust && hashFiles('Cargo.lock') != ''
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          key: ${{ matrix.recipe }}
+          cache-bin: false
+          save-if: ${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+      - env:
+          RECIPE: ${{ matrix.recipe }}
+        run: just "$RECIPE"

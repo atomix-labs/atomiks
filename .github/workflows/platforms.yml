@@ -1,0 +1,38 @@
+# What `check.yml`, on x86_64 Linux, cannot show: the tests and the loom models on arm64 Linux,
+# where `fetch_or`, `max` and `min` exist and the 128-bit atomics are core's; on arm64 macOS, whose
+# floor adds LSE2's 128-bit load and store; and on x86_64 macOS.
+name: platforms
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  merge_group:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # cargo installs the toolchain rust-toolchain.toml names, on every runner.
+  RUSTUP_AUTO_INSTALL: "1"
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04-arm, macos-latest, macos-15-intel]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: cargo test --workspace --all-features --locked
+      - run: >-
+          cargo test -p atomiks-core --features loom --test model --locked
+          --config 'target."cfg(all())".rustflags=["--cfg","loom"]' --target-dir target/loom

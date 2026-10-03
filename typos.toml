@@ -1,0 +1,9 @@
+[files]
+# What a tool writes: devset's records, the locks with their checksums, and minified code, as dprint
+# leaves them out too; and what is vendored, which is upstream's. What git ignores, typos leaves out
+# already.
+extend-exclude = [".devset/", "*.lock", "*.min.css", "*.min.js", "vendor/"]
+
+[default]
+# A commit id is no word, and changelogs and status lines carry them: `54ba0dc` is not `ba`.
+extend-ignore-identifiers-re = ["^[0-9a-f]{7,40}$"]

@@ -1,0 +1,37 @@
+[global]
+# Line length is the formatter's to keep. MD052 would flag every intra-doc link, `[`Type`][crate::Type]`,
+# a reference the rustdoc-links preprocessor resolves and reports on itself.
+disable = ["MD013", "MD038", "MD049", "MD050", "MD052"]
+# Additive. `enable` is exclusive: it would switch every other rule off.
+extend-enable = ["MD063"]
+
+# Collapsible definitions are a `<details>`/`<summary>` pair, which Markdown has no form of, and a
+# README's header is centered HTML: an `<h1>` holding a `<picture>`, then `<p>`s of `<a>` and `<img>`.
+# Narrowed rather than disabling MD033, so every other tag still reports.
+[MD033]
+allowed_elements = [
+    "details",
+    "summary",
+    "code",
+    "span",
+    "h1",
+    "p",
+    "picture",
+    "source",
+    "img",
+    "a",
+]
+
+# A heading repeats across a changelog's releases: Features, Bug Fixes.
+[MD024]
+siblings_only = true
+
+# GitHub's templates are the body of an issue or a pull request, which has its own title, and a
+# release's notes the body of a release. An mdBook summary titles each part of the book with a `#`
+# heading, which MD025's fix would demote, and a catalog's parts are named for its groups'
+# directories, which MD063's would capitalise.
+[per-file-ignores]
+".github/ISSUE_TEMPLATE/*.md"      = ["MD041"]
+".github/pull_request_template.md" = ["MD041"]
+".github/release-notes.md"         = ["MD041"]
+"**/SUMMARY.md"                    = ["MD025", "MD063"]

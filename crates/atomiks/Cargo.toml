@@ -1,0 +1,20 @@
+[package]
+name                   = "atomiks"
+description            = "typed atomics for any value that fits one atomic word."
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+authors.workspace      = true
+repository.workspace   = true
+
+[features]
+default = []
+loom    = ["atomiks-core/loom"]
+
+[lints]
+workspace = true
+
+[dependencies]
+# internal
+atomiks-core = { workspace = true }
