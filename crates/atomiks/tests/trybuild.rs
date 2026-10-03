@@ -30,14 +30,14 @@ mod tests {
         let cases = trybuild::TestCases::new();
         // With a pass case, trybuild builds every fixture rather than checking it, so the
         // post-monomorphization errors show.
-        cases.pass("tests/ui/pass/*.rs");
-        cases.compile_fail("tests/ui/fail/*.rs");
+        cases.pass("tests/compile_pass/*.rs");
+        cases.compile_fail("tests/compile_fail/*.rs");
         // trybuild removes `RUSTFLAGS`, so a build that raises the CPU with it still builds these
         // with the floor; a `CARGO_TARGET_<TRIPLE>_RUSTFLAGS` adds to the floor instead,
         // and fails this batch. On `aarch64`, only Apple's floor has LSE2's 16-byte load
         // and store.
         if cfg!(all(target_arch = "aarch64", not(target_vendor = "apple"))) {
-            cases.compile_fail("tests/ui/fail/aarch64_without_lse2/*.rs");
+            cases.compile_fail("tests/compile_fail/aarch64_without_lse2/*.rs");
         }
     }
 }

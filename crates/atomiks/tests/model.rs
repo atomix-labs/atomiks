@@ -119,7 +119,7 @@ mod tests {
     }
 
     #[test]
-    fn try_update_retries_until_f_declines() {
+    fn a_try_update_that_loses_the_race_retries_on_what_it_found() {
         check(|| {
             let seats = Arc::new(AtomicU64::new(2));
             let book = |left: u64| left.checked_sub(1);
@@ -129,8 +129,14 @@ mod tests {
             };
             let mine = seats.try_update(AcqRel, Acquire, book);
             let theirs = other.join().expect("the other booking does not panic");
-            assert!(mine.is_ok() && theirs.is_ok(), "a booking that loses the race books again");
-            assert_eq!(seats.load(Acquire), 0, "the two bookings take both seats");
+            let mut seen = [mine, theirs];
+            seen.sort_unstable();
+            assert_eq!(
+                seen,
+                [Ok(1), Ok(2)],
+                "one saw two seats, and the other the one left, after a retry if it lost the race"
+            );
+            assert_eq!(seats.load(Acquire), 0, "and the two bookings take both seats");
         });
     }
 
