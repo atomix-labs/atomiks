@@ -1,7 +1,61 @@
 //! What the code `#[derive(Atom)]` writes calls: hidden, since nothing else should call it.
+//!
+//! A derived impl for a type with no parameters calls the codecs here rather than `Atom`'s methods:
+//! their bound is `const`, never `[const]`, so the call needs no `const_trait_impl` in the crate
+//! that derives.
 
+use crate::atom::{Atom, AtomAdd, AtomBitwise, AtomOrd};
 pub use crate::range::{FieldLayout, NicheLayout};
 use crate::validity::{Partial, Total, TotalZeroNiche, Validity, ZeroNiche, ZeroValid};
+
+/// `value`'s repr: [`Atom::to_repr`].
+#[inline]
+#[must_use]
+pub const fn to_repr<T: const Atom>(value: T) -> T::Repr {
+    value.to_repr()
+}
+
+/// The value `repr` encodes: [`Atom::from_repr`].
+#[inline]
+#[must_use]
+pub const fn from_repr<T: const Atom>(repr: T::Repr) -> Option<T> {
+    T::from_repr(repr)
+}
+
+/// The value `repr` encodes, without the check: [`Atom::from_repr_unchecked`].
+///
+/// # Safety
+/// `repr` decodes: `T::from_repr(repr)` is `Some`.
+#[expect(unsafe_code, reason = "forwards `Atom::from_repr_unchecked`, and its contract")]
+#[inline]
+#[must_use]
+pub const unsafe fn from_repr_unchecked<T: const Atom>(repr: T::Repr) -> T {
+    // SAFETY: the caller's repr decodes.
+    unsafe { T::from_repr_unchecked(repr) }
+}
+
+/// Compiles only where `T` is `Send` and `Sync`, as a derived value must be, or each marker beside
+/// a newtype's pointer: an `Atomic` of it is both, whatever the value's own auto traits say.
+#[inline]
+pub const fn assert_send_and_sync<T: Send + Sync>() {}
+
+/// Compiles only where `T`'s repr is `R`: the repr a derived value states, checked against the
+/// field whose repr it takes.
+#[inline]
+pub const fn assert_repr<T: Atom<Repr = R>, R>() {}
+
+/// Compiles only where `T` has [`AtomAdd`], as the field a derived `AtomAdd` takes it from must.
+#[inline]
+pub const fn assert_atom_add<T: AtomAdd>() {}
+
+/// Compiles only where `T` has [`AtomOrd`], as the field a derived `AtomOrd` takes it from must.
+#[inline]
+pub const fn assert_atom_ord<T: AtomOrd>() {}
+
+/// Compiles only where `T` has [`AtomBitwise`], as the field a derived `AtomBitwise` takes it from
+/// must.
+#[inline]
+pub const fn assert_atom_bitwise<T: AtomBitwise>() {}
 
 /// A validity named by a number, which a constant computes and [`SelectValidity`] maps to the
 /// validity's type.

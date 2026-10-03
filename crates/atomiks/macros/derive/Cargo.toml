@@ -1,0 +1,19 @@
+[package]
+name                   = "atomiks-derive"
+description            = "the derives of atomiks: `Atom`, and the read-modify-writes a newtype takes from its field."
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+authors.workspace      = true
+repository.workspace   = true
+
+[lints]
+workspace = true
+
+[lib]
+proc-macro = true
+
+[dependencies]
+# internal
+atomiks-derive-impl = { path = "../derive-impl", version = "=0.1.0" }

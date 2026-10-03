@@ -1,0 +1,11 @@
+error: `repr` is stated twice
+ --> tests/compile_fail/derive_with_a_key_stated_twice.rs:7:8
+  |
+7 | #[atom(repr = u32)]
+  |        ^^^^^^^^^^
+  |
+note: stated first here
+ --> tests/compile_fail/derive_with_a_key_stated_twice.rs:6:15
+  |
+6 | #[atom(repr = u64)]
+  |               ^^^

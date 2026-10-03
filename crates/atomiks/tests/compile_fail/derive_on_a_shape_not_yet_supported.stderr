@@ -1,0 +1,31 @@
+error: deriving `Atom` for a struct of no field but markers is not yet supported
+ --> tests/compile_fail/derive_on_a_shape_not_yet_supported.rs:7:8
+  |
+7 | struct Marker;
+  |        ^^^^^^
+  |
+  = note: only a newtype derives it so far: a struct of one field, beside any `PhantomData` markers
+
+error: deriving `Atom` for a struct of several fields is not yet supported
+  --> tests/compile_fail/derive_on_a_shape_not_yet_supported.rs:10:8
+   |
+10 | struct Quote {
+   |        ^^^^^
+   |
+   = note: only a newtype derives it so far: a struct of one field, beside any `PhantomData` markers
+
+error: deriving `Atom` for a fieldless enum is not yet supported
+  --> tests/compile_fail/derive_on_a_shape_not_yet_supported.rs:16:6
+   |
+16 | enum Side {
+   |      ^^^^
+   |
+   = note: only a newtype derives it so far: a struct of one field, beside any `PhantomData` markers
+
+error: deriving `Atom` for an enum with fields is not yet supported
+  --> tests/compile_fail/derive_on_a_shape_not_yet_supported.rs:22:6
+   |
+22 | enum Slot {
+   |      ^^^^
+   |
+   = note: only a newtype derives it so far: a struct of one field, beside any `PhantomData` markers

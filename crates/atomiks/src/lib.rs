@@ -82,9 +82,13 @@
 //!
 //! None is on by default.
 //!
-//! | Feature | Adds                                                     |
-//! | ------- | -------------------------------------------------------- |
-//! | `loom`  | loom's types under `--cfg loom`; nothing without the cfg |
+//! | Feature  | Adds                                                                        |
+//! | -------- | --------------------------------------------------------------------------- |
+//! | `derive` | `#[derive(Atom)]`, and `AtomAdd`, `AtomOrd` and `AtomBitwise` for a newtype |
+//! | `loom`   | loom's types under `--cfg loom`; nothing without the cfg                    |
+//!
+//! atomiks holds `atomiks-derive`, which `derive` adds, at its own version whether the feature is
+//! on or not, so the code a derive writes always calls the hidden items it was written against.
 
 #![no_std]
 #![feature(doc_cfg)]
@@ -110,3 +114,5 @@ pub use atomiks_core::{
 pub use atomiks_core::{AtomicI128, AtomicU128};
 #[doc(inline)]
 pub use atomiks_core::{cell, hint, ordering, validity};
+#[cfg(feature = "derive")]
+pub use atomiks_derive::{Atom, AtomAdd, AtomBitwise, AtomOrd};

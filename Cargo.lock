@@ -16,6 +16,8 @@ name = "atomiks"
 version = "0.1.0"
 dependencies = [
  "atomiks-core",
+ "atomiks-derive",
+ "trybuild",
 ]
 
 [[package]]
@@ -28,6 +30,22 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "trybuild",
+]
+
+[[package]]
+name = "atomiks-derive"
+version = "0.1.0"
+dependencies = [
+ "atomiks-derive-impl",
+]
+
+[[package]]
+name = "atomiks-derive-impl"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 3.0.6",
 ]
 
 [[package]]

@@ -1,5 +1,5 @@
 [workspace]
-members  = ["crates/*"]
+members  = ["crates/*", "crates/*/macros/*"]
 resolver = "3"
 
 [workspace.package]
@@ -14,7 +14,10 @@ repository   = "https://github.com/atomix-labs/atomiks"
 # external
 cfg_aliases        = { version = "0.2.2" }
 loom               = { version = "0.7" }
+proc-macro2        = { version = "1.0.107" }
 proptest           = { version = "1.11", default-features = false, features = ["std"] }
+quote              = { version = "1.0.47" }
+syn                = { version = "3.0.6" }
 tracing            = { version = "0.1.44", default-features = false, features = ["std"] }
 tracing-subscriber = { version = "0.3.23", default-features = false, features = ["env-filter", "fmt"] }
 trybuild           = { version = "1.0" }

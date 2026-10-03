@@ -1,0 +1,7 @@
+error: `repr` takes a value
+ --> tests/compile_fail/derive_with_a_key_without_a_value.rs:6:8
+  |
+6 | #[atom(repr)]
+  |        ^^^^
+  |
+  = help: write `repr = …`
