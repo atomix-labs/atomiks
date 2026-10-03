@@ -75,7 +75,7 @@ use crate::validity::{Partial, Total, Validity};
 #[diagnostic::on_unimplemented(
     message = "`{Self}` cannot be stored in an atomic",
     label = "not `Atom`",
-    note = "for a type of your own, implement it, keeping each promise of its `# Safety` section: `const unsafe impl Atom for {Self}`, which needs `#![feature(const_trait_impl)]`"
+    note = "for a type of your own, keep each promise of its `# Safety` section in a `const unsafe impl Atom for {Self}`, which needs `#![feature(const_trait_impl)]`"
 )]
 #[cfg_attr(
     all(target_arch = "x86_64", not(target_feature = "cmpxchg16b")),
