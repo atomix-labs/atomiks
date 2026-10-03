@@ -32,6 +32,10 @@
 //!   [`MinMax`]), while [`or`](Atomic::or), which discards the value before, needs no loop anywhere
 //!   in an optimized build.
 //!
+//! On `x86_64`, `AtomicU128` and `AtomicI128` need `cmpxchg16b` (`-C target-cpu=x86-64-v2`), and
+//! their [`Load`] and [`Store`] need AVX (`-C target-cpu=x86-64-v3`); `x86_64-unknown-linux-gnu`'s
+//! default CPU has neither.
+//!
 //! # Model checking
 //!
 //! Under `--cfg loom` with the `loom` feature, every atomic, [`fence`](fn@fence), [`cell`] and
