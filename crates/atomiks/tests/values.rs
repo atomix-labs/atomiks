@@ -128,4 +128,42 @@ mod tests {
         let constant = Atomic::new(ptr::null::<u8>());
         assert!(constant.load(Relaxed).is_null(), "a *const too");
     }
+
+    #[test]
+    fn exclusive_access_encodes_as_the_atomic_operations_do() {
+        let mut owner = Atomic::<Option<NonZero<u64>>>::new(None);
+        owner.set(NonZero::new(7));
+        assert_eq!(owner.load(Acquire), NonZero::new(7), "a load reads what set wrote");
+        let before = owner.with_mut(|seen| seen.replace(NonZero::<u64>::MAX));
+        assert_eq!(before, NonZero::new(7), "with_mut lends what set wrote");
+        assert_eq!(
+            owner.load(Acquire),
+            Some(NonZero::<u64>::MAX),
+            "a load reads what with_mut left"
+        );
+        owner.store(None, Release);
+        assert_eq!(owner.get(), None, "get reads what a store wrote");
+        let mut letter = Atomic::new('a');
+        letter.with_mut(|seen| *seen = 'λ');
+        assert_eq!(letter.load(Relaxed), 'λ', "a load reads the char with_mut left");
+    }
+
+    #[test]
+    fn a_pointer_keeps_its_provenance_through_exclusive_access() {
+        let mut slots = [10_u32, 20];
+        let base = slots.as_mut_ptr();
+        let mut raw = AtomicPtr::new(ptr::null_mut());
+        raw.set(base);
+        raw.with_mut(|seen| *seen = seen.wrapping_add(1));
+        // SAFETY: the pointer is one element into the live `slots`, with `base`'s provenance.
+        #[expect(unsafe_code, reason = "reading through the pointer the cell holds")]
+        let second = unsafe { raw.load(Acquire).read() };
+        assert_eq!(second, 20, "a load reads the pointer with_mut moved, with its provenance");
+        let mut non_null = Atomic::new(NonNull::dangling());
+        non_null.set(NonNull::new(base).expect("an array's pointer is not null"));
+        // SAFETY: the pointer is `base`, with its provenance, and `slots` is live.
+        #[expect(unsafe_code, reason = "reading through the pointer the cell holds")]
+        let first = unsafe { non_null.load(Acquire).read() };
+        assert_eq!(first, 10, "a load reads the `NonNull` set wrote, with its provenance");
+    }
 }

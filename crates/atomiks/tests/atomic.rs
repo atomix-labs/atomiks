@@ -6,7 +6,8 @@
 #[cfg(test)]
 mod tests {
     use core::fmt::Write;
-    use core::panic::{RefUnwindSafe, UnwindSafe};
+    use core::panic::{AssertUnwindSafe, RefUnwindSafe, UnwindSafe};
+    use std::panic;
 
     use atomiks::ordering::{AcqRel, Acquire, Relaxed, Release, SeqCst};
     use atomiks::{Atom, Atomic, AtomicBool, AtomicI64, AtomicU8, AtomicU64};
@@ -105,9 +106,11 @@ mod tests {
     }
 
     #[test]
-    fn new_and_into_inner_are_const() {
+    fn new_get_mut_and_into_inner_are_const() {
         const {
-            assert!(AtomicU64::new(3).into_inner() == 3, "a value built and read back in const");
+            let mut value = AtomicU64::new(3);
+            *value.get_mut() += 1;
+            assert!(value.into_inner() == 4, "into_inner reads what get_mut wrote, in const");
         }
     }
 
@@ -140,5 +143,53 @@ mod tests {
     fn an_atomic_is_send_sync_and_ref_unwind_safe_whatever_its_value() {
         atomic_has_auto_traits::<u64>();
         atomic_has_auto_traits::<bool>();
+    }
+
+    #[test]
+    fn exclusive_access_reads_and_writes_the_value() {
+        let mut value = AtomicU64::new(1);
+        assert_eq!(value.get(), 1, "get reads what new wrote");
+        value.set(2);
+        assert_eq!(value.get(), 2, "get reads what set wrote");
+        let doubled = value.with_mut(|seen| {
+            *seen *= 2;
+            *seen
+        });
+        assert_eq!(
+            (doubled, value.get()),
+            (4, 4),
+            "with_mut returns f's result and keeps its write"
+        );
+        *value.get_mut() += 1;
+        assert_eq!(value.into_inner(), 5, "into_inner reads what get_mut wrote");
+    }
+
+    #[test]
+    fn a_panic_in_with_mut_leaves_the_value_before() {
+        let mut value = AtomicU64::new(1);
+        let payload = panic::catch_unwind(AssertUnwindSafe(|| {
+            value.with_mut(|seen| {
+                *seen = 2;
+                panic::resume_unwind(Box::new("the closure's panic"));
+            });
+        }))
+        .expect_err("the closure's panic reaches `catch_unwind`");
+        assert_eq!(
+            payload.downcast_ref::<&str>(),
+            Some(&"the closure's panic"),
+            "the panic is the closure's"
+        );
+        assert_eq!(value.get(), 1, "the value before stays, without the closure's write");
+    }
+
+    /// Builds an atomic and reads it back, as generic run-time code can: `new` and `into_inner`
+    /// need `T: const Atom`.
+    fn round_trip<T: Atom>(value: T) -> T {
+        Atomic::from(value).get()
+    }
+
+    #[test]
+    fn generic_code_reads_back_through_get() {
+        assert_eq!(round_trip(-3_i64), -3, "get reads what `From` wrote");
     }
 }
