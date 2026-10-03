@@ -43,8 +43,13 @@ macro_rules! primitive {
         /// loop. Only atomiks implements it.
         #[diagnostic::on_unimplemented(
             message = "`{Self}` is not a primitive an atomic cell holds on this target",
-            label = "expected `bool`, an integer or a `*mut T`",
-            note = "a 128-bit integer needs `cmpxchg16b` on x86_64: build with `-C target-cpu=x86-64-v2` or newer"
+            label = "expected `bool`, an integer or a `*mut T`"
+        )]
+        #[cfg_attr(
+            all(target_arch = "x86_64", not(target_feature = "cmpxchg16b")),
+            diagnostic::on_unimplemented(
+                note = "a 128-bit integer needs `cmpxchg16b` on x86_64: build with `-C target-cpu=x86-64-v2` or newer"
+            )
         )]
         pub impl(crate) const trait Primitive: Copy + $($cell)+ {
             /// How many bits of value it holds: 1 for `bool`, else its width.
@@ -89,6 +94,18 @@ pub impl(crate) const trait ExactBits: [const] Primitive {
 ///
 /// Every operation here and in the capabilities below takes the `core` spelling of an atomiks
 /// ordering its caller's bound admits, so `core` never refuses one.
+// `Atom::Repr` is bound by this and `Primitive`, and rustc reports only this one for a repr that is
+// neither, so it speaks as `Primitive` does.
+#[diagnostic::on_unimplemented(
+    message = "`{Self}` is not a primitive an atomic cell holds on this target",
+    label = "expected `bool`, an integer or a `*mut T`"
+)]
+#[cfg_attr(
+    all(target_arch = "x86_64", not(target_feature = "cmpxchg16b")),
+    diagnostic::on_unimplemented(
+        note = "a 128-bit integer needs `cmpxchg16b` on x86_64: build with `-C target-cpu=x86-64-v2` or newer"
+    )
+)]
 #[doc(hidden)]
 pub impl(crate) trait CompareExchange: Primitive {
     /// The first read of an update loop: a load where there is one, else a compare-exchange.
