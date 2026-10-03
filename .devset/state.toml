@@ -72,8 +72,8 @@ exact = "7baa60eaed457e424d6694b65bfc598a4cb8383088efe307c88a61c525af68e9"
 canonical = "7baa60eaed457e424d6694b65bfc598a4cb8383088efe307c88a61c525af68e9"
 
 [files.".claude/skills/preparing-a-release-for-open-source/SKILL.md"]
-exact = "746bd3680dea679795420c3ea6974254cc026b4d5d20bbbf4a8ed8aca2861c4f"
-canonical = "746bd3680dea679795420c3ea6974254cc026b4d5d20bbbf4a8ed8aca2861c4f"
+exact = "1d4a50343b9d5574ca9f723bbf8f489b96653e19daedcd7e9bea5626c2e40193"
+canonical = "1d4a50343b9d5574ca9f723bbf8f489b96653e19daedcd7e9bea5626c2e40193"
 
 [files.".claude/skills/review-names/SKILL.md"]
 exact = "da66972488e301ae6a750c85c0dbe96348cb87df9a4a9e0767a6c61589637111"
@@ -1056,8 +1056,8 @@ canonical = "97ae3bed43a289ecb77fd9f99ed84523563adf60c44f27a624f9f62308af2744"
 
 [parts."README.md".project]
 scope = "block"
-exact = "042dcb70ccb59821de0a8c61651a392e21ff5252c4265ca47e2790060ced5dff"
-canonical = "042dcb70ccb59821de0a8c61651a392e21ff5252c4265ca47e2790060ced5dff"
+exact = "b4db615b1ceec118b5db605f12317b52c7d90dbc3bfbf507195cb26028c6e608"
+canonical = "b4db615b1ceec118b5db605f12317b52c7d90dbc3bfbf507195cb26028c6e608"
 
 [parts."clippy.toml".rust-clippy]
 scope = "keys"

@@ -23,6 +23,14 @@ features = ["agents", "nightly", "strict", "oss", "docs"]
 [[layers]]
 profile = "atxp/vscode"
 
+[[layers]]
+profile = "atxp/project"
+features = ["devset-badge"]
+
+[[layers]]
+profile = "atxp/github-templates"
+features = ["discussions"]
+
 # Raises the CPU floor for 128-bit atomic loads and stores, and LSE.
 [files.".cargo/config.toml"]
 policy = "merge"

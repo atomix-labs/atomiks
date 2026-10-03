@@ -37,6 +37,26 @@ description = "Moves a pinned tool, action or crate"
 color       = "ededed"
 description = "Opened by a workflow"
 
+[labels."area: core"]
+color       = "1d76db"
+description = "atomiks-core: the atomic, its values, orderings and primitives"
+paths       = ["crates/atomiks-core/**"]
+
+[labels."area: facade"]
+color       = "0e8a16"
+description = "atomiks: the facade's re-exports"
+paths       = ["crates/atomiks/**"]
+
+[labels."area: docs"]
+color       = "c5def5"
+description = "The book, the READMEs and the guides"
+paths       = ["docs/**", "*.md", "crates/*/README.md"]
+
+[labels."area: ci"]
+color       = "bfd4f2"
+description = "The workflows and their configuration"
+paths       = [".github/**"]
+
 # GitHub's first labels: types say the kind, Discussions take questions, and closing says duplicate
 # or not planned.
 [retired]

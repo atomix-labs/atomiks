@@ -26,7 +26,7 @@ security = ["default"]
 [[profiles]]
 name = "cargo-workspace"
 rev = "ed08936b8dfd96e1f490603cc7ba129ba287b20d"
-digest = "7c19a60e42199aacbf7b09fa7c13d50d18ada661dd172ade2758d97724dab7cd"
+digest = "1f946ab14307896e5093f30f267601e81dff4e4dc92fdd765e618ab00e56fde5"
 
 [profiles.source]
 git = "https://github.com/atomix-labs/atxp"
@@ -264,11 +264,14 @@ tag = "v0.19.1"
 [[profiles]]
 name = "github-templates"
 rev = "ed08936b8dfd96e1f490603cc7ba129ba287b20d"
-digest = "252ab196f50062a952c37dfbe9b47ae68f6dc4b144429149e6d861e1da8f5899"
+digest = "3684ee859de091d7d91282462aba40e796f0cd47d9624d7286b85eb8859be391"
 
 [profiles.source]
 git = "https://github.com/atomix-labs/atxp"
 tag = "v0.19.1"
+
+[profiles.features]
+discussions = ["target"]
 
 [[profiles]]
 name = "github-workflow-lint"
@@ -343,7 +346,7 @@ pages = ["default"]
 [[profiles]]
 name = "project"
 rev = "ed08936b8dfd96e1f490603cc7ba129ba287b20d"
-digest = "8d83023a8ab92737c375d6a52c6053548a8f0efd00eb8c4212afb25bcc11bb36"
+digest = "fadba1867b2c7e65827dc96e9b096bb569430753e03f98e8a4477015f233aa3d"
 
 [profiles.source]
 git = "https://github.com/atomix-labs/atxp"
@@ -354,6 +357,7 @@ agents = ["rust/agents"]
 breaking-changes = ["default"]
 conduct = ["rust/oss"]
 contributing = ["default"]
+devset-badge = ["target"]
 license = ["default"]
 readme = ["default"]
 security = ["default"]

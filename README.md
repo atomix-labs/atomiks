@@ -3,11 +3,12 @@
 
 <h1 align="center">atomiks</h1>
 
-<p align="center">An atomics and locks library.</p>
+<p align="center">Typed atomics for any value that fits one atomic word, and the locks built on them.</p>
 
 <p align="center">
   <a href="https://github.com/atomix-labs/atomiks/actions/workflows/check.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/atomix-labs/atomiks/check.yml?branch=main&amp;style=flat-square&amp;label=check"></a>
   <a href="https://atomix-labs.github.io/atomiks/"><img alt="Book" src="https://img.shields.io/badge/book-read-blue?style=flat-square"></a>
+  <a href="https://github.com/atomix-labs/devset"><img alt="managed with devset" src="https://img.shields.io/badge/managed_with-devset-0969da?style=flat-square&amp;logo=data:image/svg%2bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+PHRpdGxlPmRldnNldDwvdGl0bGU+PHBhdGggZmlsbD0iI2YwZjZmYyIgZD0ibTE2IDMgMTMgNi41TDE2IDE2IDMgOS41WiIvPjxwYXRoIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2YwZjZmYyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiBzdHJva2Utd2lkdGg9IjIuNSIgZD0ibTMgMTYgMTMgNi41TDI5IDE2TTMgMjIuNSAxNiAyOWwxMy02LjUiLz48L3N2Zz4K"></a>
 </p>
 
 <!-- dprint-ignore-end -->
