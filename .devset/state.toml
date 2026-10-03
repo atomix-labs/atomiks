@@ -410,8 +410,8 @@ canonical = "8d45cd4373e6f54a64d663f8aea3cf87a4ff26d0d52d25d44c483301d1091fac"
 policy = "once"
 
 [files.".github/ISSUE_TEMPLATE/config.yml"]
-exact = "5cb4a3a2f6aabc9600272d4c995c2824d43ad37e2299a490b34616a2563da89a"
-canonical = "5cb4a3a2f6aabc9600272d4c995c2824d43ad37e2299a490b34616a2563da89a"
+exact = "ec2562c58a79a4d3d6896b0c579c72cbd7008a1177964dabbd84f946e1120b94"
+canonical = "ec2562c58a79a4d3d6896b0c579c72cbd7008a1177964dabbd84f946e1120b94"
 policy = "once"
 
 [files.".github/ISSUE_TEMPLATE/feature_request.yml"]
@@ -646,8 +646,8 @@ canonical = "e11b07256fa52c0493caea2dddfadc91b012af6a887863aebd7f84e53689d7ab"
 policy = "once"
 
 [files."SUPPORT.md"]
-exact = "9f35fcc8399e1c84d1e3970e9925094c9262022975f725d93938f0bc7753be9c"
-canonical = "9f35fcc8399e1c84d1e3970e9925094c9262022975f725d93938f0bc7753be9c"
+exact = "ae216914059f79ed41ba802ede6b7adca557ebdc836921057cf99eaf9ee345f3"
+canonical = "ae216914059f79ed41ba802ede6b7adca557ebdc836921057cf99eaf9ee345f3"
 policy = "once"
 
 [files."cliff.toml"]
