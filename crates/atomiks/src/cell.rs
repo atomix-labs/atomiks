@@ -7,10 +7,10 @@
 pub use loom::cell::{ConstPtr, MutPtr, UnsafeCell};
 
 #[cfg(not(loom))]
-pub use self::native::{ConstPtr, MutPtr, UnsafeCell};
+pub use self::off_loom::{ConstPtr, MutPtr, UnsafeCell};
 
 #[cfg(not(loom))]
-mod native {
+mod off_loom {
     //! Core's `UnsafeCell` behind loom's surface.
 
     use core::cell;
