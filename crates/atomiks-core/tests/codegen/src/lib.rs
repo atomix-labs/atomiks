@@ -18,7 +18,7 @@ use atomiks_core::AtomicI64;
 #[cfg(any(target_arch = "aarch64", target_feature = "cmpxchg16b"))]
 use atomiks_core::AtomicU128;
 use atomiks_core::ordering::{AcqRel, Acquire, Relaxed, Release, SeqCst, StoreStore};
-use atomiks_core::{Atomic, AtomicBool, AtomicPtr, AtomicU64, compiler_fence, fence};
+use atomiks_core::{Atomic, AtomicBool, AtomicPtr, AtomicU64, RangedU64, compiler_fence, fence};
 
 #[unsafe(no_mangle)]
 pub fn u64_load(atomic: &AtomicU64) -> u64 {
@@ -157,6 +157,18 @@ pub fn char_load(atomic: &Atomic<char>) -> char {
 #[unsafe(no_mangle)]
 pub fn option_load(atomic: &Atomic<Option<NonZero<u64>>>) -> Option<NonZero<u64>> {
     atomic.load(Acquire)
+}
+
+#[unsafe(no_mangle)]
+pub fn ranged_load(atomic: &Atomic<RangedU64<3>>) -> RangedU64<3> {
+    atomic.load(Acquire)
+}
+
+/// Whether a value from 3 lies below 3: never, as LLVM knows from the pattern type's range, and
+/// must still know should a plain integer replace the pattern type.
+#[unsafe(no_mangle)]
+pub fn ranged_below_min(value: RangedU64<3>) -> bool {
+    value.get() < 3
 }
 
 #[cfg(any(target_feature = "avx", target_feature = "lse2", feature = "aarch64-refused"))]

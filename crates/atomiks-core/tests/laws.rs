@@ -1,9 +1,10 @@
 //! The `Atom` laws over every built-in: a value's repr lies in its range, which may wrap, and
 //! decodes back to it; a repr that decodes re-encodes to itself, unchecked too; each validity's
-//! promise holds; and `None` takes a spare repr: zero where zero is the niche, else one outside its
-//! value's range.
+//! promise holds; a ranged integer's repr decodes, as itself, exactly where it lies in its range;
+//! and `None` takes a spare repr: zero where zero is the niche, else one outside its value's range.
 //!
-//! Each law runs on every repr of a byte, on the edges of each width and range, and on random bits.
+//! Each law runs on every repr of a byte, on the edges of each width and range, and on random bits;
+//! a 16-bit ranged integer's, on every repr of 16 bits too.
 
 // Loom's cells exist only inside a model; `model.rs` holds the loom tests.
 #![cfg(not(loom))]
@@ -22,16 +23,21 @@ mod tests {
 
     #[cfg(target_arch = "aarch64")]
     use atomiks_core::ordering::Relaxed;
-    use atomiks_core::validity::{Total, TotalZeroNiche, ZeroValid};
-    use atomiks_core::{Atom, AtomOrd, ExactBits, Primitive};
+    use atomiks_core::validity::{Partial, Total, TotalZeroNiche, ZeroValid};
+    use atomiks_core::{
+        Atom, AtomOrd, ExactBits, Primitive, RangedI8, RangedI16, RangedI32, RangedI64,
+        RangedIsize, RangedU8, RangedU16, RangedU32, RangedU64, RangedUsize,
+    };
     #[cfg(target_arch = "aarch64")]
     use atomiks_core::{Atomic, Load, MinMax};
+    #[cfg(wide)]
+    use atomiks_core::{RangedI128, RangedU128};
     use proptest::prelude::prop_oneof;
     use proptest::test_runner::TestCaseError;
     use proptest::{prop_assert, prop_assert_eq, proptest};
 
     use crate::testing::law::{
-        assert_holds, canonical, decodes_as_promised, edge_or_random_bits, edges, none_bits,
+        assert_holds, canonical, decodes_as_promised, edge_or_random_bits, edges, none_laws,
         none_takes_a_spare_repr, round_trips,
     };
 
@@ -138,10 +144,96 @@ mod tests {
         Ok(())
     }
 
+    /// The ranged integer laws for the low bits of `bits` as `T`'s repr: it decodes, as the integer
+    /// it is, exactly where it lies in `T`'s range, alike unchecked; and where the low bits of
+    /// `other` decode too, the two order as their reprs.
+    fn ranged_integer_laws<T>(bits: u128, other: u128) -> Result<(), TestCaseError>
+    where
+        T: AtomOrd<Validity = Partial> + Into<T::Repr> + Debug,
+        T::Repr: ExactBits + Ord + Debug,
+    {
+        let [repr, other] = [bits, other].map(<T::Repr as Primitive>::from_bits);
+        let decoded = T::from_repr(repr);
+        prop_assert_eq!(
+            decoded.map(Into::into),
+            T::REPRS.contains(repr.to_bits()).then_some(repr),
+            "{:?} decodes as itself exactly where it lies in {:?}",
+            repr,
+            T::REPRS
+        );
+        decodes_as_promised::<Partial, T>(repr)?;
+        if let (Some(a), Some(b)) = (decoded, T::from_repr(other)) {
+            round_trips(a)?;
+            reprs_order_as_ord(a, b)?;
+        }
+        Ok(())
+    }
+
+    /// The atomic order law for the low bits of `bits` and `other` as `T`'s reprs, where both
+    /// decode.
+    #[cfg(target_arch = "aarch64")]
+    fn ranged_atomics_order_as_ord<T: AtomOrd + Debug>(
+        bits: u128, other: u128,
+    ) -> Result<(), TestCaseError>
+    where
+        T::Repr: Load + MinMax,
+    {
+        let decode = |bits| T::from_repr(Primitive::from_bits(bits));
+        if let (Some(a), Some(b)) = (decode(bits), decode(other)) {
+            atomics_order_as_ord(a, b)
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Checks the ranged integer laws on the low bits of `$bits` and `$other` as each type's
+    /// reprs, and on `aarch64` the atomic order law.
+    macro_rules! ranged_laws {
+        ($bits:expr, $other:expr; $($ranged:ty),+ $(,)?) => {$(
+            ranged_integer_laws::<$ranged>($bits, $other)?;
+            #[cfg(target_arch = "aarch64")]
+            ranged_atomics_order_as_ord::<$ranged>($bits, $other)?;
+        )+};
+    }
+
+    /// Checks the laws on the low bits of `$bits` as the repr of an `Option` of each type, whose
+    /// validity is `Partial`.
+    macro_rules! partial_option_laws {
+        ($bits:expr; $($value:ty),+ $(,)?) => {$(
+            decodes_as_promised::<Partial, Option<$value>>(Primitive::from_bits($bits))?;
+        )+};
+    }
+
+    /// Every law on `bits` and `other` for the ranged integers of 16 bits, and on `bits` for an
+    /// `Option` of each.
+    fn sixteen_bit_ranged_laws(bits: u128, other: u128) -> Result<(), TestCaseError> {
+        ranged_laws!(bits, other; RangedU16<3>, RangedI16<-300, 300>);
+        partial_option_laws!(bits; RangedU16<3>, RangedI16<-300, 300>);
+        Ok(())
+    }
+
+    /// Every law on `bits` and `other` for ranged integers of 64 bits or fewer, unsigned and
+    /// signed: ranges below, through and above zero, full ones, one of a single integer, and the
+    /// default `MAX`; and on `bits` for an `Option` of each of 16 bits or fewer that leaves `None`
+    /// a repr.
+    fn narrow_ranged_laws(bits: u128, other: u128) -> Result<(), TestCaseError> {
+        ranged_laws!(bits, other; RangedU8<1, 10>, RangedU8<0, 255>, RangedI8<-5, 5>);
+        ranged_laws!(bits, other; RangedI8<-100, -10>, RangedI8<{ i8::MIN }>);
+        partial_option_laws!(bits; RangedU8<1, 10>, RangedI8<-5, 5>, RangedI8<-100, -10>);
+        sixteen_bit_ranged_laws(bits, other)?;
+        ranged_laws!(bits, other; RangedU32<7, 7>, RangedI32<{ i32::MIN }, -1>);
+        ranged_laws!(bits, other; RangedU64<3>, RangedI64<{ i64::MIN }, 5>);
+        ranged_laws!(bits, other; RangedUsize<1>, RangedIsize<-1, 1>);
+        Ok(())
+    }
+
     /// Every law on `bits` as the repr of the 128-bit values.
     #[cfg(wide)]
     fn wide_laws(bits: u128, other: u128) -> Result<(), TestCaseError> {
         integer_laws!(bits, other; u128, i128);
+        ranged_integer_laws::<RangedU128<1>>(bits, other)?;
+        ranged_integer_laws::<RangedI128<{ i128::MIN }, -1>>(bits, other)?;
+        ranged_integer_laws::<RangedI128<-5, 5>>(bits, other)?;
         keeps_every_bit(bits, f128::from_bits)
     }
 
@@ -191,6 +283,7 @@ mod tests {
     fn every_byte_obeys_the_laws() {
         for bits in 0..=u128::from(u8::MAX) {
             assert_holds(narrow_integer_laws(bits, bits.wrapping_add(1)));
+            assert_holds(narrow_ranged_laws(bits, bits.wrapping_add(1)));
             let byte = u8::from_bits(bits);
             assert_holds(decodes_as_promised::<ZeroValid, ()>(byte));
             assert_holds(decodes_as_promised::<ZeroValid, PhantomData<str>>(byte));
@@ -210,9 +303,17 @@ mod tests {
     }
 
     #[test]
+    fn every_repr_of_16_bits_obeys_the_ranged_laws() {
+        for bits in 0..=u128::from(u16::MAX) {
+            assert_holds(sixteen_bit_ranged_laws(bits, bits.wrapping_add(1)));
+        }
+    }
+
+    #[test]
     fn every_edge_obeys_the_laws() {
         for bits in edges(&CHAR_EDGES) {
             assert_holds(narrow_integer_laws(bits, bits.wrapping_sub(1)));
+            assert_holds(narrow_ranged_laws(bits, bits.wrapping_sub(1)));
             assert_holds(char_laws(bits, char::MAX));
             assert_holds(float_laws(bits));
             assert_holds(pointer_laws(bits));
@@ -221,23 +322,18 @@ mod tests {
         }
     }
 
-    /// Checks the `None` law for each integer's `NonZero`.
-    macro_rules! nonzero_none_laws {
-        ($($int:ty),+) => {$(
-            assert_holds(none_takes_a_spare_repr::<NonZero<$int>>(none_bits::<NonZero<$int>>()));
-        )+};
-    }
-
     #[test]
     fn none_takes_a_spare_repr_of_each_built_in() {
-        nonzero_none_laws!(u8, u16, u32, u64, usize, i8, i16, i32, i64, isize);
+        none_laws!(NonZero<u8>, NonZero<u16>, NonZero<u32>, NonZero<u64>, NonZero<usize>);
+        none_laws!(NonZero<i8>, NonZero<i16>, NonZero<i32>, NonZero<i64>, NonZero<isize>);
+        none_laws!(char, Option<char>, (), Option<()>, PhantomData<str>);
+        none_laws!(RangedU8<1, 10>, RangedI8<-5, 5>, RangedI8<-100, -10>, RangedU16<3>);
+        none_laws!(RangedI16<-300, 300>, RangedU32<7, 7>, RangedI32<{ i32::MIN }, -1>);
+        none_laws!(RangedU64<3>, RangedI64<{ i64::MIN }, 5>, RangedUsize<1>, RangedIsize<-1, 1>);
         #[cfg(wide)]
-        nonzero_none_laws!(u128, i128);
-        assert_holds(none_takes_a_spare_repr::<char>(none_bits::<char>()));
-        assert_holds(none_takes_a_spare_repr::<Option<char>>(none_bits::<Option<char>>()));
-        assert_holds(none_takes_a_spare_repr::<()>(none_bits::<()>()));
-        assert_holds(none_takes_a_spare_repr::<Option<()>>(none_bits::<Option<()>>()));
-        assert_holds(none_takes_a_spare_repr::<PhantomData<str>>(none_bits::<PhantomData<str>>()));
+        none_laws!(NonZero<u128>, NonZero<i128>);
+        #[cfg(wide)]
+        none_laws!(RangedU128<1>, RangedI128<{ i128::MIN }, -1>, RangedI128<-5, 5>);
         let null = None::<NonNull<u8>>.to_repr().addr();
         assert_holds(none_takes_a_spare_repr::<NonNull<u8>>(
             u128::try_from(null).expect("an address fits a `u128`"),
@@ -257,6 +353,11 @@ mod tests {
         #[test]
         fn integers_obey_the_laws(bits in edge_or_random_bits(&[]), other: u128) {
             narrow_integer_laws(bits, other)?;
+        }
+
+        #[test]
+        fn ranged_integers_obey_the_laws(bits in edge_or_random_bits(&[]), other: u128) {
+            narrow_ranged_laws(bits, other)?;
         }
 
         #[test]

@@ -3,8 +3,8 @@
 //! [`Atomic<T>`](Atomic) holds a `T` as its [`Repr`](Atom::Repr), one primitive an atomic
 //! instruction reads and writes, and decodes it on the way out. The integer, `bool` and pointer
 //! atomics are its aliases (`AtomicU64 = Atomic<u64>`), and any value implementing [`Atom`] is one
-//! more: a `NonZero`, a `char`, a float, an `Option` that spends a spare repr on `None`, and a
-//! struct or an enum that derives it.
+//! more: a `NonZero`, a `char`, a float, a ranged integer, an `Option` that spends a spare repr on
+//! `None`, and a struct or an enum that derives it.
 //!
 //! # Types
 //!

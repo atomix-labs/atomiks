@@ -1,7 +1,11 @@
 //! The ranged integers as a user sees them, for widths signed and unsigned: each constructor and
 //! operation at the edges of the range and of the integer, the conversions and the text, with each
 //! refusal and its message, and comparing, hashing, stepping and formatting as the integer does;
-//! and the niche an `Option` takes.
+//! the niche an `Option` takes; and in an atomic, the integer itself as the repr, `None` beside the
+//! range, statics that need no feature gate, and `max` and `min` through zero, on aarch64.
+
+// Loom's cells exist only inside a model; `model.rs` holds the loom tests.
+#![cfg(not(loom))]
 
 #[cfg(test)]
 mod tests {
@@ -11,15 +15,23 @@ mod tests {
     use core::str::FromStr;
     use std::hash::RandomState;
 
+    #[cfg(target_arch = "aarch64")]
+    use atomiks_core::ordering::Relaxed;
+    use atomiks_core::ordering::{AcqRel, Acquire, Release};
     use atomiks_core::{
-        ParseRangeError, RangeError, RangedI8, RangedI64, RangedI128, RangedIsize, RangedU8,
-        RangedU64, RangedU128, RangedUsize,
+        Atom, Atomic, ParseRangeError, RangeError, RangedI8, RangedI16, RangedI64, RangedI128,
+        RangedIsize, RangedU8, RangedU64, RangedU128, RangedUsize, ReprRange,
     };
 
     /// How many levels of an order book a feed sends.
     type Depth = RangedU8<1, 10>;
     /// How far a price moves in one update, in ticks.
     type PriceMove = RangedI64<-5, 5>;
+
+    /// How many levels of the book a feed keeps, from 3 to 100.
+    static LEVELS: Atomic<RangedU64<3, 100>> = Atomic::new(RangedU64::MIN);
+    /// The last move of a price, -5 to 5 ticks, or `None` before the first.
+    static LAST_MOVE: Atomic<Option<RangedI8<-5, 5>>> = Atomic::new(None);
 
     /// The error core's parse gives for `text` as a `T`.
     fn parse_error<T: FromStr<Err = ParseIntError>>(text: &str) -> ParseIntError {
@@ -289,5 +301,57 @@ mod tests {
     fn an_option_of_a_full_range_takes_a_byte_more() {
         assert_eq!(size_of::<RangedU8<0, 255>>(), 1, "the value alone");
         assert_eq!(size_of::<Option<RangedU8<0, 255>>>(), 2, "no integer is left for `None`");
+    }
+
+    #[test]
+    fn an_atomic_stores_the_integer_itself() {
+        assert_eq!(PriceMove::MIN.to_repr(), -5, "-5, not its offset from `MIN`");
+        assert_eq!(
+            <RangedU64<3, 100>>::REPRS,
+            ReprRange::new(3, 100),
+            "so the reprs are the range"
+        );
+        assert_eq!(<RangedU64<3>>::REPRS, ReprRange::new(3, u128::from(u64::MAX)), "to `u64::MAX`");
+        assert_eq!(<RangedI8<-5, 5>>::REPRS, ReprRange::from_signed(-5, 5), "through zero");
+        assert_eq!(<RangedI16<-300, -10>>::REPRS, ReprRange::from_signed(-300, -10), "below it");
+        assert_eq!(<RangedIsize<-1, 1>>::REPRS, ReprRange::from_signed(-1, 1), "in any width");
+        assert_eq!(<RangedU8<0, 255>>::REPRS, ReprRange::FULL, "every repr, for a full range");
+        assert_eq!(<RangedI8<{ i8::MIN }>>::REPRS, ReprRange::FULL, "signed too");
+    }
+
+    #[test]
+    fn none_takes_the_repr_beside_the_range() {
+        assert_eq!(None::<RangedU64<3, 100>>.to_repr(), 2, "2, below 3");
+        assert_eq!(
+            None::<RangedU64<3>>.to_repr(),
+            0,
+            "0, past `u64::MAX`, beside the range, as `ReprRange` picks it"
+        );
+        assert_eq!(
+            None::<RangedI8<-5, 5>>.to_repr(),
+            -6,
+            "-6, 0xFA, beside the range, as `ReprRange` picks it"
+        );
+    }
+
+    #[test]
+    fn statics_hold_a_ranged_integer_and_an_option_of_one() {
+        LEVELS.store(RangedU64::MAX, Release);
+        assert_eq!(LEVELS.load(Acquire), RangedU64::MAX, "100 levels");
+        assert_eq!(LAST_MOVE.load(Acquire), None, "no move yet");
+        LAST_MOVE.store(Some(RangedI8::MIN), Release);
+        assert_eq!(LAST_MOVE.swap(Some(RangedI8::MAX), AcqRel), Some(RangedI8::MIN), "-5");
+        assert_eq!(LAST_MOVE.load(Acquire), Some(RangedI8::MAX), "then 5");
+    }
+
+    // x86_64 has no atomic maximum or minimum, so `max` and `min` exist on aarch64 alone.
+    #[cfg(target_arch = "aarch64")]
+    #[test]
+    fn max_and_min_order_as_the_integers_through_zero() {
+        let price_move = Atomic::new(PriceMove::new(-3).expect("-3 is a move"));
+        price_move.max(PriceMove::new(2).expect("2 is one"), Relaxed);
+        assert_eq!(price_move.load(Relaxed).get(), 2, "2, above -3");
+        assert_eq!(price_move.fetch_min(PriceMove::MIN, Relaxed).get(), 2, "the value before");
+        assert_eq!(price_move.load(Relaxed), PriceMove::MIN, "then -5, below 2");
     }
 }

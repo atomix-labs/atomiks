@@ -2,6 +2,7 @@
 
 mod option;
 mod ptr;
+mod ranged;
 mod scalar;
 
 use crate::primitive::{AddSub, Bitwise, CompareExchange, Primitive};

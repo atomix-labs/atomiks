@@ -36,6 +36,13 @@ macro_rules! ranged {
         /// [`max`](Ord::max) and [`clamp`](Ord::clamp) are, and arithmetic is `checked_` or
         /// `saturating_`. There is no `Default`, since zero may lie outside the range.
         ///
+        /// Wherever its integer is an [`Atom`](crate::Atom), so is it: an [`Atomic`](crate::Atomic)
+        /// stores it as its integer, and an `Option`'s `None` as an integer outside the range, so
+        /// an atomic of a full range's `Option` is refused. It has [`AtomOrd`](crate::AtomOrd), as
+        /// the larger or smaller of two values in the range is in it, but neither
+        /// [`AtomAdd`](crate::AtomAdd) nor [`AtomBitwise`](crate::AtomBitwise): a sum or an or of
+        /// two can leave it.
+        ///
         #[doc = concat!(
             "`MAX` defaults to [`", stringify!($int), "::MAX`]. ",
             "A `MIN` above `MAX` names no type: rustc refuses it where it is used, in a message ",
