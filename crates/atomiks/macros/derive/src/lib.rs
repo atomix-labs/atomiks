@@ -27,7 +27,8 @@ use proc_macro::{Diagnostic, Level, Span, TokenStream};
 /// - **Fieldless enum**: each variant as its discriminant, exactly as rustc evaluates it.
 /// - **Packed struct**, of several fields: each field in bits of its own, from bit 0 in declaration
 ///   order, as few as its reprs need, in two's complement where that is fewer; the bits above
-///   extend the last field of any bits, so a signed one's sign fills them.
+///   extend the last field of any bits, so a signed one's sign fills them. A ranged integer field
+///   takes the bits its range needs, with no attribute: 4 for a `RangedI8<-5, 5>`.
 /// - **Enum with fields**, tagged: each variant's fields packed as a struct's, below a tag of its
 ///   discriminant. Where one variant alone has fields and none states a discriminant, niche-filling
 ///   instead, unless that is wider: the unit variants take the reprs beside that variant's range,

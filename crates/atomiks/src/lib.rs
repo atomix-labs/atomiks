@@ -70,6 +70,35 @@
 //! assert_eq!(OWNER.load(Acquire), NonZero::new(1), "the first id taken");
 //! ```
 //!
+//! ## Reserving Integers for a Lock's States
+//! ```
+//! # #[cfg(feature = "derive")] {
+//! use atomiks::ordering::{AcqRel, Acquire};
+//! use atomiks::{Atom, Atomic, RangedU64};
+//!
+//! /// An owner's id, from 3, which leaves 0 to 2 spare.
+//! #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+//! struct OwnerId(RangedU64<3>);
+//!
+//! /// A lock, whose unit variants take integers below the ids.
+//! #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+//! enum Lock {
+//!     Free,
+//!     Poisoned,
+//!     Held(OwnerId),
+//! }
+//!
+//! static LOCK: Atomic<Option<Lock>> = Atomic::new(Some(Lock::Free));
+//!
+//! let owner = OwnerId(RangedU64::new(7).expect("7 is from 3 up"));
+//! let (free, held) = (Some(Lock::Free), Some(Lock::Held(owner)));
+//! assert_eq!(LOCK.compare_exchange(free, held, AcqRel, Acquire), Ok(free), "taken by owner 7");
+//! assert_eq!((Lock::Free.to_repr(), Lock::Poisoned.to_repr()), (1, 2), "the states below 3");
+//! assert_eq!(None::<Lock>.to_repr(), 0, "`None` below them");
+//! assert_eq!(size_of_val(&LOCK), 8, "and the lock in the id's `u64`");
+//! # }
+//! ```
+//!
 //! # What Each Operation Costs
 //!
 //! An operation exists only where it is what its name says:

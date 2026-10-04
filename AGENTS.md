@@ -39,14 +39,14 @@ with the profile, on `devset update`. Never edit `.devset/`.
 
 A Cargo workspace of crates under `crates/`: `atomiks-core` holds the typed
 atomic (`Atom`, `Atomic`, the orderings, validity, the primitives, the fences,
-the cell and the loom seam), and the facade `atomiks` re-exports it.
-`crates/atomiks/macros/derive`, `atomiks-derive`, is the proc macro of
-`#[derive(Atom)]` and the capabilities' derives, and
-`crates/atomiks/macros/derive-impl`, `atomiks-derive-impl`, its logic; the
-derive is `atomiks`' `derive` feature. Each crate inherits its version, edition,
-licence and lints from the root `Cargo.toml`, and builds for Linux and macOS, on
-aarch64 and x86_64. `atomiks-lock` is yet to be written. The book is under
-`docs/`. The toolchain, with the four targets, is the nightly
+the cell and the loom seam) and the ranged integers, each on a pattern-type
+field; the facade `atomiks` re-exports both. `crates/atomiks/macros/derive`,
+`atomiks-derive`, is the proc macro of `#[derive(Atom)]` and the capabilities'
+derives, and `crates/atomiks/macros/derive-impl`, `atomiks-derive-impl`, its
+logic; the derive is `atomiks`' `derive` feature. Each crate inherits its
+version, edition, licence and lints from the root `Cargo.toml`, and builds for
+Linux and macOS, on aarch64 and x86_64. `atomiks-lock` is yet to be written. The
+book is under `docs/`. The toolchain, with the four targets, is the nightly
 `rust-toolchain.toml` pins, which the crates need for their nightly features.
 The CPU floor is `.cargo/config.toml`'s: x86-64-v3, LSE on aarch64 Linux, and
 the M1 on macOS. The tools are the versions `.config/mise/` pins. The justfile's
@@ -84,8 +84,10 @@ What a change here keeps, beyond what the checks hold it to.
   a `// SAFETY:` comment that proves what it requires; a field a proof relies on
   states its `// INVARIANT:` and names every writer.
 - A nightly feature is taken where it makes the API right, never to reach core's
-  internals beyond the 128-bit intrinsics; `generic_const_exprs`,
-  `specialization` and `unsafe_fields` stay out.
+  internals beyond the 128-bit intrinsics and a ranged integer's pattern-type
+  field, which `transmute_neo` alone converts and a plain integer replaces
+  should a nightly break it; `generic_const_exprs`, `specialization` and
+  `unsafe_fields` stay out.
 
 ### Docs
 
