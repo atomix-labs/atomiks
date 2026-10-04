@@ -13,6 +13,9 @@
 //!   it takes and its [`validity`] which decode; [`AtomAdd`], [`AtomOrd`] and [`AtomBitwise`] add
 //!   the read-modify-writes that mean something for it. With the `derive` feature, each derives:
 //!   `Atom` for a struct or an enum, and each capability for a newtype whose field has it.
+//!   [`RangedU64<MIN, MAX>`](RangedU64) and its siblings, `RangedU8` to `RangedIsize`, hold an
+//!   integer from `MIN` to `MAX`, and [`RangeError`] and [`ParseRangeError`] say why one refused an
+//!   integer or a text.
 //! - **Orderings.** The [`ordering`] types, each accepted only where it means something, and the
 //!   [`fence`](fn@fence) and [`compiler_fence`] they order.
 //! - **Primitives.** [`Primitive`], [`ExactBits`] where the bits are the whole value, and what the
@@ -140,8 +143,9 @@ pub use atomiks_core::model;
 pub use atomiks_core::{
     Atom, AtomAdd, AtomBitwise, AtomOrd, Atomic, AtomicBool, AtomicI8, AtomicI16, AtomicI32,
     AtomicI64, AtomicIsize, AtomicPtr, AtomicU8, AtomicU16, AtomicU32, AtomicU64, AtomicUsize,
-    ExactBits, FetchBitwise, Load, MinMax, Primitive, ReprRange, Store, Swap, compiler_fence,
-    fence,
+    ExactBits, FetchBitwise, Load, MinMax, ParseRangeError, Primitive, RangeError, RangedI8,
+    RangedI16, RangedI32, RangedI64, RangedI128, RangedIsize, RangedU8, RangedU16, RangedU32,
+    RangedU64, RangedU128, RangedUsize, ReprRange, Store, Swap, compiler_fence, fence,
 };
 #[cfg(any(
     target_arch = "aarch64",
