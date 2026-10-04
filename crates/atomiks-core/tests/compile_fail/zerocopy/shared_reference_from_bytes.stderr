@@ -1,0 +1,22 @@
+error[E0277]: the trait bound `atomiks_core::Atomic<u64>: Immutable` is not satisfied
+  --> tests/compile_fail/zerocopy/shared_reference_from_bytes.rs:12:20
+   |
+12 |     is_immutable::<AtomicU64>();
+   |                    ^^^^^^^^^ the trait `Immutable` is not implemented for `atomiks_core::Atomic<u64>`
+   |
+   = note: Consider adding `#[derive(Immutable)]` to `atomiks_core::Atomic<u64>`
+   = help: the following other types implement trait `Immutable`:
+             &T
+             &mut T
+             ()
+             (A, B)
+             (A, B, C)
+             (A, B, C, D)
+             (A, B, C, D, E)
+             (A, B, C, D, E, F)
+           and $N others
+note: required by a bound in `is_immutable`
+  --> tests/compile_fail/zerocopy/shared_reference_from_bytes.rs:9:26
+   |
+ 9 | const fn is_immutable<T: Immutable>() {}
+   |                          ^^^^^^^^^ required by this bound in `is_immutable`

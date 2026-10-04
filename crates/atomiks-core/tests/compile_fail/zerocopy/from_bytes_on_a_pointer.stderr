@@ -1,0 +1,26 @@
+error[E0599]: the associated function or constant `read_from_bytes` exists for struct `atomiks_core::Atomic<*mut u8>`, but its trait bounds were not satisfied
+ --> tests/compile_fail/zerocopy/from_bytes_on_a_pointer.rs:8:32
+  |
+8 |     let _ = Atomic::<*mut u8>::read_from_bytes(&[0; 8]);
+  |                                ^^^^^^^^^^^^^^^ associated function or constant cannot be called on `atomiks_core::Atomic<*mut u8>` due to unsatisfied trait bounds
+  |
+ ::: src/atomic/mod.rs
+  |
+  | pub struct Atomic<T: Atom> {
+  | -------------------------- doesn't satisfy `atomiks_core::Atomic<*mut u8>: FromBytes`
+  |
+ ::: $RUST/core/src/sync/atomic.rs
+  |
+  | pub struct Atomic<T: AtomicPrimitive> {
+  | ------------------------------------- doesn't satisfy `std::sync::atomic::Atomic<*mut u8>: FromBytes`
+  |
+note: if you're trying to build a new `atomiks_core::Atomic<*mut u8>`, consider using `atomiks_core::Atomic::<T>::new` which returns `atomiks_core::Atomic<_>`
+ --> src/atomic/mod.rs
+  |
+  | /     pub const fn new(value: T) -> Self
+  | |     where
+  | |         T: const Atom,
+  | |______________________^
+  = note: the following trait bounds were not satisfied:
+          `std::sync::atomic::Atomic<*mut u8>: FromBytes`
+          which is required by `atomiks_core::Atomic<*mut u8>: FromBytes`

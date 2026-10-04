@@ -150,11 +150,13 @@
 //!
 //! None is on by default.
 //!
-//! | Feature  | Adds                                                                              |
-//! | -------- | --------------------------------------------------------------------------------- |
-//! | `derive` | `#[derive(Atom)]`, and `AtomAdd`, `AtomOrd` and `AtomBitwise` for a newtype       |
-//! | `loom`   | loom's types under `--cfg loom`; nothing without the cfg                          |
-//! | `serde`  | serde for an atomic, by a `Relaxed` load, and a ranged integer, held to its range |
+//! | Feature       | Adds                                                                        |
+//! | ------------- | --------------------------------------------------------------------------- |
+//! | `bytemuck`    | an atomic's `Zeroable`, off under loom, and a ranged integer's byte traits  |
+//! | `derive`      | `#[derive(Atom)]`, and `AtomAdd`, `AtomOrd` and `AtomBitwise` for a newtype |
+//! | `loom`        | loom's types under `--cfg loom`; nothing without the cfg                    |
+//! | `serde`       | serde: an atomic by a `Relaxed` load; a ranged integer, held to its range   |
+//! | `zerocopy-08` | an atomic's zerocopy traits: its cell's, never `Immutable`; off under loom  |
 //!
 //! atomiks holds `atomiks-derive`, which `derive` adds, at its own version whether the feature is
 //! on or not, so the code a derive writes always calls the hidden items it was written against.

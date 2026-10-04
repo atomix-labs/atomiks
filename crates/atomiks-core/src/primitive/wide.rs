@@ -16,6 +16,9 @@ use core::ptr;
 #[cfg(not(loom))]
 use core::sync::atomic::Ordering as CoreOrdering;
 
+#[cfg(all(feature = "zerocopy-08", not(loom)))]
+use zerocopy::{FromBytes, IntoBytes, KnownLayout};
+
 #[cfg(not(loom))]
 use super::{CellAccess, CompareExchange};
 use super::{ExactBits, Primitive};
@@ -48,8 +51,11 @@ macro_rules! wide_bits {
 wide_bits!(u128, i128);
 
 /// A 16-byte atomic cell.
+///
+/// With zerocopy, its bits are plain memory, read and written as bytes.
 #[cfg(not(loom))]
 #[repr(C, align(16))]
+#[cfg_attr(all(feature = "zerocopy-08", not(loom)), derive(KnownLayout, IntoBytes, FromBytes))]
 pub struct Wide {
     // INVARIANT: while shared, every access is a 16-byte atomic: core's `AtomicU128` on `aarch64`;
     // `cmpxchg16b`, or AVX's load and store, on `x86_64`; or a caller's through `as_ptr` or

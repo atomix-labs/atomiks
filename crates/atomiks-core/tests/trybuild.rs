@@ -32,6 +32,12 @@ mod tests {
         // post-monomorphization errors show.
         cases.pass("tests/compile_pass/*.rs");
         cases.compile_fail("tests/compile_fail/*.rs");
+        if cfg!(feature = "zerocopy-08") {
+            cases.compile_fail("tests/compile_fail/zerocopy/*.rs");
+        }
+        if cfg!(feature = "bytemuck") {
+            cases.compile_fail("tests/compile_fail/bytemuck/*.rs");
+        }
         // trybuild removes `RUSTFLAGS`, so a build that raises the CPU with it still builds these
         // with the floor; a `CARGO_TARGET_<TRIPLE>_RUSTFLAGS` adds to the floor instead,
         // and fails this batch. On `aarch64`, only Apple's floor has LSE2's 16-byte load

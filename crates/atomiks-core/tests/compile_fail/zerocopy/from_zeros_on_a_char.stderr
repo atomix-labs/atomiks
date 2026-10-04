@@ -1,0 +1,26 @@
+error[E0599]: the associated function or constant `new_zeroed` exists for struct `atomiks_core::Atomic<char>`, but its trait bounds were not satisfied
+ --> tests/compile_fail/zerocopy/from_zeros_on_a_char.rs:8:29
+  |
+8 |     let _ = Atomic::<char>::new_zeroed();
+  |                             ^^^^^^^^^^ associated function or constant cannot be called on `atomiks_core::Atomic<char>` due to unsatisfied trait bounds
+  |
+ ::: src/atomic/mod.rs
+  |
+  | pub struct Atomic<T: Atom> {
+  | -------------------------- doesn't satisfy `atomiks_core::Atomic<char>: FromZeros`
+  |
+ ::: src/validity.rs
+  |
+  |     pub struct Opaque<C>(pub(super) C);
+  |     -------------------- doesn't satisfy `_: FromZeros`
+  |
+note: if you're trying to build a new `atomiks_core::Atomic<char>`, consider using `atomiks_core::Atomic::<T>::new` which returns `atomiks_core::Atomic<_>`
+ --> src/atomic/mod.rs
+  |
+  | /     pub const fn new(value: T) -> Self
+  | |     where
+  | |         T: const Atom,
+  | |______________________^
+  = note: the following trait bounds were not satisfied:
+          `validity::opaque::Opaque<std::sync::atomic::Atomic<u32>>: FromZeros`
+          which is required by `atomiks_core::Atomic<char>: FromZeros`
