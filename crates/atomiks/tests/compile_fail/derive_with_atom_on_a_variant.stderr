@@ -1,0 +1,7 @@
+error: `#[atom]` goes on the type, not on a variant
+ --> tests/compile_fail/derive_with_atom_on_a_variant.rs:7:5
+  |
+7 |     #[atom(repr = u8)]
+  |     ^^^^^^^^^^^^^^^^^^
+  |
+  = note: a variant's tag is its discriminant

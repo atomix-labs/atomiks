@@ -1,0 +1,11 @@
+error[E0271]: type mismatch resolving `<u64 as Atom>::Repr == u32`
+ --> tests/compile_fail/derive_with_a_repr_other_than_the_fields.rs:8:12
+  |
+8 | struct Seq(u64);
+  |            ^^^ expected `u32`, found `u64`
+  |
+note: required by a bound in `atomiks::__private::assert_repr`
+ --> $WORKSPACE/crates/atomiks-core/src/__private.rs
+  |
+  | pub const fn assert_repr<T: Atom<Repr = R>, R>() {}
+  |                                  ^^^^^^^^ required by this bound in `assert_repr`

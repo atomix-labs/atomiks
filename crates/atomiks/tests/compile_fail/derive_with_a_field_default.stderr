@@ -1,0 +1,7 @@
+error: a field of a derived atom takes no default
+ --> tests/compile_fail/derive_with_a_field_default.rs:9:18
+  |
+9 |     value: u64 = 1,
+  |                  ^
+  |
+  = help: remove it: each field is read from the repr

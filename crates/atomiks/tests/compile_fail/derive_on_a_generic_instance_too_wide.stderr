@@ -1,0 +1,22 @@
+error[E0080]: evaluation panicked: `$CRATE::Pair<u64, bool>` needs 65 bits, but its repr `u64` has 64
+ --> tests/compile_fail/derive_on_a_generic_instance_too_wide.rs:8:23
+  |
+8 | #[derive(Clone, Copy, Atom)]
+  |                       ^^^^ evaluation of `_::<impl atomiks::Atom for Pair<u64, bool>>::to_repr::{constant#0}` failed inside this call
+  |
+note: inside `lay_out::<u64, bool>`
+ --> tests/compile_fail/derive_on_a_generic_instance_too_wide.rs:9:15
+  |
+8 | #[derive(Clone, Copy, Atom)]
+  |                       ---- in this derive macro expansion
+9 | #[atom(repr = u64)]
+  |               ^^^ the failure occurred here
+  = note: this error originates in the derive macro `Atom` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+note: erroneous constant encountered
+ --> tests/compile_fail/derive_on_a_generic_instance_too_wide.rs:8:23
+  |
+8 | #[derive(Clone, Copy, Atom)]
+  |                       ^^^^
+  |
+  = note: this note originates in the derive macro `Atom` (in Nightly builds, run with -Z macro-backtrace for more info)

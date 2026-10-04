@@ -37,13 +37,16 @@ with the profile, on `devset update`. Never edit `.devset/`.
 
 ## The Repository
 
-A Cargo workspace of two crates under `crates/`: `atomiks-core` holds the typed
+A Cargo workspace of crates under `crates/`: `atomiks-core` holds the typed
 atomic (`Atom`, `Atomic`, the orderings, validity, the primitives, the fences,
-the cell and the loom seam), and the facade `atomiks` re-exports it. Each
-inherits its version, edition, licence and lints from the root `Cargo.toml`, and
-builds for Linux and macOS, on aarch64 and x86_64. `atomiks-derive`, behind the
-facade's `derive` feature, and `atomiks-lock` are yet to be written. The book is
-under `docs/`. The toolchain, with the four targets, is the nightly
+the cell and the loom seam), and the facade `atomiks` re-exports it.
+`crates/atomiks/macros/derive`, `atomiks-derive`, is the proc macro of
+`#[derive(Atom)]` and the capabilities' derives, and
+`crates/atomiks/macros/derive-impl`, `atomiks-derive-impl`, its logic; the
+derive is `atomiks`' `derive` feature. Each crate inherits its version, edition,
+licence and lints from the root `Cargo.toml`, and builds for Linux and macOS, on
+aarch64 and x86_64. `atomiks-lock` is yet to be written. The book is under
+`docs/`. The toolchain, with the four targets, is the nightly
 `rust-toolchain.toml` pins, which the crates need for their nightly features.
 The CPU floor is `.cargo/config.toml`'s: x86-64-v3, LSE on aarch64 Linux, and
 the M1 on macOS. The tools are the versions `.config/mise/` pins. The justfile's
@@ -90,8 +93,10 @@ What a change here keeps, beyond what the checks hold it to.
   sits under `# Examples`, as an item's does.
 - An item's example in `atomiks-core` names `atomiks`, the crate a user depends
   on, through a hidden `# extern crate atomiks_core as atomiks;`: the facade's
-  pages show it as it is written. Only `atomiks-core`'s own page names
-  `atomiks_core`.
+  pages show it as it is written. A derive's example in `atomiks-derive` does
+  too, and imports the derive with a hidden `# use atomiks_derive::Atom;`, so
+  its doctests run every example the facade shows. Only `atomiks-core`'s own
+  page names `atomiks_core`.
 - Siblings are documented alike: every alias, validity and ordering has the same
   sections, and each feature's row reads the same on every page that lists it.
 
@@ -103,10 +108,17 @@ What a change here keeps, beyond what the checks hold it to.
 - A change to an ordering, a fence or a cell adds or updates its model in
   `crates/atomiks-core/tests/model.rs`, which `just check-loom` runs.
 - What the types refuse has a fixture in
-  `crates/atomiks-core/tests/compile_fail/`, and what aarch64 Linux's floor
-  alone refuses one under its `aarch64_without_lse2/`. A new toolchain may
-  reword a message; `TRYBUILD=overwrite cargo test -p atomiks-core --test
-  trybuild` writes it again, to be read before it is committed.
+  `crates/atomiks-core/tests/compile_fail/`, what aarch64 Linux's floor alone
+  refuses one under its `aarch64_without_lse2/`, and what the derive refuses one
+  in `crates/atomiks/tests/compile_fail/`. A new toolchain may reword a message;
+  `TRYBUILD=overwrite cargo test -p atomiks-core --test trybuild`, and
+  `TRYBUILD=overwrite cargo test -p atomiks --features derive --test compiled
+  trybuild` for the derive's, write it again, to be read before it is committed.
+- The checks of a value's repr, validity and decodes, the `Atom` laws, and the
+  reading of a codegen fixture's assembly live once in
+  `crates/atomiks-core/tests/testing/`, which the facade's tests reach by path:
+  `crates/atomiks/tests/derive_laws.rs` holds each derived shape to the laws a
+  built-in keeps.
 
 <!-- >>> devset: cargo-deny >>> -->
 

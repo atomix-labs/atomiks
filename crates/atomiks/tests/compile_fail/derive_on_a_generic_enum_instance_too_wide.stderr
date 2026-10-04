@@ -1,0 +1,22 @@
+error[E0080]: evaluation panicked: `$CRATE::Lock<u64>` needs 66 bits, but its repr `u64` has 64
+  --> tests/compile_fail/derive_on_a_generic_enum_instance_too_wide.rs:9:23
+   |
+ 9 | #[derive(Clone, Copy, Atom)]
+   |                       ^^^^ evaluation of `_::<impl atomiks::Atom for Lock<u64>>::to_repr::{constant#0}` failed inside this call
+   |
+note: inside `lay_out::<u64>`
+  --> tests/compile_fail/derive_on_a_generic_enum_instance_too_wide.rs:10:15
+   |
+ 9 | #[derive(Clone, Copy, Atom)]
+   |                       ---- in this derive macro expansion
+10 | #[atom(repr = u64)]
+   |               ^^^ the failure occurred here
+   = note: this error originates in the derive macro `Atom` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+note: erroneous constant encountered
+ --> tests/compile_fail/derive_on_a_generic_enum_instance_too_wide.rs:9:23
+  |
+9 | #[derive(Clone, Copy, Atom)]
+  |                       ^^^^
+  |
+  = note: this note originates in the derive macro `Atom` (in Nightly builds, run with -Z macro-backtrace for more info)

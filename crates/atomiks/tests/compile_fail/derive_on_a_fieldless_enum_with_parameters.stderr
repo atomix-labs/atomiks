@@ -1,0 +1,8 @@
+error: a fieldless enum derives `Atom` without parameters
+ --> tests/compile_fail/derive_on_a_fieldless_enum_with_parameters.rs:6:11
+  |
+6 | enum Level<const N: usize> {
+  |           ^^^^^^^^^^^^^^^^
+  |
+  = note: no variant holds a field, so no parameter changes what is stored
+  = help: remove them, or move them to a newtype of the enum and derive `Atom` for it

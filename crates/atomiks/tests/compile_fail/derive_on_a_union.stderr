@@ -1,0 +1,7 @@
+error: `Bits` is a union, so no repr could say which field it holds
+ --> tests/compile_fail/derive_on_a_union.rs:6:1
+  |
+6 | union Bits {
+  | ^^^^^
+  |
+  = help: use an enum, whose variant says which

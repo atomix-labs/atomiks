@@ -1,0 +1,9 @@
+error[E0080]: evaluation panicked: `$CRATE::Swing` needs 9 bits, but its repr `u8` has 8
+ --> tests/compile_fail/derive_with_a_repr_too_narrow_for_the_discriminants.rs:7:15
+  |
+6 | #[derive(Clone, Copy, Atom)]
+  |                       ---- in this derive macro expansion
+7 | #[atom(repr = u8)]
+  |               ^^ evaluation of `_::_` failed here
+  |
+  = note: this error originates in the derive macro `Atom` (in Nightly builds, run with -Z macro-backtrace for more info)

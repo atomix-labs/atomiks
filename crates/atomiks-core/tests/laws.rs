@@ -1,6 +1,7 @@
 //! The `Atom` laws over every built-in: a value's repr lies in its range, which may wrap, and
 //! decodes back to it; a repr that decodes re-encodes to itself, unchecked too; each validity's
-//! promise holds; and `None` takes a repr outside its value's range.
+//! promise holds; and `None` takes a spare repr: zero where zero is the niche, else one outside its
+//! value's range.
 //!
 //! Each law runs on every repr of a byte, on the edges of each width and range, and on random bits.
 
@@ -8,6 +9,9 @@
 #![cfg(not(loom))]
 #![feature(f16, integer_casts)]
 #![cfg_attr(wide, feature(f128))]
+
+#[cfg(test)]
+mod testing;
 
 #[cfg(test)]
 mod tests {
@@ -22,44 +26,17 @@ mod tests {
     use atomiks_core::{Atom, AtomOrd, ExactBits, Primitive};
     #[cfg(target_arch = "aarch64")]
     use atomiks_core::{Atomic, Load, MinMax};
-    use proptest::prelude::{Strategy, any, prop_oneof};
-    use proptest::sample::select;
+    use proptest::prelude::prop_oneof;
     use proptest::test_runner::TestCaseError;
     use proptest::{prop_assert, prop_assert_eq, proptest};
 
+    use crate::testing::law::{
+        assert_holds, canonical, decodes_as_promised, edge_or_random_bits, edges, none_bits,
+        none_takes_a_spare_repr, round_trips,
+    };
+
     /// The last scalar value, and the first and last surrogates.
     const CHAR_EDGES: [u128; 3] = [0x10_FFFF, 0xD800, 0xDFFF];
-
-    /// Edge bits, each with its neighbours.
-    ///
-    /// The edges are zero, each width's largest signed and unsigned values, and `extra`.
-    fn edges(extra: &[u128]) -> Vec<u128> {
-        let tops = [8_u32, 16, 32, 64, 128]
-            .map(|width| u128::MAX.unbounded_shr(128_u32.wrapping_sub(width)));
-        let mut edges = vec![0];
-        edges.extend(tops.into_iter().flat_map(|top| [top.unbounded_shr(1), top]));
-        edges.extend_from_slice(extra);
-        edges
-            .into_iter()
-            .flat_map(|edge| [edge.wrapping_sub(1), edge, edge.wrapping_add(1)])
-            .collect()
-    }
-
-    /// Bits, half from `edges` and half anywhere; each primitive takes their low bits.
-    fn edge_or_random_bits(extra: &[u128]) -> impl Strategy<Value = u128> {
-        prop_oneof![select(edges(extra)), any::<u128>()]
-    }
-
-    /// The range and round-trip laws for `value`, and the repr laws for its repr.
-    fn round_trips<T: Atom + PartialEq + Debug>(value: T) -> Result<(), TestCaseError>
-    where
-        T::Repr: ExactBits + PartialEq + Debug,
-    {
-        let bits = value.to_repr().to_bits();
-        prop_assert!(T::REPRS.contains(bits), "{value:?}'s repr {bits:#x} lies in {:?}", T::REPRS);
-        prop_assert_eq!(T::from_repr(value.to_repr()), Some(value), "the value decodes back");
-        canonical::<T>(value.to_repr())
-    }
 
     /// The range and round-trip laws for `value`, whose repr is a pointer.
     fn pointer_round_trips<T: Atom<Repr = *mut P> + PartialEq + Debug, P>(
@@ -87,72 +64,7 @@ mod tests {
         let unsigned = repr.to_bits();
         prop_assert!(T::REPRS.contains(unsigned), "the bits {unsigned:#x} lie in {:?}", T::REPRS);
         prop_assert_eq!(from_bits(repr).to_repr(), repr, "the repr is the bits");
-        total::<T>(repr)
-    }
-
-    /// The repr laws for `repr`: if it decodes, the value it decodes to, checked and unchecked,
-    /// re-encodes to it.
-    fn canonical<T: Atom + Debug>(repr: T::Repr) -> Result<(), TestCaseError>
-    where
-        T::Repr: PartialEq + Debug,
-    {
-        if let Some(value) = T::from_repr(repr) {
-            prop_assert_eq!(
-                value.to_repr(),
-                repr,
-                "{:?} re-encodes to the repr it came from",
-                value
-            );
-            // SAFETY: `from_repr` decodes `repr`.
-            #[expect(unsafe_code, reason = "the unchecked decode the `Atom` contract constrains")]
-            let unchecked = unsafe { T::from_repr_unchecked(repr) };
-            prop_assert_eq!(unchecked.to_repr(), repr, "{:?} decodes unchecked as checked", repr);
-        }
-        Ok(())
-    }
-
-    /// The `None` law for `T`, given `none`, the bits of `None`'s repr: they lie outside `T`'s
-    /// range and decode as no `T`, and `Option<T>`'s range holds them.
-    fn none_lies_outside<T: Atom>(none: u128) -> Result<(), TestCaseError> {
-        prop_assert!(!T::REPRS.contains(none), "`None`'s {none:#x} lies outside {:?}", T::REPRS);
-        let repr = <T::Repr as Primitive>::from_bits(none);
-        prop_assert!(T::from_repr(repr).is_none(), "and decodes as no value");
-        let with_none = <Option<T> as Atom>::REPRS;
-        prop_assert!(with_none.contains(none), "and lies in `Option`'s, {:?}", with_none);
-        Ok(())
-    }
-
-    /// The `Total` law for `repr`: it decodes; then the repr laws.
-    fn total<T: Atom<Validity = Total> + Debug>(repr: T::Repr) -> Result<(), TestCaseError>
-    where
-        T::Repr: PartialEq + Debug,
-    {
-        prop_assert!(T::from_repr(repr).is_some(), "every repr decodes, {:?} too", repr);
-        canonical::<T>(repr)
-    }
-
-    /// The `TotalZeroNiche` law for `repr`: it decodes unless it is zero; then the repr laws.
-    fn total_zero_niche<T: Atom<Validity = TotalZeroNiche> + Debug>(
-        repr: T::Repr,
-    ) -> Result<(), TestCaseError>
-    where
-        T::Repr: PartialEq + Debug,
-    {
-        let nonzero = !repr.is_bits(0);
-        prop_assert_eq!(
-            T::from_repr(repr).is_some(),
-            nonzero,
-            "every repr but zero decodes, {:?} too",
-            repr
-        );
-        canonical::<T>(repr)
-    }
-
-    /// The `ZeroValid` law: zero decodes.
-    fn zero_decodes<T: Atom<Validity = ZeroValid>>() -> Result<(), TestCaseError> {
-        let zero = <T::Repr as Primitive>::from_bits(0);
-        prop_assert!(T::from_repr(zero).is_some(), "zero decodes");
-        Ok(())
+        decodes_as_promised::<Total, T>(repr)
     }
 
     /// The order law for `a` and `b`: the reprs' own order is the values'.
@@ -187,9 +99,9 @@ mod tests {
     macro_rules! integer_laws {
         ($bits:expr, $other:expr; $($int:ty),+) => {$({
             let (a, b): ($int, $int) = ($bits.wrapping_cast(), $other.wrapping_cast());
-            total::<$int>(a)?;
-            total_zero_niche::<NonZero<$int>>(a)?;
-            total::<Option<NonZero<$int>>>(a)?;
+            decodes_as_promised::<Total, $int>(a)?;
+            decodes_as_promised::<TotalZeroNiche, NonZero<$int>>(a)?;
+            decodes_as_promised::<Total, Option<NonZero<$int>>>(a)?;
             round_trips(a)?;
             round_trips(Wrapping(a))?;
             round_trips(Saturating(a))?;
@@ -238,11 +150,9 @@ mod tests {
     /// The order laws compare the `char` they make, if any, with `other`.
     fn char_laws(bits: u128, other: char) -> Result<(), TestCaseError> {
         let repr = u32::from_bits(bits);
-        zero_decodes::<char>()?;
-        zero_decodes::<Option<char>>()?;
-        canonical::<char>(repr)?;
-        canonical::<Option<char>>(repr)?;
-        canonical::<Option<Option<char>>>(repr)?;
+        decodes_as_promised::<ZeroValid, char>(repr)?;
+        decodes_as_promised::<ZeroValid, Option<char>>(repr)?;
+        decodes_as_promised::<ZeroValid, Option<Option<char>>>(repr)?;
         round_trips(None::<char>)?;
         round_trips(None::<Option<char>>)?;
         if let Some(letter) = char::from_u32(repr) {
@@ -271,18 +181,10 @@ mod tests {
         if let Some(value) = NonNull::new(pointer) {
             pointer_round_trips(value)?;
         }
-        total::<*mut u8>(pointer)?;
-        total::<*const u8>(pointer)?;
-        total_zero_niche::<NonNull<u8>>(pointer)?;
-        total::<Option<NonNull<u8>>>(pointer)
-    }
-
-    /// Panics with the broken law's message, where `laws` broke one.
-    #[track_caller]
-    fn assert_holds(laws: Result<(), TestCaseError>) {
-        if let Err(broken) = laws {
-            panic!("{broken}");
-        }
+        decodes_as_promised::<Total, *mut u8>(pointer)?;
+        decodes_as_promised::<Total, *const u8>(pointer)?;
+        decodes_as_promised::<TotalZeroNiche, NonNull<u8>>(pointer)?;
+        decodes_as_promised::<Total, Option<NonNull<u8>>>(pointer)
     }
 
     #[test]
@@ -290,19 +192,16 @@ mod tests {
         for bits in 0..=u128::from(u8::MAX) {
             assert_holds(narrow_integer_laws(bits, bits.wrapping_add(1)));
             let byte = u8::from_bits(bits);
-            assert_holds(canonical::<()>(byte));
-            assert_holds(canonical::<PhantomData<str>>(byte));
-            assert_holds(canonical::<Option<()>>(byte));
-            assert_holds(canonical::<Option<Option<()>>>(byte));
-            assert_holds(canonical::<Option<PhantomData<str>>>(byte));
+            assert_holds(decodes_as_promised::<ZeroValid, ()>(byte));
+            assert_holds(decodes_as_promised::<ZeroValid, PhantomData<str>>(byte));
+            assert_holds(decodes_as_promised::<ZeroValid, Option<()>>(byte));
+            assert_holds(decodes_as_promised::<ZeroValid, Option<Option<()>>>(byte));
+            assert_holds(decodes_as_promised::<ZeroValid, Option<PhantomData<str>>>(byte));
         }
         for value in [false, true] {
-            assert_holds(total::<bool>(value));
+            assert_holds(decodes_as_promised::<Total, bool>(value));
             assert_holds(round_trips(value));
         }
-        assert_holds(zero_decodes::<()>());
-        assert_holds(zero_decodes::<PhantomData<str>>());
-        assert_holds(zero_decodes::<Option<()>>());
         assert_holds(round_trips(()));
         assert_holds(round_trips(PhantomData::<str>));
         assert_holds(round_trips(Some(())));
@@ -322,33 +221,25 @@ mod tests {
         }
     }
 
-    /// The bits of `None`'s repr as an `Option<T>`.
-    fn none_bits<T: Atom>() -> u128
-    where
-        T::Repr: ExactBits,
-    {
-        None::<T>.to_repr().to_bits()
-    }
-
     /// Checks the `None` law for each integer's `NonZero`.
     macro_rules! nonzero_none_laws {
         ($($int:ty),+) => {$(
-            assert_holds(none_lies_outside::<NonZero<$int>>(none_bits::<NonZero<$int>>()));
+            assert_holds(none_takes_a_spare_repr::<NonZero<$int>>(none_bits::<NonZero<$int>>()));
         )+};
     }
 
     #[test]
-    fn none_lies_outside_each_built_in_range() {
+    fn none_takes_a_spare_repr_of_each_built_in() {
         nonzero_none_laws!(u8, u16, u32, u64, usize, i8, i16, i32, i64, isize);
         #[cfg(wide)]
         nonzero_none_laws!(u128, i128);
-        assert_holds(none_lies_outside::<char>(none_bits::<char>()));
-        assert_holds(none_lies_outside::<Option<char>>(none_bits::<Option<char>>()));
-        assert_holds(none_lies_outside::<()>(none_bits::<()>()));
-        assert_holds(none_lies_outside::<Option<()>>(none_bits::<Option<()>>()));
-        assert_holds(none_lies_outside::<PhantomData<str>>(none_bits::<PhantomData<str>>()));
+        assert_holds(none_takes_a_spare_repr::<char>(none_bits::<char>()));
+        assert_holds(none_takes_a_spare_repr::<Option<char>>(none_bits::<Option<char>>()));
+        assert_holds(none_takes_a_spare_repr::<()>(none_bits::<()>()));
+        assert_holds(none_takes_a_spare_repr::<Option<()>>(none_bits::<Option<()>>()));
+        assert_holds(none_takes_a_spare_repr::<PhantomData<str>>(none_bits::<PhantomData<str>>()));
         let null = None::<NonNull<u8>>.to_repr().addr();
-        assert_holds(none_lies_outside::<NonNull<u8>>(
+        assert_holds(none_takes_a_spare_repr::<NonNull<u8>>(
             u128::try_from(null).expect("an address fits a `u128`"),
         ));
     }

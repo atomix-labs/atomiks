@@ -1,0 +1,8 @@
+error: `AtomAdd` derives only for a newtype
+ --> tests/compile_fail/derive_capability_on_a_non_newtype.rs:6:8
+  |
+6 | struct Pair(u32, u32);
+  |        ^^^^
+  |
+  = note: a newtype, a struct of one field beside any `PhantomData` markers, takes `AtomAdd` from that field
+  = help: to change the value in a compare-exchange loop, call `update`

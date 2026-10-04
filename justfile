@@ -1,7 +1,8 @@
 # The repository's own recipes go here, above the block the just profile writes.
 
-# Under loom: the feature, and `--cfg loom` through a `--config` entry, which joins the CPU floor.
-loom := '''--features loom --config 'target."cfg(all())".rustflags=["--cfg","loom"]' --target-dir target/loom'''
+# Under loom: `--cfg loom` through a `--config` entry, which joins the CPU floor, and a target
+# directory of its own; each command names the features it builds.
+loom := '''--config 'target."cfg(all())".rustflags=["--cfg","loom"]' --target-dir target/loom'''
 
 # Miri with strict provenance, isolation on, and proptest's cases cut to what Miri runs in time.
 miri := "MIRIFLAGS='-Zmiri-strict-provenance -Zmiri-isolation-error=warn-nobacktrace -Zmiri-env-forward=PROPTEST_CASES' PROPTEST_CASES=16"
@@ -9,13 +10,14 @@ miri := "MIRIFLAGS='-Zmiri-strict-provenance -Zmiri-isolation-error=warn-nobackt
 # x86-64 goes through `RUSTFLAGS`, which replaces the floor. Only the models run: a doctest fails
 # under loom, whose atomics exist only inside a model, with no `const` `new` and no `from_ptr`.
 
-# Lints every crate under loom on aarch64, and on x86_64 with the floor and x86-64; runs the models.
+# Lints every crate under loom, the derive's code too, on aarch64, and on x86_64 with the floor and
+# x86-64; runs the models.
 [metadata("rust")]
 check-loom:
-    cargo clippy --workspace --all-targets {{ loom }} --target aarch64-unknown-linux-gnu -- -D warnings
-    cargo clippy --workspace --all-targets {{ loom }} --target x86_64-unknown-linux-gnu -- -D warnings
-    RUSTFLAGS='--cfg loom -C target-cpu=x86-64' cargo clippy --workspace --all-targets --features loom --target x86_64-unknown-linux-gnu --target-dir target/loom-x86-64 -- -D warnings
-    cargo test -p atomiks-core {{ loom }} --test model
+    cargo clippy --workspace --all-targets --features loom,derive {{ loom }} --target aarch64-unknown-linux-gnu -- -D warnings
+    cargo clippy --workspace --all-targets --features loom,derive {{ loom }} --target x86_64-unknown-linux-gnu -- -D warnings
+    RUSTFLAGS='--cfg loom -C target-cpu=x86-64' cargo clippy --workspace --all-targets --features loom,derive --target x86_64-unknown-linux-gnu --target-dir target/loom-x86-64 -- -D warnings
+    cargo test -p atomiks-core --features loom {{ loom }} --test model
 
 # macOS's aarch64 floor has LSE2, which Linux's lacks. x86_64's floor has AVX; x86-64-v2 has
 # `cmpxchg16b` but no AVX; x86-64 has neither, so no 128-bit atomics. The last two go through
@@ -31,27 +33,28 @@ check-targets:
     RUSTFLAGS='-C target-cpu=x86-64-v2' cargo clippy --workspace --all-targets --all-features --target x86_64-unknown-linux-gnu --target-dir target/x86-64-v2 -- -D warnings
     RUSTFLAGS='-C target-cpu=x86-64' cargo clippy --workspace --all-targets --all-features --target x86_64-unknown-linux-gnu --target-dir target/x86-64 -- -D warnings
 
-# Checks the codegen fixture's formatting, which `cargo fmt --all` misses: it is its own workspace.
+# Checks the codegen fixtures' formatting, which `cargo fmt --all` misses: each is its own workspace.
 [metadata("rust")]
 check-codegen-fmt:
-    rustfmt --check crates/atomiks-core/tests/codegen/src/lib.rs
+    rustfmt --check crates/atomiks-core/tests/codegen/src/lib.rs crates/atomiks/tests/codegen/src/lib.rs
 
-# Formats the codegen fixture.
+# Formats the codegen fixtures.
 fix-codegen-fmt:
-    rustfmt crates/atomiks-core/tests/codegen/src/lib.rs
+    rustfmt crates/atomiks-core/tests/codegen/src/lib.rs crates/atomiks/tests/codegen/src/lib.rs
 
 # macOS's aarch64 floor has LSE2, whose 128-bit load is `ldp`; Linux's floor reads with a
 # compare-exchange. x86_64's floor has AVX; x86-64-v2's 128-bit load is a compare-exchange. x86_64
 # macOS builds as x86_64 Linux does.
 
-# Runs the tests under Miri on aarch64 Linux and macOS, and on x86_64 with the floor and x86-64-v2.
+# Runs every feature's tests under Miri on aarch64 Linux and macOS, and on x86_64 with the floor and
+# x86-64-v2.
 [metadata("rust")]
 nightly-miri:
     rustup component add miri
-    {{ miri }} cargo miri test --workspace --target aarch64-unknown-linux-gnu
-    {{ miri }} cargo miri test --workspace --target aarch64-apple-darwin
-    {{ miri }} cargo miri test --workspace --target x86_64-unknown-linux-gnu
-    {{ miri }} RUSTFLAGS='-C target-cpu=x86-64-v2' cargo miri test --workspace --target x86_64-unknown-linux-gnu --target-dir target/miri-x86-64-v2
+    {{ miri }} cargo miri test --workspace --all-features --target aarch64-unknown-linux-gnu
+    {{ miri }} cargo miri test --workspace --all-features --target aarch64-apple-darwin
+    {{ miri }} cargo miri test --workspace --all-features --target x86_64-unknown-linux-gnu
+    {{ miri }} RUSTFLAGS='-C target-cpu=x86-64-v2' cargo miri test --workspace --all-features --target x86_64-unknown-linux-gnu --target-dir target/miri-x86-64-v2
 
 # >>> devset: just >>>
 # Each active profile's recipes.

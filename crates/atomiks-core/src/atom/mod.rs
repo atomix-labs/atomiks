@@ -15,6 +15,9 @@ use crate::validity::{Partial, Total, Validity};
 /// compare-exchange loop converges, a repr that decodes should re-encode to itself: every value has
 /// one repr.
 ///
+/// Prefer `#[derive(Atom)]`, with atomiks' `derive` feature, for a struct or an enum of atoms: it
+/// keeps each promise below, and a type without parameters needs no feature gate.
+///
 /// # Safety
 /// For every value `v`:
 ///
@@ -78,7 +81,7 @@ use crate::validity::{Partial, Total, Validity};
 #[diagnostic::on_unimplemented(
     message = "`{Self}` cannot be stored in an atomic",
     label = "not `Atom`",
-    note = "for a type of your own, keep each promise of `Atom`'s `# Safety` section in a `const unsafe impl Atom for {Self}`, which needs `#![feature(const_trait_impl)]`"
+    note = "for a type of your own, derive it, `#[derive(Atom)]`, with atomiks' `derive` feature, or keep each promise of `Atom`'s `# Safety` section in a `const unsafe impl`"
 )]
 #[cfg_attr(
     x86_64_without_cmpxchg16b,
@@ -116,34 +119,40 @@ pub const unsafe trait Atom: Copy {
 /// Wrapping add and subtract on the repr, an integer of at most 64 bits, are add and subtract on
 /// the value.
 ///
+/// A newtype over a value that has it derives it, `#[derive(AtomAdd)]`.
+///
 /// A wrong impl gives wrong values, never undefined behaviour: every repr decodes ([`Total`]).
 #[diagnostic::on_unimplemented(
     message = "`{Self}` has no atomic add",
     label = "`add`, `sub`, `fetch_add` and `fetch_sub` need `AtomAdd`",
-    note = "for your own newtype over a value that has it, implement it: `impl AtomAdd for YourNewtype {{}}`",
+    note = "for your own newtype over a value that has it, derive it: `#[derive(AtomAdd)]`",
     note = "to change the value in a compare-exchange loop, call `update`"
 )]
 pub trait AtomAdd: Atom<Validity = Total, Repr: AddSub> {}
 
 /// The repr's own (signed or unsigned) order is the value's [`Ord`].
 ///
+/// A newtype over a value that has it derives it, `#[derive(AtomOrd)]`.
+///
 /// A wrong impl gives wrong values, never undefined behaviour: the larger or smaller of two reprs
 /// is one of them, so it decodes.
 #[diagnostic::on_unimplemented(
     message = "`{Self}` has no atomic maximum or minimum",
     label = "`max`, `min`, `fetch_max` and `fetch_min` need `AtomOrd`",
-    note = "for your own newtype over a value that has it, implement it: `impl AtomOrd for YourNewtype {{}}`",
+    note = "for your own newtype over a value that has it, derive it: `#[derive(AtomOrd)]`",
     note = "to change the value in a compare-exchange loop, call `update`"
 )]
 pub trait AtomOrd: Atom + Ord {}
 
 /// And, or, xor and not on the repr, an integer of at most 64 bits or `bool`, combine values.
 ///
+/// A newtype over a value that has it derives it, `#[derive(AtomBitwise)]`.
+///
 /// A wrong impl gives wrong values, never undefined behaviour: every repr decodes ([`Total`]).
 #[diagnostic::on_unimplemented(
     message = "`{Self}` has no atomic bitwise operations",
     label = "`and`, `or`, `xor`, `not` and their `fetch_` forms need `AtomBitwise`",
-    note = "for your own newtype over a value that has it, implement it: `impl AtomBitwise for YourNewtype {{}}`",
+    note = "for your own newtype over a value that has it, derive it: `#[derive(AtomBitwise)]`",
     note = "to change the value in a compare-exchange loop, call `update`"
 )]
 pub trait AtomBitwise: Atom<Validity = Total, Repr: Bitwise> {}

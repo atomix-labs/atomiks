@@ -1,0 +1,7 @@
+error: `f64` is not an integer primitive
+ --> tests/compile_fail/derive_with_a_repr_that_is_not_an_integer.rs:6:15
+  |
+6 | #[atom(repr = f64)]
+  |               ^^^
+  |
+  = help: state one, such as `repr = u64`

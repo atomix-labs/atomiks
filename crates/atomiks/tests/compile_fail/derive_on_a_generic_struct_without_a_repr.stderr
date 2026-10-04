@@ -1,0 +1,8 @@
+error: a struct of several fields derives `Atom` with parameters only where it states its repr
+ --> tests/compile_fail/derive_on_a_generic_struct_without_a_repr.rs:8:12
+  |
+8 | struct Pair<A, B> {
+  |            ^^^^^^
+  |
+  = note: each instance lays its fields out by their reprs, so how many bits it needs is known only once they are
+  = help: state a repr every instance fits, such as `#[atom(repr = u64)]`, which each one is checked against as it is built

@@ -1,0 +1,18 @@
+error[E0271]: type mismatch resolving `<u64 as Atom>::Repr == u32`
+  --> tests/compile_fail/derive_with_a_repr_other_than_an_instances_field.rs:12:14
+   |
+12 | static WORD: Atomic<Word<u64>> = Atomic::new(Word(7));
+   |              ^^^^^^^^^^^^^^^^^ expected `u32`, found `u64`
+   |
+note: required for `Word<u64>` to implement `Atom`
+  --> tests/compile_fail/derive_with_a_repr_other_than_an_instances_field.rs:10:8
+   |
+ 9 | #[atom(repr = u32)]
+   |               --- type parameter would need to implement `Atom`
+10 | struct Word<T>(T);
+   |        ^^^^^^^
+note: required by a bound in `atomiks::Atomic`
+  --> $WORKSPACE/crates/atomiks-core/src/atomic/mod.rs
+   |
+   | pub struct Atomic<T: Atom> {
+   |                      ^^^^ required by this bound in `Atomic`

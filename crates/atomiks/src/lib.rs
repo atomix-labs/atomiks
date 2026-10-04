@@ -3,14 +3,16 @@
 //! [`Atomic<T>`](Atomic) holds a `T` as its [`Repr`](Atom::Repr), one primitive an atomic
 //! instruction reads and writes, and decodes it on the way out. The integer, `bool` and pointer
 //! atomics are its aliases (`AtomicU64 = Atomic<u64>`), and any value implementing [`Atom`] is one
-//! more: a `NonZero`, a `char`, a float, an `Option` that spends a spare repr on `None`.
+//! more: a `NonZero`, a `char`, a float, an `Option` that spends a spare repr on `None`, and a
+//! struct or an enum that derives it.
 //!
 //! # Types
 //!
 //! - **The atomic.** [`Atomic<T>`](Atomic), with an alias per primitive, such as [`AtomicU64`].
 //! - **Values.** [`Atom`] encodes a value as its repr and back, its [`ReprRange`] says which reprs
 //!   it takes and its [`validity`] which decode; [`AtomAdd`], [`AtomOrd`] and [`AtomBitwise`] add
-//!   the read-modify-writes that mean something for it.
+//!   the read-modify-writes that mean something for it. With the `derive` feature, each derives:
+//!   `Atom` for a struct or an enum, and each capability for a newtype whose field has it.
 //! - **Orderings.** The [`ordering`] types, each accepted only where it means something, and the
 //!   [`fence`](fn@fence) and [`compiler_fence`] they order.
 //! - **Primitives.** [`Primitive`], [`ExactBits`] where the bits are the whole value, and what the
@@ -18,6 +20,40 @@
 //! - **Building blocks.** The loom-shaped [`cell`], the spin [`hint`], and `model` under loom.
 //!
 //! # Examples
+//! ## Storing a Type of Your Own
+//! ```
+//! # #[cfg(feature = "derive")] {
+//! use atomiks::ordering::{Acquire, Release};
+//! use atomiks::{Atom, Atomic};
+//!
+//! /// The side of the book an order rests on.
+//! #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+//! enum Side {
+//!     Bid,
+//!     Ask,
+//! }
+//!
+//! /// A resting quote: 32 bits of price, 16 of quantity, then a bit of side, in a `u64`.
+//! #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+//! struct Quote {
+//!     price: u32,
+//!     qty: u16,
+//!     side: Side,
+//! }
+//!
+//! // Each `None` takes a repr no value is, so neither `Option` widens its word.
+//! static BEST_BID: Atomic<Option<Quote>> = Atomic::new(None);
+//! static LAST_FILL: Atomic<Option<Side>> = Atomic::new(None);
+//!
+//! BEST_BID.store(Some(Quote { price: 10_050, qty: 300, side: Side::Bid }), Release);
+//! LAST_FILL.store(Some(Side::Ask), Release);
+//! assert_eq!(BEST_BID.load(Acquire).map(|quote| quote.qty), Some(300), "the quantity bid");
+//! assert_eq!(LAST_FILL.load(Acquire), Some(Side::Ask), "the side last filled");
+//! assert_eq!(size_of_val(&BEST_BID), 8, "and the quote in one `u64`, `None` too");
+//! # }
+//! ```
+//!
+//! ## Handing Out Ids
 //! ```
 //! use core::num::NonZero;
 //!
@@ -82,9 +118,13 @@
 //!
 //! None is on by default.
 //!
-//! | Feature | Adds                                                     |
-//! | ------- | -------------------------------------------------------- |
-//! | `loom`  | loom's types under `--cfg loom`; nothing without the cfg |
+//! | Feature  | Adds                                                                        |
+//! | -------- | --------------------------------------------------------------------------- |
+//! | `derive` | `#[derive(Atom)]`, and `AtomAdd`, `AtomOrd` and `AtomBitwise` for a newtype |
+//! | `loom`   | loom's types under `--cfg loom`; nothing without the cfg                    |
+//!
+//! atomiks holds `atomiks-derive`, which `derive` adds, at its own version whether the feature is
+//! on or not, so the code a derive writes always calls the hidden items it was written against.
 
 #![no_std]
 #![feature(doc_cfg)]
@@ -92,6 +132,8 @@
 // target of its own, and the 128-bit atomics write out the condition `wide` stands for.
 #![doc(auto_cfg(hide(loom, wide)))]
 
+#[doc(hidden)]
+pub use atomiks_core::__private;
 #[cfg(loom)]
 #[doc(inline)]
 pub use atomiks_core::model;
@@ -108,3 +150,5 @@ pub use atomiks_core::{
 pub use atomiks_core::{AtomicI128, AtomicU128};
 #[doc(inline)]
 pub use atomiks_core::{cell, hint, ordering, validity};
+#[cfg(feature = "derive")]
+pub use atomiks_derive::{Atom, AtomAdd, AtomBitwise, AtomOrd};

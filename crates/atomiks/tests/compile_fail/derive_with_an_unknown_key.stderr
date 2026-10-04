@@ -1,0 +1,7 @@
+error: `width` is not a key of `#[atom]`
+ --> tests/compile_fail/derive_with_an_unknown_key.rs:7:8
+  |
+7 | #[atom(width = 8)]
+  |        ^^^^^
+  |
+  = help: `#[atom]` takes `crate = <path>` and `repr = <integer primitive>`
