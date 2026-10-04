@@ -9,24 +9,6 @@ use super::{
 };
 use crate::errors::{ParseRangeError, RangeError};
 
-/// Runs the checks below on each ranged integer, `$name`, over its integer, `$int`.
-macro_rules! each_ranged_integer {
-    ($check:ident) => {
-        $check!(RangedU8(u8));
-        $check!(RangedU16(u16));
-        $check!(RangedU32(u32));
-        $check!(RangedU64(u64));
-        $check!(RangedU128(u128));
-        $check!(RangedUsize(usize));
-        $check!(RangedI8(i8));
-        $check!(RangedI16(i16));
-        $check!(RangedI32(i32));
-        $check!(RangedI64(i64));
-        $check!(RangedI128(i128));
-        $check!(RangedIsize(isize));
-    };
-}
-
 #[test]
 fn each_ranged_integer_takes_its_range_and_refuses_the_integers_past_it() {
     macro_rules! check {

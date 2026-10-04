@@ -11,17 +11,26 @@ repository.workspace   = true
 [package.metadata.cargo-shear]
 ignored-paths = ["tests/compile_fail/**/*.rs", "tests/compile_pass/*.rs"]
 
+[package.metadata.docs.rs]
+features = ["serde"]
+
 [features]
 default = []
 loom    = ["dep:loom", "dep:tracing", "dep:tracing-subscriber"]
+serde   = ["dep:serde_core"]
 
 [lints]
 workspace = true
 
+[dependencies]
+# external
+serde_core = { workspace = true, optional = true }
+
 [dev-dependencies]
 # external
-proptest = { workspace = true }
-trybuild = { workspace = true }
+proptest   = { workspace = true }
+serde_json = { workspace = true }
+trybuild   = { workspace = true }
 
 [build-dependencies]
 # external

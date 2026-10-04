@@ -11,9 +11,32 @@ use core::str::FromStr;
 
 use crate::errors::{ParseRangeError, RangeError};
 
-/// Defines each ranged integer, `$name`, over its integer, `$int`, one section at a time.
+/// Calls `$macro!($name($int))` for each ranged integer, `$name`, over its integer, `$int`: the
+/// one list of the twelve, which defines them and gives them each integration's traits.
+macro_rules! each_ranged_integer {
+    ($macro:ident) => {
+        $macro!(RangedU8(u8));
+        $macro!(RangedU16(u16));
+        $macro!(RangedU32(u32));
+        $macro!(RangedU64(u64));
+        $macro!(RangedU128(u128));
+        $macro!(RangedUsize(usize));
+        $macro!(RangedI8(i8));
+        $macro!(RangedI16(i16));
+        $macro!(RangedI32(i32));
+        $macro!(RangedI64(i64));
+        $macro!(RangedI128(i128));
+        $macro!(RangedIsize(isize));
+    };
+}
+
+// For the integrations, which name it by its path.
+#[cfg(feature = "serde")]
+pub(crate) use each_ranged_integer;
+
+/// Defines a ranged integer, `$name`, over its integer, `$int`, one section at a time.
 macro_rules! ranged {
-    ($($name:ident($int:ident)),+ $(,)?) => {$(
+    ($name:ident($int:ident)) => {
         ranged!(@type $name $int);
         ranged!(@construct $name $int);
         ranged!(@arithmetic $name $int);
@@ -23,7 +46,7 @@ macro_rules! ranged {
         ranged!(@format $name $int: Debug, Display, Binary, Octal, LowerHex, UpperHex);
         ranged!(@convert $name $int);
         ranged!(@step $name $int);
-    )+};
+    };
 
     // The type, its docs, and the niche its range leaves an `Option`.
     (@type $name:ident $int:ident) => {
@@ -317,22 +340,7 @@ macro_rules! ranged {
     };
 }
 
-ranged!(
-    RangedU8(u8),
-    RangedU16(u16),
-    RangedU32(u32),
-    RangedU64(u64),
-    RangedU128(u128),
-    RangedUsize(usize),
-);
-ranged!(
-    RangedI8(i8),
-    RangedI16(i16),
-    RangedI32(i32),
-    RangedI64(i64),
-    RangedI128(i128),
-    RangedIsize(isize),
-);
+each_ranged_integer!(ranged);
 
 #[cfg(test)]
 mod tests;

@@ -21,9 +21,10 @@
 //!
 //! None is on by default.
 //!
-//! | Feature | Adds                                                     |
-//! | ------- | -------------------------------------------------------- |
-//! | `loom`  | loom's types under `--cfg loom`; nothing without the cfg |
+//! | Feature | Adds                                                                              |
+//! | ------- | --------------------------------------------------------------------------------- |
+//! | `loom`  | loom's types under `--cfg loom`; nothing without the cfg                          |
+//! | `serde` | serde for an atomic, by a `Relaxed` load, and a ranged integer, held to its range |
 
 #![no_std]
 #![feature(
@@ -86,6 +87,7 @@ pub mod cell;
 mod errors;
 mod fence;
 pub mod hint;
+mod interop;
 mod message;
 #[cfg(loom)]
 pub mod model;

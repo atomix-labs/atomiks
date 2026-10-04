@@ -17,6 +17,9 @@ loom               = { version = "0.7" }
 proc-macro2        = { version = "1.0.107" }
 proptest           = { version = "1.11", default-features = false, features = ["std"] }
 quote              = { version = "1.0.47" }
+serde              = { version = "1.0.229", default-features = false }
+serde_core         = { version = "1.0.229", default-features = false }
+serde_json         = { version = "1.0.151" }
 syn                = { version = "3.0.6" }
 tracing            = { version = "0.1.44", default-features = false, features = ["std"] }
 tracing-subscriber = { version = "0.3.23", default-features = false, features = ["env-filter", "fmt"] }

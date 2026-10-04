@@ -12,12 +12,13 @@ repository.workspace   = true
 ignored-paths = ["tests/compile_fail/*.rs", "tests/compile_pass/*.rs"]
 
 [package.metadata.docs.rs]
-features = ["derive"]
+features = ["derive", "serde"]
 
 [features]
 default = []
 derive  = ["dep:atomiks-derive"]
 loom    = ["atomiks-core/loom"]
+serde   = ["atomiks-core/serde"]
 
 [lints]
 workspace = true
@@ -29,8 +30,10 @@ atomiks-derive = { path = "macros/derive", version = "=0.1.0", optional = true }
 
 [dev-dependencies]
 # external
-proptest = { workspace = true }
-trybuild = { workspace = true }
+proptest   = { workspace = true }
+serde      = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+trybuild   = { workspace = true }
 
 [target.'cfg(any())'.dependencies]
 # internal

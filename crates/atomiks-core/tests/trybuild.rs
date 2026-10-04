@@ -38,6 +38,9 @@ mod tests {
         // and store.
         if cfg!(all(target_arch = "aarch64", not(target_vendor = "apple"))) {
             cases.compile_fail("tests/compile_fail/aarch64_without_lse2/*.rs");
+            if cfg!(feature = "serde") {
+                cases.compile_fail("tests/compile_fail/aarch64_without_lse2/serde/*.rs");
+            }
         }
     }
 }
