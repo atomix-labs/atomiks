@@ -9,8 +9,8 @@ use core::any::type_name;
 use crate::atom::{Atom, AtomAdd, AtomBitwise, AtomOrd};
 use crate::message::{Message, refuse};
 use crate::primitive::{CompareExchange, ExactBits, Primitive};
+pub use crate::range::{EnumLayout, PackedField, PackedLayout};
 use crate::range::{FieldLayout, ReprRange};
-pub use crate::range::{NicheLayout, PackedField, PackedLayout};
 use crate::validity::{Partial, Total, TotalZeroNiche, Validity, ZeroNiche, ZeroValid};
 
 /// `value`'s repr: [`Atom::to_repr`].
@@ -44,7 +44,7 @@ pub const unsafe fn from_repr_unchecked<T: const Atom>(repr: T::Repr) -> T {
 #[diagnostic::on_unimplemented(
     message = "a field stored as `{Self}` cannot be packed beside others",
     label = "a pointer, whose bits do not hold its provenance",
-    note = "a newtype, a struct of one field beside any `PhantomData` markers, stores a pointer"
+    note = "a pointer is stored alone: in a newtype, a struct of one field beside any `PhantomData` markers, or in an `Option`"
 )]
 pub impl(crate) const trait FieldRepr: [const] ExactBits {}
 
@@ -305,8 +305,8 @@ macro_rules! validity_codes {
 }
 
 validity_codes! {
-    PARTIAL = 0 => Partial;
-    ZERO_VALID = 1 => ZeroValid;
+    pub PARTIAL = 0 => Partial;
+    pub ZERO_VALID = 1 => ZeroValid;
     ZERO_NICHE = 2 => ZeroNiche;
     TOTAL = 3 => Total;
     TOTAL_ZERO_NICHE = 4 => TotalZeroNiche;
@@ -365,17 +365,88 @@ impl PackedValidity {
     }
 }
 
+/// What an enum with fields promises of its reprs, folded variant by variant from
+/// [`new`](Self::new), from which a concrete derived impl picks its validity.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct EnumValidity {
+    /// How the enum lays out its variants.
+    layout: EnumLayout,
+    /// The discriminant of the variant the zero repr holds, as unsigned bits.
+    zero_discriminant: u128,
+    /// How many variants are folded in.
+    variant_count: u128,
+    /// What the variants folded in promise of the bits below the selector, and of zero.
+    promises: PackedValidity,
+}
+
+impl EnumValidity {
+    /// The promises of an enum laid out in `layout`, before any variant: zero, until its variant
+    /// is folded in, never decodes.
+    #[inline]
+    #[must_use]
+    pub const fn new(layout: EnumLayout) -> Self {
+        let promises = PackedValidity {
+            every_pattern_decodes: true,
+            zero_decodes: false,
+            none_takes_zero: true,
+        };
+        Self { layout, zero_discriminant: layout.discriminant_bits(0), variant_count: 0, promises }
+    }
+
+    /// The promises with the unit variant of `discriminant` added.
+    #[inline]
+    #[must_use]
+    pub const fn with_unit<D: const ExactBits>(self, discriminant: D) -> Self {
+        self.with_variant(discriminant, PackedLayout::new(&[]), PackedValidity::EMPTY)
+    }
+
+    /// The promises with the variant of `discriminant` added, whose fields lie in `variant` and
+    /// promise `fields`: every pattern of the bits below the selector decodes as it only where
+    /// they fill those bits, and zero decodes as the variant the zero repr holds does.
+    #[inline]
+    #[must_use]
+    pub const fn with_variant<D: const ExactBits>(
+        self, discriminant: D, variant: PackedLayout, fields: PackedValidity,
+    ) -> Self {
+        let every_pattern =
+            fields.every_pattern_decodes && self.layout.is_full_below_selector(variant);
+        let zero =
+            if discriminant.to_bits() == self.zero_discriminant { fields } else { self.promises };
+        let promises = PackedValidity {
+            every_pattern_decodes: self.promises.every_pattern_decodes && every_pattern,
+            zero_decodes: zero.zero_decodes,
+            none_takes_zero: zero.none_takes_zero,
+        };
+        Self { promises, variant_count: self.variant_count.saturating_add(1), ..self }
+    }
+
+    /// The number of the strongest validity these promises give the enum in a repr `repr_width`
+    /// bits wide, as [`PackedValidity::code`] picks it: every pattern decodes only where each
+    /// pattern of the selector says a variant, and each variant's fields decode every pattern of
+    /// the bits below it.
+    #[inline]
+    #[must_use]
+    pub const fn code(self, repr_width: u32) -> u8 {
+        let every_pattern_decodes =
+            self.promises.every_pattern_decodes && self.layout.is_selector_full(self.variant_count);
+        PackedValidity { every_pattern_decodes, ..self.promises }
+            .code(self.layout.width(), repr_width)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use core::array;
     use core::num::NonZero;
 
     use super::{
-        FieldLayout, PARTIAL, PackedField, PackedValidity, SelectRepr, SelectValidity, TOTAL,
-        TOTAL_ZERO_NICHE, ValidityCode, Width, ZERO_NICHE, ZERO_VALID, assert_stated_width,
-        assert_width, discriminant_range, discriminant_validity_code, discriminant_width,
-        from_bits, from_bits_unchecked, narrowest_width, to_bits,
+        EnumLayout, EnumValidity, FieldLayout, PARTIAL, PackedField, PackedLayout, PackedValidity,
+        SelectRepr, SelectValidity, TOTAL, TOTAL_ZERO_NICHE, ValidityCode, Width, ZERO_NICHE,
+        ZERO_VALID, assert_stated_width, assert_width, discriminant_range,
+        discriminant_validity_code, discriminant_width, from_bits, from_bits_unchecked,
+        narrowest_width, to_bits,
     };
+    use crate::primitive::Primitive;
     use crate::range::ReprRange;
     use crate::validity::{Partial, Total, TotalZeroNiche, Validity, ZeroNiche, ZeroValid};
 
@@ -492,6 +563,67 @@ mod tests {
         assert_eq!(unknown.code(8, 8), PARTIAL, "but not beside a field that promises nothing");
     }
 
+    /// The layout of a variant of `COUNT` fields of `reprs`, each of validity `V`, and what they
+    /// promise.
+    fn fields<F: Primitive, V: Validity, const COUNT: usize>(
+        reprs: ReprRange<F>,
+    ) -> (PackedLayout, PackedValidity) {
+        let mut offset = 0;
+        let placed: [PackedField; COUNT] = array::from_fn(|_| {
+            let field = PackedField::new(reprs, offset);
+            offset = field.next_offset();
+            field
+        });
+        let promises = placed.iter().fold(PackedValidity::EMPTY, |promises, field| {
+            promises.with_field::<V>(field.layout())
+        });
+        (PackedLayout::new(&placed), promises)
+    }
+
+    #[test]
+    fn a_tagged_enum_promises_what_the_variant_of_tag_zero_does() {
+        let (lap, laps) = fields::<u32, Total, 1>(ReprRange::FULL);
+        let slot = EnumLayout::tagged(ReprRange::<u8>::new(0, 2), &[lap, lap]);
+        let slot = EnumValidity::new(slot).with_unit(0_u8).with_variant(1_u8, lap, laps);
+        assert_eq!(slot.with_variant(2_u8, lap, laps).code(64), ZERO_VALID, "a unit at tag 0");
+        let (id, ids) = fields::<u8, TotalZeroNiche, 1>(ReprRange::NONZERO);
+        let owned = EnumLayout::tagged(ReprRange::<u8>::new(0, 1), &[id]);
+        let owned = EnumValidity::new(owned).with_variant(0_u8, id, ids).with_unit(1_u8);
+        assert_eq!(owned.code(16), ZERO_NICHE, "a field at tag 0 whose zero never decodes");
+        let late = EnumLayout::tagged(ReprRange::<u8>::new(1, 2), &[]);
+        let late = EnumValidity::new(late).with_unit(1_u8).with_unit(2_u8);
+        assert_eq!(late.code(8), ZERO_NICHE, "and no variant at tag 0");
+    }
+
+    #[test]
+    fn a_tagged_enum_is_total_where_its_tags_and_fields_fill_its_repr() {
+        let (flags, every) = fields::<bool, Total, 7>(ReprRange::FULL);
+        let both = EnumLayout::tagged(ReprRange::<u8>::new(0, 1), &[flags, flags]);
+        let both = EnumValidity::new(both).with_variant(0_u8, flags, every);
+        assert_eq!(both.with_variant(1_u8, flags, every).code(8), TOTAL, "seven flags and a tag");
+        let (fewer, six) = fields::<bool, Total, 6>(ReprRange::FULL);
+        assert_eq!(both.with_variant(1_u8, fewer, six).code(8), ZERO_VALID, "not one flag fewer");
+        let tags = EnumLayout::tagged(ReprRange::<u8>::new(0, 2), &[flags, flags]);
+        let tags = EnumValidity::new(tags).with_variant(0_u8, flags, every);
+        let tags = tags.with_variant(1_u8, flags, every).with_variant(2_u8, flags, every);
+        assert_eq!(tags.code(16), ZERO_VALID, "nor three tags of four");
+        let ends = EnumLayout::tagged(ReprRange::<u16>::new(0, 255), &[]);
+        let ends = EnumValidity::new(ends).with_unit(0_u16).with_unit(255_u16);
+        assert_eq!(ends.code(8), ZERO_VALID, "nor two tags whose range fills a byte");
+    }
+
+    #[test]
+    fn a_niche_filling_enum_promises_what_its_zero_repr_holds() {
+        let (owner, owners) = fields::<u64, ZeroNiche, 1>(ReprRange::new(3, u128::from(u64::MAX)));
+        let lock = EnumValidity::new(EnumLayout::niche_or_tagged(2, owner, 2_u8));
+        let lock = lock.with_unit(0_u8).with_unit(1_u8).with_variant(2_u8, owner, owners);
+        assert_eq!(lock.code(64), ZERO_NICHE, "zero is the payload's, which never decodes");
+        let (id, ids) = fields::<u8, TotalZeroNiche, 1>(ReprRange::NONZERO);
+        let maybe = EnumValidity::new(EnumLayout::niche_or_tagged(1, id, 1_u8));
+        let maybe = maybe.with_unit(0_u8).with_variant(1_u8, id, ids);
+        assert_eq!(maybe.code(8), ZERO_VALID, "zero is the unit's");
+    }
+
     #[test]
     fn a_value_of_no_fields_promises_only_that_zero_decodes() {
         assert_eq!(PackedValidity::EMPTY.code(0, 8), ZERO_VALID, "zero alone, in a `u8`");
@@ -575,6 +707,7 @@ mod tests {
     #[test]
     fn a_value_as_wide_as_its_stated_repr_is_held() {
         assert_stated_width::<Wide, u64>(64);
+        assert_stated_width::<Wide, u128>(128);
     }
 
     #[test]

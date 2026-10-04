@@ -7,9 +7,11 @@ extern crate alloc;
 use alloc::vec::Vec;
 use alloc::{format, vec};
 
+use super::layout::NicheLayout;
 use super::{
-    FieldLayout, NicheLayout, PackedField, PackedLayout, ReprRange, Span, mask, sign_extend,
+    EnumLayout, FieldLayout, PackedField, PackedLayout, ReprRange, Span, mask, sign_extend,
 };
+use crate::primitive::Primitive;
 
 /// The span `start..=end` of `width`-bit numbers, whose bounds the caller keeps within the width.
 const fn span(start: u128, end: u128, width: u32) -> Span {
@@ -755,7 +757,7 @@ fn niche_takes_the_ranked_reprs(span: Span, units: u128) {
         (0..).zip(&inside).all(|number| niche.span.contains(number.0) == taken(number)),
         "{span:?}: {units} units and the payload, and nothing else"
     );
-    assert_eq!(niche.field_layout(), layout, "{span:?}: in the field they share");
+    assert_eq!(niche.span.field_layout(), layout, "{span:?}: in the field they share");
 }
 
 /// One unit variant beside `span` takes the repr `Option`'s `None` would.
@@ -790,30 +792,154 @@ fn a_lone_unit_beside_every_span_takes_options_none() {
     each_span(lone_unit_takes_options_none);
 }
 
+/// The layout of an enum whose variants are `units` units and, last, one of a field of `reprs`.
+fn niche_or_tagged<F: Primitive>(units: u8, reprs: ReprRange<F>) -> EnumLayout {
+    EnumLayout::niche_or_tagged(
+        units.into(),
+        PackedLayout::new(&[PackedField::new(reprs, 0)]),
+        units,
+    )
+}
+
 #[test]
 fn units_fill_the_niche_beside_a_payload() {
-    let owner = ReprRange::<u64>::new(3, u128::from(u64::MAX));
-    let lock = NicheLayout::new(2, owner).expect("two units fit below an owner");
-    assert_eq!((lock.unit_bits(0), lock.unit_bits(1)), (1, 2), "`Uninit` and `Free` take 1 and 2");
+    let lock = niche_or_tagged(2, ReprRange::<u64>::new(3, u128::from(u64::MAX)));
+    let reprs: [u64; 3] = [lock.repr(0_u8, 0), lock.repr(1_u8, 0), lock.repr(2_u8, 3)];
+    assert_eq!(reprs, [1, 2, 3], "`Uninit` and `Free` take 1 and 2, below `Owned`'s 3");
     assert_eq!(lock.range::<u64>(), ReprRange::NONZERO, "leaving 0 to `Option`'s `None`");
-    let side = NicheLayout::new(1, ReprRange::<u8>::new(0, 1)).expect("a unit fits beside a side");
-    assert_eq!(side.unit_bits(0), 2, "after the end of a range from zero, as `None` would");
-    let signs = NicheLayout::new(1, ReprRange::<i8>::from_signed(-1, 1)).expect("one fits");
-    assert_eq!(signs.unit_bits(0), 0xFE, "below -1, as `None` would");
+    let discriminants: [u8; 3] = [1, 2, 3].map(|bits| lock.discriminant(bits));
+    assert_eq!(discriminants, [0, 1, 2], "each read back");
+    let side = niche_or_tagged(1, ReprRange::<u8>::new(0, 1));
+    assert_eq!(side.repr::<u8, u8>(0, 0), 2, "after the end of a range from zero, as `None`");
+    let signs = niche_or_tagged(1, ReprRange::<i8>::from_signed(-1, 1));
+    assert_eq!(signs.repr::<u8, u8>(0, 0), 0xFE, "below -1, as `None` would");
     assert_eq!(signs.range::<u8>(), ReprRange::from_signed(-2, 1), "in two bits, signed");
-    assert_eq!(NicheLayout::new(2, ReprRange::<u8>::NONZERO), None, "two units need a tag");
+    let tagged = niche_or_tagged(2, ReprRange::<u8>::NONZERO);
+    assert_eq!(tagged.width(), 10, "two units beside one spare repr need a tag");
+    assert_eq!(tagged.repr::<u16, u8>(1, 0), 1 << 8, "`Free`'s tag above the byte");
 }
 
 #[test]
 fn a_niche_narrower_than_its_payload_reads_back_to_the_payloads_primitive() {
-    let level = ReprRange::<i16>::from_signed(-100, 100);
-    let niche = NicheLayout::new(1, level).expect("a unit fits beside a level");
-    assert_eq!(niche.unit_bits(0), 0xFF9B, "-101, an `i16`'s");
-    let layout = niche.field_layout();
-    assert_eq!(layout, FieldLayout { width: 8, signed: true }, "in a byte");
-    assert_eq!(niche.range::<u8>(), ReprRange::from_signed(-101, 100), "a `u8` repr holds it");
-    assert_eq!(layout.unpack(0x9B, 0, 16), niche.unit_bits(0), "read back to the `i16`'s");
-    assert_eq!(layout.unpack(niche.unit_bits(0), 0, 8), 0x9B, "and stored as the `u8`'s");
+    let level = niche_or_tagged(1, ReprRange::<i16>::from_signed(-100, 100));
+    assert_eq!(level.width(), 8, "in a byte, signed");
+    assert_eq!(level.repr::<u8, u8>(0, 0), 0x9B, "the unit -101, stored as a byte's");
+    assert_eq!(level.range::<u8>(), ReprRange::from_signed(-101, 100), "which a `u8` holds");
+    assert_eq!(level.discriminant::<u8>(0x9B), 0, "and read back to the `i16`'s to compare");
+    assert_eq!(level.repr::<u8, u8>(1, 0xFF9C), 0x9C, "-100 is the payload's");
+    assert_eq!(level.discriminant::<u8>(0x9C), 1, "and read back as it");
+}
+
+#[test]
+fn a_tag_lies_above_the_widest_payload_and_encloses_the_discriminants() {
+    let lap = PackedLayout::new(&[PackedField::new(ReprRange::<u32>::FULL, 0)]);
+    let slot = EnumLayout::tagged(ReprRange::<u8>::new(0, 2), &[lap, lap]);
+    assert_eq!(slot.width(), 34, "two bits above 32");
+    assert_eq!(slot.repr::<u64, u8>(1, 7), 1 << 32 | 7, "tag 1 above a lap of 7");
+    assert_eq!(slot.range::<u64>(), ReprRange::new(0, 2 << 32 | 0xFFFF_FFFF), "spare tags above");
+    assert_eq!(slot.canonical_bits(1_u64 << 34), None, "refusing a bit above the tag");
+    assert_eq!(slot.discriminant::<u8>(2 << 32 | 9), 2, "the tag read back");
+    assert!(
+        slot.is_clear_below_selector(2 << 32) && !slot.is_clear_below_selector(2 << 32 | 1),
+        "a unit clears the lap"
+    );
+    let signs = EnumLayout::tagged(ReprRange::<i8>::from_signed(-1, 1), &[]);
+    assert_eq!(signs.width(), 2, "signed tags of no payload, in two bits");
+    assert_eq!(signs.repr::<u8, i8>(-1, 0), 0xFF, "extended as the tag's sign");
+    assert_eq!(signs.discriminant::<i8>(0xFF), -1, "and read back so");
+    assert_eq!(signs.range::<u8>(), ReprRange::from_signed(-1, 1), "so the range wraps");
+}
+
+#[test]
+fn a_narrower_payload_clears_the_bits_up_to_the_tag() {
+    let byte = PackedLayout::new(&[PackedField::new(BYTE, 0)]);
+    let flag = PackedLayout::new(&[PackedField::new(ReprRange::<bool>::FULL, 0)]);
+    let layout = EnumLayout::tagged(ReprRange::<u8>::new(0, 1), &[byte, flag]);
+    assert!(layout.is_clear_above_fields(1 << 8 | 1, flag), "a flag of 1");
+    assert!(!layout.is_clear_above_fields(1 << 8 | 2, flag), "and no bit above it below the tag");
+    assert!(layout.is_clear_above_fields(0xFF, byte), "where the byte takes them all");
+    let alone = EnumLayout::tagged(ReprRange::<u8>::new(0, 0), &[byte]);
+    assert_eq!(alone.width(), 8, "a tag of no bits");
+    assert_eq!(alone.repr::<u8, u8>(0, 5), 5, "lies above the byte all the same");
+}
+
+/// The widths of the payload's top field whose every span the enum layout test lays out: Miri's
+/// 1 and 2 bits.
+const TOP_WIDTHS: &[u32] = if cfg!(miri) { &[1, 2] } else { &[1, 2, 3, 4] };
+
+/// The units of an enum of `units` of them and, of discriminant `payload`, a variant of a field of
+/// `top`'s numbers above `low` bits of any pattern take the reprs [`NicheLayout`] ranks first where
+/// it fills a niche, else tags above that variant; each value encodes to a repr of its own in the
+/// range, and exactly those reprs decode, each back to its value.
+fn decodes_exactly_its_values(top: Span, low: u32, units: u8, payload: u8) {
+    let below = PackedField::from_span(span(0, mask(low), low.max(1)), 0);
+    let top_field = PackedField::from_span(top, low);
+    let variant = if low == 0 {
+        PackedLayout::new(&[top_field])
+    } else {
+        PackedLayout::new(&[below, top_field])
+    };
+    let layout = EnumLayout::niche_or_tagged(units.into(), variant, payload);
+    let at = format!("{units} units beside {top:?} above {low} bits");
+    // The units fill a niche beside the payload's top field, the last of any bits, or beside zero
+    // in a byte where it has none.
+    let (beside, offset) = match (top_field.layout.width, low) {
+        (0, 0) => (span(0, 0, u8::BITS), 0),
+        (0, _) => (below.reprs, 0),
+        _ => (top, low),
+    };
+    let niche = NicheLayout::beside(beside, units.into());
+    let unit_selectors = (0..=units).filter(|&discriminant| discriminant != payload).zip(0..);
+    for (discriminant, unit) in unit_selectors.clone() {
+        let repr: u8 = layout.repr(discriminant, 0);
+        let expected = niche.map_or_else(
+            || u128::from(discriminant) << top_field.next_offset(),
+            |niche| niche.span.field_layout().pack(niche.unit_bits(unit), offset),
+        );
+        assert_eq!(u128::from(repr) & mask(layout.width()), expected, "{at}: unit {unit}");
+    }
+    let mut values: Vec<(u8, u128)> = unit_selectors.map(|(unit, _)| (unit, 0)).collect();
+    for number in numbers(top) {
+        values.extend((0..=mask(low)).map(|bits| (payload, top_field.pack(number) | bits)));
+    }
+    let reprs: Vec<u8> =
+        values.iter().map(|&(discriminant, bits)| layout.repr(discriminant, bits)).collect();
+    for &repr in &reprs {
+        assert!(layout.range::<u8>().contains(repr.into()), "{at}: {repr:#x} in the range");
+    }
+    for repr in u8::MIN..=u8::MAX {
+        let decoded = layout.canonical_bits(repr).and_then(|bits| {
+            let discriminant: u8 = layout.discriminant(bits);
+            if discriminant != payload {
+                return (discriminant <= units && layout.is_clear_below_selector(bits))
+                    .then_some((discriminant, 0));
+            }
+            let bits = bits & mask(top_field.next_offset());
+            let decodes =
+                layout.is_clear_above_fields(bits, variant) && top.contains(top_field.unpack(bits));
+            decodes.then_some((payload, bits))
+        });
+        let encoded = reprs.iter().position(|&encoded| encoded == repr).map(|index| values[index]);
+        assert_eq!(decoded, encoded, "{at}: {repr:#x} decodes exactly as it encodes");
+    }
+}
+
+#[test]
+fn an_enum_with_one_payload_decodes_exactly_its_values() {
+    for &width in TOP_WIDTHS {
+        let largest = mask(width);
+        for (start, end) in
+            (0..=largest).flat_map(|start| (0..=largest).map(move |end| (start, end)))
+        {
+            for low in 0..=2 {
+                for units in 1..=3 {
+                    for payload in [0, units] {
+                        decodes_exactly_its_values(span(start, end, width), low, units, payload);
+                    }
+                }
+            }
+        }
+    }
 }
 
 /// -2 as 128 bits of two's complement.
@@ -891,7 +1017,8 @@ const _: () = {
     let owner = span(3, u128::MAX, 128);
     let Some(lock) = NicheLayout::beside(owner, 2) else { panic!("two units fit below") };
     assert!(lock.unit_bits(0) == 1 && lock.unit_bits(1) == 2, "below the owner");
-    assert!(lock.field_layout().width == 128, "in 128 bits");
+    assert!(matches!(lock.unit(2), Some(1)) && lock.unit(3).is_none(), "and read back");
+    assert!(lock.span.field_layout().width == 128, "in 128 bits");
     let Some(below_top) = NicheLayout::beside(span(0, MINUS_TWO, 128), 1) else { panic!("fits") };
     assert!(below_top.unit_bits(0) == u128::MAX, "the largest, after the end of a span from zero");
     assert!(below_top.span.is_full() && below_top.span.start == 0, "filling every number");

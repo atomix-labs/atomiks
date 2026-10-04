@@ -83,10 +83,9 @@ pub fn expand_atom(input: TokenStream, def_site: Span) -> Expansion {
         Ok(Shape::Fieldless(fieldless)) => {
             Expansion::written(code::fieldless(&implementor, &fieldless, def_site))
         },
-        Ok(shape @ Shape::EnumWithFields) => Expansion::refused(
-            vec![not_yet_supported(&implementor, &shape)],
-            code::stub(&implementor),
-        ),
+        Ok(Shape::EnumWithFields(enum_with_fields)) => {
+            Expansion::written(code::enum_with_fields(&implementor, &enum_with_fields, def_site))
+        },
         Err(errors) => Expansion::refused(errors, code::stub(&implementor)),
     }
 }
@@ -105,19 +104,6 @@ pub fn expand_capability(input: TokenStream, capability: Capability) -> Expansio
             Expansion::refused(errors, TokenStream::new())
         },
     }
-}
-
-/// The refusal of a shape the derive cannot yet write `Atom` for.
-fn not_yet_supported(implementor: &Implementor, shape: &Shape) -> DeriveError {
-    DeriveError::new(
-        implementor.ident.span(),
-        format!("deriving `Atom` for {} is not yet supported", shape.noun()),
-    )
-    .note(
-        None,
-        "so far it derives for a newtype, a zero-width struct, a struct of several fields and a fieldless enum"
-            .to_owned(),
-    )
 }
 
 /// The refusal of `capability` for a type that is not a newtype.
@@ -536,7 +522,10 @@ mod tests {
     fn a_generic_packed_struct_lays_out_each_instance_in_the_repr_it_states() {
         let layout = quote! {
             const fn lay_out<A, B>(_: ::core::marker::PhantomData<Pair<A, B> >) -> (
-                [::atomiks::__private::PackedField; 3], ::atomiks::__private::PackedLayout
+                ::atomiks::__private::PackedField,
+                ::atomiks::__private::PackedField,
+                ::atomiks::__private::PackedField,
+                ::atomiks::__private::PackedLayout,
             )
             where
                 A: ::atomiks::Atom,
@@ -549,7 +538,7 @@ mod tests {
                 ::atomiks::__private::assert_stated_width::<Pair<A, B>, ::core::primitive::u64>(
                     layout.width()
                 );
-                ([placement_0, placement_1, placement_2], layout)
+                (placement_0, placement_1, placement_2, layout,)
             }
         };
         let bounds = quote! {
@@ -570,7 +559,7 @@ mod tests {
                 >;
         };
         let bound = quote! {
-            let ([placement_0, placement_1, placement_2], layout) =
+            let (placement_0, placement_1, placement_2, layout,) =
                 const { lay_out(::core::marker::PhantomData::<Self>) };
         };
         let pair = derive_atom(quote! {
@@ -589,33 +578,218 @@ mod tests {
     }
 
     #[test]
-    fn a_shape_not_yet_supported_is_refused_beside_a_stub() {
-        let stub = quote! {
-            #[automatically_derived]
-            const unsafe impl ::atomiks::Atom for Slot
+    #[expect(clippy::too_many_lines, reason = "the impl is checked whole, as a crate gets it")]
+    fn a_tagged_enum_puts_its_tag_above_the_widest_variant() {
+        let expected = quote! {
+            const _: () = ::atomiks::__private::assert_send_and_sync::<Slot>();
+            const _: () = {
+                type Discriminant = ::core::primitive::isize;
+                const discriminant_0: Discriminant = 0;
+                const discriminant_1: Discriminant = 1;
+                const discriminant_2: Discriminant = 2;
+                const placement_1_0: ::atomiks::__private::PackedField =
+                    ::atomiks::__private::PackedField::new(<u32 as ::atomiks::Atom>::REPRS, 0);
+                const variant_1: ::atomiks::__private::PackedLayout =
+                    ::atomiks::__private::PackedLayout::new(&[placement_1_0]);
+                const placement_2_0: ::atomiks::__private::PackedField =
+                    ::atomiks::__private::PackedField::new(<Sign as ::atomiks::Atom>::REPRS, 0);
+                const variant_2: ::atomiks::__private::PackedLayout =
+                    ::atomiks::__private::PackedLayout::new(&[placement_2_0]);
+                const layout: ::atomiks::__private::EnumLayout =
+                    ::atomiks::__private::EnumLayout::tagged(
+                        ::atomiks::__private::discriminant_range([
+                            discriminant_0, discriminant_1, discriminant_2
+                        ]),
+                        &[variant_1, variant_2]
+                    );
+                type Repr = <
+                    ::atomiks::__private::Width<{ ::atomiks::__private::narrowest_width(layout.width()) }>
+                    as ::atomiks::__private::SelectRepr
+                >::Repr;
+                const _: () = ::atomiks::__private::assert_width::<Slot>(layout.width());
+                #[automatically_derived]
+                const unsafe impl ::atomiks::Atom for Slot {
+                    type Repr = Repr;
+                    type Validity = <
+                        ::atomiks::__private::ValidityCode<{
+                            ::atomiks::__private::EnumValidity::new(layout)
+                                .with_unit(discriminant_0)
+                                .with_variant(
+                                    discriminant_1,
+                                    variant_1,
+                                    ::atomiks::__private::PackedValidity::EMPTY
+                                        .with_field::<<u32 as ::atomiks::Atom>::Validity>(placement_1_0.layout())
+                                )
+                                .with_variant(
+                                    discriminant_2,
+                                    variant_2,
+                                    ::atomiks::__private::PackedValidity::EMPTY
+                                        .with_field::<<Sign as ::atomiks::Atom>::Validity>(placement_2_0.layout())
+                                )
+                                .code(<Repr as ::atomiks::Primitive>::BITS)
+                        }>
+                        as ::atomiks::__private::SelectValidity
+                    >::Validity;
+                    const REPRS: ::atomiks::ReprRange<Repr> = layout.range();
+                    #[inline]
+                    fn to_repr(self) -> Repr {
+                        match self {
+                            Self::Empty => layout.repr(discriminant_0, 0),
+                            Self::Writing { lap: value_0 } => layout.repr(
+                                discriminant_1,
+                                placement_1_0.pack(::atomiks::__private::to_bits::<u32>(value_0))
+                            ),
+                            Self::Turned(value_0) => layout.repr(
+                                discriminant_2,
+                                placement_2_0.pack(::atomiks::__private::to_bits::<Sign>(value_0))
+                            ),
+                        }
+                    }
+                    #[inline]
+                    fn from_repr(repr: Repr) -> ::core::option::Option<Self> {
+                        match layout.canonical_bits(repr) {
+                            ::core::option::Option::Some(bits) => match layout.discriminant::<Discriminant>(bits) {
+                                discriminant_0 if layout.is_clear_below_selector(bits) =>
+                                    ::core::option::Option::Some(Self::Empty),
+                                discriminant_1 if layout.is_clear_above_fields(bits, variant_1) => match
+                                    ::atomiks::__private::from_bits::<u32>(placement_1_0.unpack(bits))
+                                {
+                                    ::core::option::Option::Some(value_0) =>
+                                        ::core::option::Option::Some(Self::Writing { lap: value_0 }),
+                                    ::core::option::Option::None => ::core::option::Option::None,
+                                },
+                                discriminant_2 if layout.is_clear_above_fields(bits, variant_2) => match
+                                    ::atomiks::__private::from_bits::<Sign>(placement_2_0.unpack(bits))
+                                {
+                                    ::core::option::Option::Some(value_0) =>
+                                        ::core::option::Option::Some(Self::Turned(value_0)),
+                                    ::core::option::Option::None => ::core::option::Option::None,
+                                },
+                                _ => ::core::option::Option::None,
+                            },
+                            ::core::option::Option::None => ::core::option::Option::None,
+                        }
+                    }
+                    #[inline]
+                    unsafe fn from_repr_unchecked(repr: Repr) -> Self {
+                        let bits = ::atomiks::__private::to_bits(repr);
+                        match layout.discriminant::<Discriminant>(bits) {
+                            discriminant_0 => Self::Empty,
+                            discriminant_1 => Self::Writing {
+                                lap: unsafe {
+                                    ::atomiks::__private::from_bits_unchecked::<u32>(placement_1_0.unpack(bits))
+                                }
+                            },
+                            discriminant_2 => Self::Turned(unsafe {
+                                ::atomiks::__private::from_bits_unchecked::<Sign>(placement_2_0.unpack(bits))
+                            }),
+                            _ => unsafe { ::core::hint::unreachable_unchecked() },
+                        }
+                    }
+                }
+            };
+        };
+        let slot = derive_atom(quote! { enum Slot { Empty, Writing { lap: u32 }, Turned(Sign) } });
+        assert_eq!(written(&slot), expected.to_string(), "the impl");
+    }
+
+    #[test]
+    fn one_variant_with_fields_among_units_fills_a_niche_where_it_is_no_wider() {
+        let gate = written(&derive_atom(quote! { enum Gate { Closed, Open(OwnerId), Held } }));
+        let layout = quote! {
+            const layout: ::atomiks::__private::EnumLayout =
+                ::atomiks::__private::EnumLayout::niche_or_tagged(2, variant_1, discriminant_1);
+        };
+        assert!(gate.contains(&layout.to_string()), "two units beside the payload: {gate}");
+        let explicit = written(&derive_atom(quote! {
+            #[repr(u8)]
+            enum Gate { Closed = 1, Open(OwnerId) = 2 }
+        }));
+        let tagged = quote! {
+            ::atomiks::__private::EnumLayout::tagged(
+                ::atomiks::__private::discriminant_range([discriminant_0, discriminant_1]), &[variant_1]
+            )
+        };
+        assert!(explicit.contains(&tagged.to_string()), "but tagged by those stated: {explicit}");
+    }
+
+    #[test]
+    fn each_discriminant_is_a_constant_of_the_enums_integer() {
+        let level = written(&derive_atom(quote! {
+            #[repr(i8)]
+            enum Level { Low(u8) = -1 - OFFSET, Mid, High = 4, Top }
+        }));
+        let discriminants = quote! {
+            type Discriminant = ::core::primitive::i8;
+            const discriminant_0: Discriminant = -1 - OFFSET;
+            const discriminant_1: Discriminant = discriminant_0.wrapping_add(1);
+            const discriminant_2: Discriminant = 4;
+            const discriminant_3: Discriminant = discriminant_2.wrapping_add(1);
+        };
+        assert!(level.contains(&discriminants.to_string()), "as stated, or one past: {level}");
+        let based = written(&derive_atom(quote! {
+            #[repr(u8)]
+            enum Based { Low = Self::BASE + 1, High(u8) }
+        }));
+        let low = quote!(
+            const discriminant_0: Discriminant = Based::BASE + 1;
+        );
+        assert!(based.contains(&low.to_string()), "`Self` naming the enum: {based}");
+    }
+
+    #[test]
+    fn a_unit_variant_written_with_parentheses_or_braces_is_built_so() {
+        let mode = written(&derive_atom(quote! { enum Mode { Off(), On {}, Idle, Busy(u8) } }));
+        for built in [
+            quote!(Self::Off {} => layout.repr(discriminant_0, 0)),
+            quote!(Self::Idle => layout.repr(discriminant_2, 0)),
+        ] {
+            assert!(mode.contains(&built.to_string()), "`{built}`: {mode}");
+        }
+    }
+
+    #[test]
+    fn a_generic_enum_lays_out_each_instance_and_promises_zero_where_a_unit_takes_it() {
+        let lock = written(&derive_atom(quote! {
+            #[atom(repr = u64)]
+            enum Lock<O> { Uninit, Free, Owned(O) }
+        }));
+        let layout = quote! {
+            const fn lay_out<O>(_: ::core::marker::PhantomData<Lock<O> >) -> (
+                ::atomiks::__private::PackedField,
+                ::atomiks::__private::PackedLayout,
+                ::atomiks::__private::EnumLayout,
+            )
             where
-                Self: ::core::marker::Copy,
+                O: ::atomiks::Atom
             {
-                type Repr = ::core::primitive::u8;
-                const REPRS: ::atomiks::ReprRange<::core::primitive::u8> = ::atomiks::ReprRange::new(0, 0);
-                #[inline]
-                fn to_repr(self) -> ::core::primitive::u8 {
-                    0
-                }
-                #[inline]
-                fn from_repr(_: ::core::primitive::u8) -> ::core::option::Option<Self> {
-                    ::core::panic!("`#[derive(Atom)]` refused this type")
-                }
+                let placement_2_0 = ::atomiks::__private::PackedField::new(<O as ::atomiks::Atom>::REPRS, 0);
+                let variant_2 = ::atomiks::__private::PackedLayout::new(&[placement_2_0]);
+                let layout = ::atomiks::__private::EnumLayout::niche_or_tagged(2, variant_2, discriminant_2);
+                ::atomiks::__private::assert_stated_width::<Lock<O>, ::core::primitive::u64>(
+                    layout.width()
+                );
+                (placement_2_0, variant_2, layout,)
             }
         };
-        let payload = derive_atom(quote! { enum Slot { Empty, Full(u32) } });
-        let (messages, code) = refused(payload);
-        assert_eq!(
-            messages,
-            ["deriving `Atom` for an enum with fields is not yet supported"],
-            "why"
+        assert!(lock.contains(&layout.to_string()), "laid out for each instance: {lock}");
+        let partial = quote!(
+            type Validity = ::atomiks::validity::Partial;
         );
-        assert_eq!(code, stub.to_string(), "and the stub");
+        assert!(lock.contains(&partial.to_string()), "promising nothing of zero: {lock}");
+        let word = written(&derive_atom(quote! {
+            #[atom(repr = u64)]
+            #[repr(u8)]
+            enum Word<O> { Unbuilt = 0, Free = 1, Owned(O) = 2, Poisoned = 3 }
+        }));
+        let zero_valid = quote! {
+            if discriminant_0 == 0 || discriminant_1 == 0 || discriminant_3 == 0 {
+                ::atomiks::__private::ZERO_VALID
+            } else {
+                ::atomiks::__private::PARTIAL
+            }
+        };
+        assert!(word.contains(&zero_valid.to_string()), "but where a unit is zero: {word}");
     }
 
     #[test]
@@ -628,6 +802,8 @@ mod tests {
             quote! { enum Side { Bid, Ask } },
             quote! { #[atom(repr = u16)] struct Step { length: u8, sign: Sign } },
             quote! { #[atom(repr = u64)] struct Pair<A, B> { first: A, second: B } },
+            quote! { enum Slot { Empty, Writing { lap: u32 }, Ready(u32) } },
+            quote! { #[atom(repr = u64)] #[repr(u8)] enum Lock<O> { Free = 0, Owned(O) = 1 } },
         ];
         for shape in shapes {
             let code = written(&derive_atom(quote! { #[atom(crate = renamed)] #shape }));

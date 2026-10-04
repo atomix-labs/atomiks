@@ -2,7 +2,7 @@
 
 use core::iter;
 
-use syn::{Generics, Ident, Member, Path, Type};
+use syn::{Expr, Generics, Ident, Member, Path, Type};
 
 use crate::errors::DeriveError;
 
@@ -39,23 +39,11 @@ pub(crate) enum Shape {
     ZeroWidth(ZeroWidth),
     /// Several fields that hold a value, each in declaration order, as a struct packs them.
     Packed(Vec<Field>),
-    /// Variants that hold no fields.
+    /// Unit variants alone, each stored as its discriminant.
     Fieldless(Fieldless),
-    /// Variants, one of them at least holding fields.
-    EnumWithFields,
-}
-
-impl Shape {
-    /// What the shape is called in a message: "a fieldless enum".
-    pub(crate) const fn noun(&self) -> &'static str {
-        match self {
-            Self::Newtype(_) => "a newtype",
-            Self::ZeroWidth(_) => "a zero-width struct",
-            Self::Packed(_) => "a struct of several fields",
-            Self::Fieldless(_) => "a fieldless enum",
-            Self::EnumWithFields => "an enum with fields",
-        }
-    }
+    /// Variants, one at least written with parentheses or braces, each stored as its discriminant
+    /// beside its fields.
+    EnumWithFields(EnumWithFields),
 }
 
 /// A newtype's fields: the one that holds the value, and the `PhantomData` markers split around it
@@ -96,12 +84,36 @@ impl ZeroWidth {
     }
 }
 
-/// A fieldless enum's variants, each stored as its discriminant, and the integer that stores them.
+/// A fieldless enum's variants, each a unit stored as its discriminant, and the integer that stores
+/// them.
 pub(crate) struct Fieldless {
     /// Which integer its impl stores the discriminants as.
     pub(crate) repr: EnumRepr,
     /// Each variant's name, in declaration order.
     pub(crate) variants: Vec<Ident>,
+}
+
+/// What an enum with fields stores: each variant's discriminant, of the integer named, beside its
+/// fields.
+pub(crate) struct EnumWithFields {
+    /// The integer its discriminants are, the one its `#[repr]` names; `None` for `isize`, where
+    /// none does.
+    pub(crate) integer: Option<Ident>,
+    /// Each variant, in declaration order.
+    pub(crate) variants: Vec<Variant>,
+}
+
+/// A variant of an enum with fields.
+pub(crate) struct Variant {
+    /// Its name.
+    pub(crate) ident: Ident,
+    /// Whether it is written as a unit, with neither parentheses nor braces.
+    pub(crate) is_written_as_unit: bool,
+    /// Its fields, in declaration order: none for a unit variant, which holds no value but its
+    /// discriminant, however it is written.
+    pub(crate) fields: Vec<Field>,
+    /// Its discriminant, where it states one, with the user's spans.
+    pub(crate) discriminant: Option<Expr>,
 }
 
 /// Which integer a fieldless enum's impl stores its discriminants as.

@@ -1,5 +1,5 @@
 //! [`ReprRange`], the reprs a value takes, the math of a range of numbers of any width that wraps
-//! through zero, and how a packed value lays out its fields.
+//! through zero, and how a packed value lays out its fields and an enum its variants.
 
 mod layout;
 
@@ -8,7 +8,7 @@ use core::fmt;
 use core::marker::PhantomData;
 
 pub(crate) use self::layout::FieldLayout;
-pub use self::layout::{NicheLayout, PackedField, PackedLayout};
+pub use self::layout::{EnumLayout, PackedField, PackedLayout};
 use crate::message::{Message, refuse};
 use crate::primitive::Primitive;
 

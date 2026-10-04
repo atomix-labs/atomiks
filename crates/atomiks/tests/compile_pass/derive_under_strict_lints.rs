@@ -1,6 +1,7 @@
 //! A crate under the workspace's lints, `unsafe_code` forbidden, derives `Atom` and the
 //! capabilities for documented newtypes, a pointer's among them, and `Atom` for fieldless enums, a
-//! marker and a struct of several fields, and stores each in a static, with no feature gate.
+//! marker, a struct of several fields and enums with fields, and stores each in a static, with no
+//! feature gate.
 //!
 //! trybuild runs rustc alone, so the clippy lints here hold only where clippy builds the same code,
 //! as it does in `tests/derive_newtype.rs`.
@@ -89,6 +90,44 @@ pub struct Quote {
     sign: Sign,
 }
 
+/// A ring buffer's slot: a tag above a lap.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+pub enum Slot {
+    /// Nothing written.
+    Empty,
+    /// Being written, in a lap.
+    Writing {
+        /// The lap.
+        lap: u32,
+    },
+    /// Written, in a lap.
+    Ready(u32),
+}
+
+/// A reading of a sign or none, which takes the repr below the sign's.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+pub enum Reading {
+    /// No reading yet.
+    Missing,
+    /// The sign read.
+    Present(Sign),
+}
+
+/// How far a discriminant moves.
+const OFFSET: i8 = 2;
+
+/// A shift by a byte, tagged by the discriminants it states.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+#[repr(i8)]
+pub enum Shift {
+    /// Back.
+    Back(u8) = -1,
+    /// Still.
+    Still,
+    /// Ahead.
+    Ahead(u8) = OFFSET + 3,
+}
+
 /// The head of a list another thread may take.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
 pub struct Head(NonNull<u64>);
@@ -114,6 +153,15 @@ pub static MARK: Atomic<Option<Marker>> = Atomic::new(Some(Marker));
 /// The best quote, or `None` before the first.
 pub static BEST: Atomic<Option<Quote>> = Atomic::new(None);
 
+/// The last slot written, or `None` before the first.
+pub static SLOT: Atomic<Option<Slot>> = Atomic::new(None);
+
+/// The last reading.
+pub static READING: Atomic<Reading> = Atomic::new(Reading::Missing);
+
+/// The last shift.
+pub static SHIFT: Atomic<Shift> = Atomic::new(Shift::Still);
+
 fn main() {
     NEXT.add(1, Relaxed);
     assert_eq!(NEXT.load(Acquire), Seq(1), "one taken");
@@ -125,4 +173,12 @@ fn main() {
     let quote = Quote { qty: 3, side: Side::Ask, sign: Sign::Minus };
     BEST.store(Some(quote), Relaxed);
     assert_eq!(BEST.load(Acquire), Some(quote), "and the quote");
+    SLOT.store(Some(Slot::Writing { lap: 1 }), Relaxed);
+    assert_eq!(SLOT.load(Acquire), Some(Slot::Writing { lap: 1 }), "a slot");
+    assert_eq!(SLOT.swap(Some(Slot::Ready(1)), Relaxed), Some(Slot::Writing { lap: 1 }), "swapped");
+    READING.store(Reading::Present(Sign::Plus), Relaxed);
+    assert_eq!(READING.load(Acquire), Reading::Present(Sign::Plus), "a reading");
+    SHIFT.store(Shift::Back(3), Relaxed);
+    assert_eq!(SHIFT.load(Acquire), Shift::Back(3), "and a shift");
+    assert_eq!(Shift::Ahead(0).to_repr(), 5 << 8, "tagged by its discriminant");
 }

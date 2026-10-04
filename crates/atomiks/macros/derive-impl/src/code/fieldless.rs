@@ -6,7 +6,7 @@ use quote::{format_ident, quote};
 use syn::Ident;
 
 use super::bound::{thread_checks, where_clause};
-use super::repr;
+use super::{repr, respan};
 use crate::model::{EnumRepr, Fieldless, Implementor};
 
 /// `Atom` for the fieldless enum, in a block beside its repr and each variant's discriminant in it,
@@ -60,8 +60,10 @@ pub(crate) fn fieldless(
     // The impl keeps each promise of `Atom`: a variant's repr is its discriminant, which
     // `from_repr` decodes as that variant alone, and the range encloses; the repr holds each
     // discriminant whole, as its integer `#[repr]` types it or as the width checked or selected
-    // says, so no two share a repr; the validity says which reprs the discriminants take; and the
-    // enum may cross threads, as `thread_checks` checks.
+    // says, so no two share a repr; `from_repr_unchecked` matches the same discriminants, and the
+    // caller's repr decodes, so it is one of them, and gives what `from_repr` does; the validity
+    // says which reprs the discriminants take; and the enum may cross threads, as `thread_checks`
+    // checks.
     let thread_checks = thread_checks(implementor, []);
     quote! {
         #thread_checks
@@ -102,11 +104,4 @@ pub(crate) fn fieldless(
             }
         };
     }
-}
-
-/// `ident`, spanned at `span`.
-fn respan(ident: &Ident, span: Span) -> Ident {
-    let mut respanned = ident.clone();
-    respanned.set_span(span);
-    respanned
 }

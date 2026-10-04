@@ -1,11 +1,14 @@
 error[E0277]: a field stored as `*mut u64` cannot be packed beside others
-  --> tests/compile_fail/derive_with_a_pointer_field.rs:10:11
+  --> tests/compile_fail/derive_with_a_pointer_field_in_a_variant.rs:11:10
    |
  8 | #[derive(Clone, Copy, Atom)]
    |                       ---- in this derive macro expansion
- 9 | struct Node {
-10 |     next: NonNull<u64>,
-   |           ^^^^^^^^^^^^ a pointer, whose bits do not hold its provenance
+...
+11 |     Next(NonNull<u64>),
+   |          ^^^^^^^^^^^^
+   |          |
+   |          a pointer, whose bits do not hold its provenance
+   |          required by a bound introduced by this call
    |
    = help: the trait `atomiks::__private::FieldRepr` is not implemented for `*mut u64`
    = note: a pointer is stored alone: in a newtype, a struct of one field beside any `PhantomData` markers, or in an `Option`

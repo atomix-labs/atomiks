@@ -16,7 +16,7 @@ use proc_macro::{Diagnostic, Level, Span, TokenStream};
 
 /// Derives `Atom`, so that an `Atomic` holds the type.
 ///
-/// So far it derives for four shapes:
+/// It derives for five shapes:
 ///
 /// - **A newtype**, a struct of one field beside any `PhantomData` markers: its repr, range,
 ///   validity and conversions are that field's.
@@ -29,16 +29,26 @@ use proc_macro::{Diagnostic, Level, Span, TokenStream};
 ///   parameters, it states its repr, which each instance is checked against as it is built, and
 ///   promises only that zero decodes, where each field's does. A field stored as a pointer is
 ///   refused.
-/// - **A fieldless enum** without parameters: each variant is its discriminant, exactly as rustc
-///   evaluates it, in the integer its `#[repr]` names, C's `int` for `#[repr(C)]`, which must hold
-///   each, or else the narrowest unsigned integer that holds each, sign-extended where one is
-///   negative. Its validity says which reprs the discriminants take: `Total` where they are every
-///   one, `TotalZeroNiche` every one but zero, else `ZeroValid` or `ZeroNiche` as zero is one or
-///   not.
+/// - **A fieldless enum**, of unit variants alone, without parameters: each variant is its
+///   discriminant, exactly as rustc evaluates it, in the integer its `#[repr]` names, C's `int` for
+///   `#[repr(C)]`, which must hold each, or else the narrowest unsigned integer that holds each,
+///   sign-extended where one is negative. Its validity says which reprs the discriminants take:
+///   `Total` where they are every one, `TotalZeroNiche` every one but zero, else `ZeroValid` or
+///   `ZeroNiche` as zero is one or not.
+/// - **An enum with fields**: each variant's fields take bits as a struct's do, from bit 0, below a
+///   tag of its discriminant, exactly as rustc evaluates it, above the widest variant's fields.
+///   Where one variant alone has fields and none states its discriminant, the unit variants instead
+///   take the reprs beside the range of that variant's last field of any bits, as `Option`'s `None`
+///   takes one, wherever that is no wider than a tag. Its repr is the narrowest unsigned integer
+///   that holds the tag or that field, and its validity what its variants promise of zero and of
+///   every repr. With parameters, it states its repr, as a struct of several fields does, and
+///   promises that zero decodes only where it states its discriminants and a unit variant's is 0,
+///   stated or implied. A field stored as a pointer is refused.
 ///
 /// A crate enables `#![feature(const_trait_impl)]` where the impl converts a field that names one
 /// of the type's parameters, a lifetime too: a newtype's field that holds the value, or any field
-/// of a struct of several fields, a `PhantomData` among them. Every other field converts through
+/// of a struct of several fields or an enum with fields, a `PhantomData` among them. Every other
+/// field converts through
 /// functions bounded `const`, so a newtype whose markers alone name its parameters, a zero-width
 /// struct, or a type whose `const` parameter no field names needs no gate.
 ///
@@ -50,8 +60,9 @@ use proc_macro::{Diagnostic, Level, Span, TokenStream};
 ///
 /// `#[atom(crate = path)]` names atomiks where `::atomiks` does not, and `#[atom(repr = u64)]`
 /// states the repr: a newtype's field must have it, a zero-width struct, a struct of several fields
-/// that fit it or a fieldless enum without a `#[repr]` takes it, and an enum's `#[repr]` must name
-/// it. A 128-bit repr is refused on a target without 128-bit atomics.
+/// or an enum with fields that fits it, or a fieldless enum without a `#[repr]`, takes it, and a
+/// fieldless enum's `#[repr]` must name it. A 128-bit repr is refused on a target without 128-bit
+/// atomics.
 #[proc_macro_derive(Atom, attributes(atom))]
 #[allow_internal_unstable(const_trait_impl)]
 pub fn derive_atom(input: TokenStream) -> TokenStream {

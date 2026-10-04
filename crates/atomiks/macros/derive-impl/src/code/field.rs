@@ -12,8 +12,8 @@ use super::repr::located_at;
 use crate::model::Field;
 
 /// The code of a packed value's fields, which names each field's placement, a `PackedField`,
-/// `placement_<index>`, and its value read back, `value_<index>`, at the derive's definition
-/// site: it names nothing of the user's there, so no name of the user's clashes with either.
+/// `<prefix>_<index>`, and its value `value_<index>`, both at the derive's definition site: the
+/// derive names nothing of the user's there, so no name of the user's clashes with either.
 pub(super) struct PackedFields<'a> {
     /// The path to atomiks.
     atomiks: &'a Path,
@@ -21,20 +21,27 @@ pub(super) struct PackedFields<'a> {
     fields: &'a [Field],
     /// Each field's placement.
     placements: Vec<Ident>,
-    /// Each field's value, read back.
+    /// Each field's value, bound where it is matched or read back.
     values: Vec<Ident>,
 }
 
 impl<'a> PackedFields<'a> {
-    /// The code of `fields`, of a value that names atomiks `atomiks`, naming its locals at
-    /// `def_site`.
-    pub(super) fn new(atomiks: &'a Path, fields: &'a [Field], def_site: Span) -> Self {
+    /// The code of `fields`, of a value that names atomiks `atomiks`, naming each placement after
+    /// `prefix` and its locals at `def_site`.
+    pub(super) fn new(
+        atomiks: &'a Path, fields: &'a [Field], prefix: &str, def_site: Span,
+    ) -> Self {
         let names = |noun: &str| -> Vec<Ident> {
             (0..fields.len())
                 .map(|index| format_ident!("{noun}_{index}", span = def_site))
                 .collect()
         };
-        Self { atomiks, fields, placements: names("placement"), values: names("value") }
+        Self { atomiks, fields, placements: names(prefix), values: names("value") }
+    }
+
+    /// The path to atomiks.
+    pub(super) const fn atomiks(&self) -> &'a Path {
+        self.atomiks
     }
 
     /// Each field, in declaration order.
@@ -42,13 +49,13 @@ impl<'a> PackedFields<'a> {
         self.fields
     }
 
-    /// Each field's placement, in declaration order.
-    pub(super) fn placements(&self) -> &[Ident] {
-        &self.placements
+    /// Each field's value, as a match binds it, in declaration order.
+    pub(super) fn values(&self) -> &[Ident] {
+        &self.values
     }
 
     /// Each field beside its placement.
-    pub(super) fn iter(&self) -> impl Iterator<Item = (&'a Field, &Ident)> {
+    fn iter(&self) -> impl Iterator<Item = (&'a Field, &Ident)> {
         self.fields.iter().zip(&self.placements)
     }
 
@@ -72,8 +79,18 @@ impl<'a> PackedFields<'a> {
         quote!(#atomiks::__private::PackedLayout::new(&[#(#placements),*]))
     }
 
+    /// What the fields promise of their bits, a `PackedValidity`, each field's validity folded in
+    /// with its layout.
+    pub(super) fn validity(&self) -> TokenStream {
+        let atomiks = self.atomiks;
+        let fields = self.iter().map(|(Field { ty, .. }, placement)| {
+            quote!(.with_field::<<#ty as #atomiks::Atom>::Validity>(#placement.layout()))
+        });
+        quote!(#atomiks::__private::PackedValidity::EMPTY #(#fields)*)
+    }
+
     /// The bits of `values`, the fields', each in its place.
-    pub(super) fn encode<I: IntoIterator<Item = TokenStream>>(&self, values: I) -> TokenStream {
+    pub(super) fn encode<I: IntoIterator<Item: ToTokens>>(&self, values: I) -> TokenStream {
         let packed = self.iter().zip(values).map(|((field, placement), value)| {
             let bits = self.field_bits(field, &value);
             quote!(#placement.pack(#bits))
@@ -128,7 +145,7 @@ impl<'a> PackedFields<'a> {
     /// A concrete field's go through `__private`, whose bound is `const`, so the crate that derives
     /// needs no `const_trait_impl`; a generic field's through the trait, the only calls that keep
     /// the impl's `[const]` bound.
-    fn field_bits(&self, field: &Field, value: &TokenStream) -> TokenStream {
+    fn field_bits<V: ToTokens>(&self, field: &Field, value: &V) -> TokenStream {
         let (atomiks, ty) = (self.atomiks, &field.ty);
         if field.is_generic {
             let repr = quote!(<<#ty as #atomiks::Atom>::Repr as #atomiks::ExactBits>);
