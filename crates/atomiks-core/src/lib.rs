@@ -31,23 +31,33 @@
     const_convert,
     const_destruct,
     const_index,
+    const_option_ops,
     const_trait_impl,
     const_type_name,
     doc_cfg,
     f16,
+    generic_pattern_types,
     impl_restriction,
-    integer_casts
+    integer_casts,
+    pattern_type_macro,
+    pattern_types,
+    step_trait,
+    structural_match,
+    transmute_neo
 )]
 #![cfg_attr(not(loom), feature(const_atomic))]
 #![cfg_attr(wide, feature(f128))]
 #![cfg_attr(core_atomic_u128, feature(integer_atomics))]
-#![cfg_attr(
-    all(target_arch = "x86_64", wide_load_store, not(loom)),
-    feature(core_intrinsics),
-    expect(
-        internal_features,
-        reason = "the AVX 16-byte load and store are core's atomic intrinsics"
-    )
+#![cfg_attr(all(target_arch = "x86_64", wide_load_store, not(loom)), feature(core_intrinsics))]
+#![expect(
+    internal_features,
+    reason = "a ranged integer's field is a pattern type, and with AVX the 16-byte load and store \
+              are core's atomic intrinsics"
+)]
+#![expect(
+    incomplete_features,
+    reason = "`generic_pattern_types` is the feature for a pattern type bounded by const \
+              parameters, as a ranged integer's is"
 )]
 // No badge names `loom` or an alias `build.rs` declares: a loom build is a model of this one, not
 // a target of its own, and an item writes out an alias's condition where its badge needs one.
@@ -73,6 +83,7 @@ pub mod __private;
 mod atom;
 mod atomic;
 pub mod cell;
+mod errors;
 mod fence;
 pub mod hint;
 mod message;
@@ -81,6 +92,7 @@ pub mod model;
 pub mod ordering;
 mod primitive;
 mod range;
+mod ranged;
 pub mod validity;
 
 pub use crate::atom::{Atom, AtomAdd, AtomBitwise, AtomOrd};
@@ -94,6 +106,11 @@ pub use crate::atomic::{
     all(target_arch = "x86_64", target_feature = "cmpxchg16b")
 )))]
 pub use crate::atomic::{AtomicI128, AtomicU128};
+pub use crate::errors::{ParseRangeError, RangeError};
 pub use crate::fence::{compiler_fence, fence};
 pub use crate::primitive::{ExactBits, FetchBitwise, Load, MinMax, Primitive, Store, Swap};
 pub use crate::range::ReprRange;
+pub use crate::ranged::{
+    RangedI8, RangedI16, RangedI32, RangedI64, RangedI128, RangedIsize, RangedU8, RangedU16,
+    RangedU32, RangedU64, RangedU128, RangedUsize,
+};

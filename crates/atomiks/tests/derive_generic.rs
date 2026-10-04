@@ -26,9 +26,8 @@ mod tests {
 
     use atomiks::ordering::{Acquire, Relaxed, Release};
     use atomiks::validity::{Partial, Total, TotalZeroNiche, ZeroValid};
-    use atomiks::{Atom, AtomAdd, AtomBitwise, AtomOrd, Atomic, ReprRange};
+    use atomiks::{Atom, AtomAdd, AtomBitwise, AtomOrd, Atomic, RangedU64, ReprRange};
 
-    use self::owner::OwnerId;
     use crate::testing::atom::{decodes_exactly_its_values, repr_and_validity_are};
 
     /// A value of any atom.
@@ -78,43 +77,8 @@ mod tests {
     struct Marker;
 
     /// An owner's id, from 3 up, so the reprs below are free.
-    mod owner {
-        use atomiks::validity::ZeroNiche;
-        use atomiks::{Atom, ReprRange};
-
-        /// An owner's id, from 3 up.
-        #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-        pub(super) struct OwnerId(
-            // INVARIANT: at least 3; `new` is its only writer.
-            u64,
-        );
-
-        impl OwnerId {
-            /// The owner `id`.
-            ///
-            /// # Panics
-            /// Where `id` is below 3; in a constant, the build fails instead.
-            pub(super) const fn new(id: u64) -> Self {
-                assert!(id >= 3, "an owner's id is from 3 up");
-                Self(id)
-            }
-        }
-
-        // SAFETY: by the field's invariant, the repr, the id, is from 3 up, so it lies in the
-        // range and decodes as it alone, and zero never does; an id may cross threads.
-        #[expect(unsafe_code, reason = "an `Atom` impl of a range from 3, which no derive gives")]
-        const unsafe impl Atom for OwnerId {
-            type Repr = u64;
-            type Validity = ZeroNiche;
-            const REPRS: ReprRange<u64> = ReprRange::new(3, 0xFFFF_FFFF_FFFF_FFFF);
-            fn to_repr(self) -> u64 {
-                self.0
-            }
-            fn from_repr(repr: u64) -> Option<Self> {
-                if repr >= 3 { Some(Self(repr)) } else { None }
-            }
-        }
-    }
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+    struct OwnerId(RangedU64<3>);
 
     /// A lock, uninitialised, free or owned: its units fill a niche beside an owner's reprs where
     /// that is no wider than a tag.
@@ -250,11 +214,12 @@ mod tests {
         repr_and_validity_are::<Lock<OwnerId>, u64, Partial>();
         let units = (Lock::<OwnerId>::Uninit.to_repr(), Lock::<OwnerId>::Free.to_repr());
         assert_eq!(units, (1, 2), "`Uninit` and `Free` take 1 and 2");
-        assert_eq!(Lock::Owned(OwnerId::new(3)).to_repr(), 3, "an owner its id");
+        assert_eq!(Lock::Owned(OwnerId(RangedU64::MIN)).to_repr(), 3, "an owner its id");
         assert_eq!(None::<Lock<OwnerId>>.to_repr(), 0, "and `None` zero");
         assert_eq!(Lock::<OwnerId>::from_repr(2), Some(Lock::Free), "each read back");
-        LOCK.store(Some(Lock::Owned(OwnerId::new(9))), Release);
-        assert_eq!(LOCK.load(Acquire), Some(Lock::Owned(OwnerId::new(9))), "through a static");
+        let owned = Lock::Owned(OwnerId(RangedU64::new(9).expect("9 is from 3 up")));
+        LOCK.store(Some(owned), Release);
+        assert_eq!(LOCK.load(Acquire), Some(owned), "through a static");
     }
 
     #[test]

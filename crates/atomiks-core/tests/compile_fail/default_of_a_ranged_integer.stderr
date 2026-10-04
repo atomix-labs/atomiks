@@ -1,0 +1,30 @@
+error[E0599]: no associated function or constant named `default` found for struct `RangedU64<MIN, MAX>` in the current scope
+ --> tests/compile_fail/default_of_a_ranged_integer.rs:6:29
+  |
+6 |     let _ = RangedU64::<3>::default();
+  |                             ^^^^^^^ associated function or constant not found in `RangedU64<3, u64::MAX>`
+  |
+note: if you're trying to build a new `RangedU64<3, u64::MAX>` consider using one of the following associated functions:
+      RangedU64::<MIN, MAX>::new
+      RangedU64::<MIN, MAX>::new_unchecked
+      RangedU64::<MIN, MAX>::new_saturating
+ --> src/ranged/mod.rs
+  |
+  |               pub const fn new(integer: $int) -> Option<Self> {
+  |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+  |               pub const unsafe fn new_unchecked(integer: $int) -> Self {
+  |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+  |               pub const fn new_saturating(integer: $int) -> Self {
+  |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+  | / ranged!(
+  | |     RangedU8(u8),
+  | |     RangedU16(u16),
+  | |     RangedU32(u32),
+... |
+  | |     RangedUsize(usize),
+  | | );
+  | |_- in this macro invocation
+  = note: this error originates in the macro `ranged` (in Nightly builds, run with -Z macro-backtrace for more info)

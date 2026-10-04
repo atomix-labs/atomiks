@@ -20,8 +20,8 @@ mod tests {
     use core::num::NonZero;
 
     use atomiks::ordering::{Acquire, Relaxed, Release};
-    use atomiks::validity::{Total, TotalZeroNiche};
-    use atomiks::{Atom, AtomAdd, AtomBitwise, AtomOrd, Atomic, ReprRange};
+    use atomiks::validity::{Partial, Total, TotalZeroNiche};
+    use atomiks::{Atom, AtomAdd, AtomBitwise, AtomOrd, Atomic, RangedU64, ReprRange};
 
     use crate::testing::atom::repr_and_validity_are;
 
@@ -35,6 +35,10 @@ mod tests {
         /// The id.
         id: NonZero<u64>,
     }
+
+    /// A lock's owner, from 3: a lock keeps 1 and 2 for its own states. It orders as its field.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Atom, AtomOrd)]
+    struct OwnerId(RangedU64<3>);
 
     /// A count, which adds, orders and combines as its field does.
     #[derive(
@@ -77,6 +81,7 @@ mod tests {
 
     static SEQ: Atomic<Seq> = Atomic::new(Seq(1));
     static OWNER: Atomic<Option<OrderId>> = Atomic::new(None);
+    static LOCK_OWNER: Atomic<Option<OwnerId>> = Atomic::new(None);
     static COUNT: Atomic<Count> = Atomic::new(Count(1));
     static VENUE: Atomic<Tagged<Venue>> = Atomic::new(Tagged(PhantomData, 7, PhantomData));
     static LIVE: Atomic<Live> = Atomic::new(Live(true));
@@ -112,6 +117,21 @@ mod tests {
     }
 
     #[test]
+    fn a_newtype_over_a_ranged_integer_takes_its_range() {
+        repr_and_validity_are::<OwnerId, u64, Partial>();
+        assert_eq!(OwnerId::REPRS, ReprRange::new(3, u128::from(u64::MAX)), "from 3 up");
+        assert_eq!(OwnerId::from_repr(2), None, "refusing 2, below it");
+    }
+
+    #[test]
+    fn none_takes_zero_past_a_ranged_fields_largest() {
+        assert_eq!(None::<OwnerId>.to_repr(), 0, "`None`, past `u64::MAX`");
+        assert_eq!(LOCK_OWNER.load(Acquire), None, "stored as zero");
+        LOCK_OWNER.store(Some(OwnerId(RangedU64::MIN)), Release);
+        assert_eq!(LOCK_OWNER.load(Acquire), Some(OwnerId(RangedU64::MIN)), "beside the first id");
+    }
+
+    #[test]
     fn markers_take_no_repr() {
         repr_and_validity_are::<Tagged<Venue>, u16, Total>();
         assert_eq!(VENUE.load(Acquire), Tagged(PhantomData, 7, PhantomData), "the id alone");
@@ -140,5 +160,8 @@ mod tests {
         let count = Atomic::new(Count(1));
         count.max(Count(9), Relaxed);
         assert_eq!(count.load(Relaxed), Count(9), "the larger");
+        let owner = Atomic::new(OwnerId(RangedU64::MIN));
+        owner.max(OwnerId(RangedU64::MAX), Relaxed);
+        assert_eq!(owner.load(Relaxed), OwnerId(RangedU64::MAX), "and the larger id");
     }
 }

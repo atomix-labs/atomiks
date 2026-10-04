@@ -3,8 +3,8 @@
 //! [`Atomic<T>`](Atomic) holds a `T` as its [`Repr`](Atom::Repr), one primitive an atomic
 //! instruction reads and writes, and decodes it on the way out. The integer, `bool` and pointer
 //! atomics are its aliases (`AtomicU64 = Atomic<u64>`), and any value implementing [`Atom`] is one
-//! more: a `NonZero`, a `char`, a float, an `Option` that spends a spare repr on `None`, and a
-//! struct or an enum that derives it.
+//! more: a `NonZero`, a `char`, a float, a ranged integer, an `Option` that spends a spare repr on
+//! `None`, and a struct or an enum that derives it.
 //!
 //! # Types
 //!
@@ -13,6 +13,9 @@
 //!   it takes and its [`validity`] which decode; [`AtomAdd`], [`AtomOrd`] and [`AtomBitwise`] add
 //!   the read-modify-writes that mean something for it. With the `derive` feature, each derives:
 //!   `Atom` for a struct or an enum, and each capability for a newtype whose field has it.
+//!   [`RangedU64<MIN, MAX>`](RangedU64) and its siblings, `RangedU8` to `RangedIsize`, hold an
+//!   integer from `MIN` to `MAX`, and [`RangeError`] and [`ParseRangeError`] say why one refused an
+//!   integer or a text.
 //! - **Orderings.** The [`ordering`] types, each accepted only where it means something, and the
 //!   [`fence`](fn@fence) and [`compiler_fence`] they order.
 //! - **Primitives.** [`Primitive`], [`ExactBits`] where the bits are the whole value, and what the
@@ -65,6 +68,35 @@
 //!
 //! OWNER.store(NonZero::new(NEXT.fetch_add(1, Relaxed)), Release);
 //! assert_eq!(OWNER.load(Acquire), NonZero::new(1), "the first id taken");
+//! ```
+//!
+//! ## Reserving Integers for a Lock's States
+//! ```
+//! # #[cfg(feature = "derive")] {
+//! use atomiks::ordering::{AcqRel, Acquire};
+//! use atomiks::{Atom, Atomic, RangedU64};
+//!
+//! /// An owner's id, from 3, which leaves 0 to 2 spare.
+//! #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+//! struct OwnerId(RangedU64<3>);
+//!
+//! /// A lock, whose unit variants take integers below the ids.
+//! #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+//! enum Lock {
+//!     Free,
+//!     Poisoned,
+//!     Held(OwnerId),
+//! }
+//!
+//! static LOCK: Atomic<Option<Lock>> = Atomic::new(Some(Lock::Free));
+//!
+//! let owner = OwnerId(RangedU64::new(7).expect("7 is from 3 up"));
+//! let (free, held) = (Some(Lock::Free), Some(Lock::Held(owner)));
+//! assert_eq!(LOCK.compare_exchange(free, held, AcqRel, Acquire), Ok(free), "taken by owner 7");
+//! assert_eq!((Lock::Free.to_repr(), Lock::Poisoned.to_repr()), (1, 2), "the states below 3");
+//! assert_eq!(None::<Lock>.to_repr(), 0, "`None` below them");
+//! assert_eq!(size_of_val(&LOCK), 8, "and the lock in the id's `u64`");
+//! # }
 //! ```
 //!
 //! # What Each Operation Costs
@@ -140,8 +172,9 @@ pub use atomiks_core::model;
 pub use atomiks_core::{
     Atom, AtomAdd, AtomBitwise, AtomOrd, Atomic, AtomicBool, AtomicI8, AtomicI16, AtomicI32,
     AtomicI64, AtomicIsize, AtomicPtr, AtomicU8, AtomicU16, AtomicU32, AtomicU64, AtomicUsize,
-    ExactBits, FetchBitwise, Load, MinMax, Primitive, ReprRange, Store, Swap, compiler_fence,
-    fence,
+    ExactBits, FetchBitwise, Load, MinMax, ParseRangeError, Primitive, RangeError, RangedI8,
+    RangedI16, RangedI32, RangedI64, RangedI128, RangedIsize, RangedU8, RangedU16, RangedU32,
+    RangedU64, RangedU128, RangedUsize, ReprRange, Store, Swap, compiler_fence, fence,
 };
 #[cfg(any(
     target_arch = "aarch64",

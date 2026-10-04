@@ -140,3 +140,14 @@ pub(crate) fn assert_holds(laws: Result<(), TestCaseError>) {
         panic!("{broken}");
     }
 }
+
+/// Checks the `None` law for each type.
+macro_rules! none_laws {
+    ($($value:ty),+ $(,)?) => {$(
+        $crate::testing::law::assert_holds($crate::testing::law::none_takes_a_spare_repr::<$value>(
+            $crate::testing::law::none_bits::<$value>(),
+        ));
+    )+};
+}
+
+pub(crate) use none_laws;

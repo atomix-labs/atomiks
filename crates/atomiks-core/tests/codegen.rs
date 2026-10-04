@@ -3,7 +3,8 @@
 //! The fixture builds for Linux and macOS with the repository's CPU floor and, on `aarch64` Linux,
 //! with LSE2 too. Each operation is the instructions and barriers its name promises, with no
 //! compare-exchange loop but `update`'s, and each target refuses each operation it lacks: `x86_64`
-//! those only `aarch64` has, and `aarch64` each 128-bit one it has no instruction for.
+//! those only `aarch64` has, and `aarch64` each 128-bit one it has no instruction for. A ranged
+//! integer's range reaches LLVM, so a comparison outside it folds to a constant.
 
 // Miri cannot run the compiler, and loom's atomics are not what ships.
 #![cfg(on_hardware)]
@@ -50,16 +51,18 @@ mod tests {
         ("acquire_fence", Only(&["dmb ishld", "ret"])),
         ("release_fence", Only(&["dmb ish", "ret"])),
         ("seq_cst_fence", Only(&["dmb ish", "ret"])),
+        ("ranged_below_min", Only(&["mov", "ret"])),
     ];
 
     /// The rest on `aarch64` with the `+lse` floor, which has no LSE2.
     ///
-    /// With no 128-bit load, `update` reads with a compare-exchange. A `char` or an `Option` load,
-    /// as every load, decodes without a check.
+    /// With no 128-bit load, `update` reads with a compare-exchange. A load of a `char`, an
+    /// `Option` or a ranged integer, as every load, decodes without a check.
     const AARCH64_FLOOR: &[(&str, Lowering)] = &[
         ("u64_load", InOrder(&["ldar"])),
         ("char_load", Only(&["ldar", "ret"])),
         ("option_load", Only(&["ldar", "ret"])),
+        ("ranged_load", Only(&["ldar", "ret"])),
         ("u128_update", Retry(&["caspa", "caspal"])),
     ];
 
@@ -71,6 +74,7 @@ mod tests {
         ("u64_load", InOrder(&["ldapr"])),
         ("char_load", Only(&["ldapr", "ret"])),
         ("option_load", Only(&["ldapr", "ret"])),
+        ("ranged_load", Only(&["ldapr", "ret"])),
         ("u128_load", InOrder(&["ldp", "dmb ishld"])),
         ("u128_load_relaxed", InOrder(&["ldp"])),
         ("u128_load_seq_cst", InOrder(&["ldar", "ldp", "dmb ish"])),
@@ -98,6 +102,7 @@ mod tests {
         ("ptr_fetch_ptr_sub", InOrder(&["negq", "lock xaddq"])),
         ("char_load", Only(&["movl", "retq"])),
         ("option_load", Only(&["movq", "retq"])),
+        ("ranged_load", Only(&["movq", "retq"])),
         ("u128_load", InOrder(&["vmovdqa"])),
         ("u128_load_relaxed", InOrder(&["vmovdqa"])),
         ("u128_load_seq_cst", InOrder(&["vmovdqa"])),
@@ -111,6 +116,7 @@ mod tests {
         ("acquire_fence", Only(&["retq"])),
         ("release_fence", Only(&["retq"])),
         ("seq_cst_fence", Only(&["lock orl", "retq"])),
+        ("ranged_below_min", Only(&["xorl", "retq"])),
     ];
 
     #[test]

@@ -22,8 +22,8 @@ mod tests {
     use core::num::NonZero;
 
     use atomiks::ordering::{Acquire, Release};
-    use atomiks::validity::{Total, ZeroNiche, ZeroValid};
-    use atomiks::{Atom, Atomic, ReprRange};
+    use atomiks::validity::{Partial, Total, ZeroNiche, ZeroValid};
+    use atomiks::{Atom, Atomic, RangedI8, ReprRange};
 
     use crate::testing::atom::{decodes_exactly_its_values, field_width, repr_and_validity_are};
 
@@ -75,6 +75,16 @@ mod tests {
         length: u8,
         /// Which way.
         sign: Sign,
+    }
+
+    /// A move on a side: the side's bit below four bits of ticks, -5 to 5, its top field, which
+    /// extend their sign.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+    struct PriceMove {
+        /// Which side.
+        side: Side,
+        /// How far, and which way.
+        ticks: RangedI8<-5, 5>,
     }
 
     /// A byte and a side, with fields of no bits between them, which take none.
@@ -200,6 +210,17 @@ mod tests {
     }
 
     #[test]
+    fn a_ranged_field_takes_the_bits_its_range_needs() {
+        assert_eq!(field_width(RangedI8::<-5, 5>::REPRS), 4, "-5 to 5 in four bits, signed");
+        repr_and_validity_are::<PriceMove, u8, Partial>();
+        let down = PriceMove { side: Side::Ask, ticks: RangedI8::MIN };
+        assert_eq!(down.to_repr(), 0xF7, "-5 above the side, its sign extended from bit 4");
+        let up = PriceMove { side: Side::Bid, ticks: RangedI8::MAX };
+        assert_eq!(up.to_repr(), 0x0A, "and 5, zeros above it");
+        assert_eq!(PriceMove::from_repr(0x0C), None, "refusing 6, past 5");
+    }
+
+    #[test]
     fn option_of_a_signed_top_field_takes_a_repr_without_another_bit() {
         assert_eq!(None::<Step>.to_repr(), 0xFEFF, "`None` below the range");
         assert_eq!(field_width(Option::<Step>::REPRS), field_width(Step::REPRS), "ten bits still");
@@ -217,6 +238,7 @@ mod tests {
     fn every_repr_of_an_8_or_16_bit_struct_decodes_exactly_where_a_value_encodes_to_it() {
         decodes_exactly_its_values::<Flags, _>(u8::MIN..=u8::MAX, 2 * 2 * 3);
         decodes_exactly_its_values::<Book, _>(u8::MIN..=u8::MAX, 2 * 2);
+        decodes_exactly_its_values::<PriceMove, _>(u8::MIN..=u8::MAX, 2 * 11);
         decodes_exactly_its_values::<Step, _>(u16::MIN..=u16::MAX, 256 * 3);
         decodes_exactly_its_values::<Gapped, _>(u16::MIN..=u16::MAX, 256 * 2);
         decodes_exactly_its_values::<Signed, _>(i16::MIN..=i16::MAX, 256 * 3);

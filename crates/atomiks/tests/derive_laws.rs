@@ -21,8 +21,8 @@ mod tests {
     use core::fmt::Debug;
     use core::num::NonZero;
 
-    use atomiks::validity::{Total, TotalZeroNiche, ZeroValid};
-    use atomiks::{Atom, ExactBits, Primitive, ReprRange};
+    use atomiks::validity::{Total, TotalZeroNiche, ZeroNiche, ZeroValid};
+    use atomiks::{Atom, ExactBits, Primitive, RangedI8, RangedU64, ReprRange};
     use proptest::prelude::{Just, Strategy, any, prop_oneof};
     use proptest::sample::select;
     use proptest::test_runner::TestCaseError;
@@ -30,8 +30,7 @@ mod tests {
 
     use crate::testing::atom::{repr_and_validity_are, with_every_byte};
     use crate::testing::law::{
-        Promise, assert_holds, decodes_as_promised, edge_or_random_bits, none_bits,
-        none_takes_a_spare_repr, round_trips,
+        Promise, assert_holds, decodes_as_promised, edge_or_random_bits, none_laws, round_trips,
     };
 
     /// The side of the book an order rests on: one bit, from zero.
@@ -113,6 +112,10 @@ mod tests {
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
     struct Seq(u64);
 
+    /// A lock's owner, from 3, as its field's range.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+    struct OwnerId(RangedU64<3>);
+
     /// A flag, a mark of no bits, a side and a sign by position: four bits, which extend the sign.
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
     struct Flags(bool, Marker, Side, Sign);
@@ -124,6 +127,16 @@ mod tests {
         length: u8,
         /// Which way.
         sign: Sign,
+    }
+
+    /// A move on a side: the side's bit below four bits of ticks, -5 to 5, its top field, which
+    /// extend their sign.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+    struct PriceMove {
+        /// Which side.
+        side: Side,
+        /// How far, and which way.
+        ticks: RangedI8<-5, 5>,
     }
 
     /// A step in the signed repr it states.
@@ -327,6 +340,11 @@ mod tests {
         select(&[Sign::Minus, Sign::Flat, Sign::Plus])
     }
 
+    /// Each swing.
+    fn swings() -> impl Strategy<Value = Swing> {
+        select(&[Swing::Low, Swing::High])
+    }
+
     /// Steps of every length and sign.
     fn steps() -> impl Strategy<Value = Step> {
         (any::<u8>(), signs()).prop_map(|(length, sign)| Step { length, sign })
@@ -362,6 +380,11 @@ mod tests {
             Just(Reading::Stale),
             signs().prop_map(Reading::Present)
         ]
+    }
+
+    /// Owners of every id.
+    fn owner_ids() -> impl Strategy<Value = OwnerId> {
+        (3..=u64::MAX).prop_map(|id| OwnerId(RangedU64::new(id).expect("the id is from 3 up")))
     }
 
     /// Pairs of every value of `first` and `second`.
@@ -434,6 +457,7 @@ mod tests {
         repr_and_validity_are::<Septet, u8, Total>();
         repr_and_validity_are::<LockWord<Sign>, u16, ZeroValid>();
         repr_and_validity_are::<LockWord<NonZero<u8>>, u16, ZeroValid>();
+        repr_and_validity_are::<Wrap<Swing>, u16, ZeroNiche>();
         assert_eq!(Turn::REPRS, ReprRange::new(0, 0x1FF), "every repr up to the third's end");
         assert_eq!(Offer::Closed.to_repr(), 2, "and `Closed` above the side's 0 and 1");
     }
@@ -451,36 +475,35 @@ mod tests {
         every_repr_obeys_the_laws::<LockWord<Sign>>();
         every_repr_obeys_the_laws::<LockWord<u8>>();
         every_repr_obeys_the_laws::<LockWord<NonZero<u8>>>();
+        every_repr_obeys_the_laws::<LockWord<Swing>>();
         every_repr_obeys_the_laws::<Option<NonZeroByte>>();
         every_repr_obeys_the_laws::<Marker>();
         every_repr_obeys_the_laws::<Id>();
         every_repr_obeys_the_laws::<Flags>();
         every_repr_obeys_the_laws::<Step>();
+        every_repr_obeys_the_laws::<PriceMove>();
+        every_repr_obeys_the_laws::<Option<PriceMove>>();
         every_repr_obeys_the_laws::<SignedStep>();
         every_repr_obeys_the_laws::<Reading>();
         every_repr_obeys_the_laws::<Fill>();
         every_repr_obeys_the_laws::<Shift>();
         every_repr_obeys_the_laws::<Signal>();
         every_repr_obeys_the_laws::<Wrap<Sign>>();
+        every_repr_obeys_the_laws::<Wrap<Swing>>();
         every_repr_obeys_the_laws::<Option<Option<Sign>>>();
         every_repr_obeys_the_laws::<Option<Swing>>();
         every_repr_obeys_the_laws::<Option<Step>>();
         every_repr_obeys_the_laws::<Option<Option<Reading>>>();
     }
 
-    /// Checks the `None` law for each type.
-    macro_rules! none_laws {
-        ($($value:ty),+ $(,)?) => {$(
-            assert_holds(none_takes_a_spare_repr::<$value>(none_bits::<$value>()));
-        )+};
-    }
-
     #[test]
     fn none_takes_a_spare_repr_of_each_derived_value() {
         none_laws!(Side, Sign, Swing, Scale, Marker, Id, Flags, Step, SignedStep, Quote, Order);
+        none_laws!(OwnerId, PriceMove, Lock<OwnerId>);
         none_laws!(NonZeroByte, Third, Turn, Entry, Slot, Reading, Fill, Offer, Shift, Signal);
         none_laws!(Wrap<Sign>, Pair<u32, bool>, Pair<NonZero<u8>, Sign>, Lock<u8>, Lock<Sign>);
         none_laws!(LockWord<Sign>, LockWord<NonZero<u8>>);
+        none_laws!(Wrap<Swing>, Lock<Swing>, LockWord<Swing>);
         none_laws!(Option<Sign>, Option<Step>, Option<Reading>, Option<Order>, Option<Slot>);
     }
 
@@ -489,7 +512,7 @@ mod tests {
         fn fieldless_enums_obey_the_laws(
             side in sides(),
             sign in signs(),
-            swing in select(&[Swing::Low, Swing::High]),
+            swing in swings(),
             scale in select(&[Scale::Unit, Scale::Tebi]),
             bits in edge_or_random_bits(&[]),
         ) {
@@ -503,10 +526,12 @@ mod tests {
         fn newtypes_and_zero_width_structs_obey_the_laws(
             id in any::<NonZero<u16>>().prop_map(Id),
             seq in any::<u64>().prop_map(Seq),
+            owner in owner_ids(),
             bits in edge_or_random_bits(&[]),
         ) {
             value_obeys_the_laws(id, bits)?;
             value_obeys_the_laws(seq, bits)?;
+            value_obeys_the_laws(owner, bits)?;
             value_obeys_the_laws(Marker, bits)?;
         }
 
@@ -567,6 +592,8 @@ mod tests {
             partial in pairs(any::<NonZero<u8>>(), signs()),
             tagged in locks(any::<u8>()),
             niche in locks(signs()),
+            ranged in locks(owner_ids()),
+            zero_niche in locks(swings()),
             stated in lock_words(any::<u8>()),
             bits in edge_or_random_bits(&[]),
         ) {
@@ -575,6 +602,8 @@ mod tests {
             value_obeys_the_laws(partial, bits)?;
             value_obeys_the_laws(tagged, bits)?;
             value_obeys_the_laws(niche, bits)?;
+            value_obeys_the_laws(ranged, bits)?;
+            value_obeys_the_laws(zero_niche, bits)?;
             value_obeys_the_laws(stated, bits)?;
         }
 
