@@ -1,6 +1,6 @@
 //! A crate under the workspace's lints, `unsafe_code` forbidden, derives `Atom` and the
-//! capabilities for documented newtypes, a pointer's among them, and stores each in a static, with
-//! no feature gate.
+//! capabilities for documented newtypes, a pointer's among them, and `Atom` for fieldless enums and
+//! a marker, and stores each in a static, with no feature gate.
 //!
 //! trybuild runs rustc alone, so the clippy lints here hold only where clippy builds the same code,
 //! as it does in `tests/derive_newtype.rs`.
@@ -53,6 +53,31 @@ pub struct Id<K> {
     kind: PhantomData<K>,
 }
 
+/// The side of the book an order rests on.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+pub enum Side {
+    /// A buy.
+    Bid,
+    /// A sell.
+    Ask,
+}
+
+/// Which way a price moved, stored as its discriminant.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+#[repr(i8)]
+pub enum Sign {
+    /// Down.
+    Minus = -1,
+    /// Neither.
+    Flat,
+    /// Up.
+    Plus,
+}
+
+/// Marks the book, storing nothing.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+pub struct Marker;
+
 /// The head of a list another thread may take.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
 pub struct Head(NonNull<u64>);
@@ -66,9 +91,21 @@ pub static LAST: Atomic<Id<Seq>> = Atomic::new(Id { value: 0, kind: PhantomData 
 /// The list's head, `None` while it is empty.
 pub static HEAD: Atomic<Option<Head>> = Atomic::new(None);
 
+/// The side of the last fill, or `None` before the first.
+pub static FILL: Atomic<Option<Side>> = Atomic::new(None);
+
+/// The last move.
+pub static MOVE: Atomic<Sign> = Atomic::new(Sign::Flat);
+
+/// Whether the book is marked.
+pub static MARK: Atomic<Option<Marker>> = Atomic::new(Some(Marker));
+
 fn main() {
     NEXT.add(1, Relaxed);
     assert_eq!(NEXT.load(Acquire), Seq(1), "one taken");
     assert_eq!(LAST.load(Acquire).value, 0, "and no id yet");
     assert_eq!(HEAD.load(Acquire), None, "nor a list's head");
+    assert_eq!(FILL.load(Acquire), None, "no fill");
+    assert_eq!(MOVE.swap(Sign::Minus, Relaxed), Sign::Flat, "a move down");
+    assert_eq!(MARK.load(Acquire), Some(Marker), "and the mark");
 }

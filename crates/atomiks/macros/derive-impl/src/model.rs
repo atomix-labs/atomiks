@@ -36,11 +36,11 @@ pub(crate) enum Shape {
     /// A newtype: one field holds the value, beside any `PhantomData` markers.
     Newtype(Newtype),
     /// A unit struct, or one of markers alone.
-    ZeroWidth,
+    ZeroWidth(ZeroWidth),
     /// Several fields that hold a value, as a struct packs them.
     Packed,
     /// Variants that hold no fields.
-    Fieldless,
+    Fieldless(Fieldless),
     /// Variants, one of them at least holding fields.
     EnumWithFields,
 }
@@ -50,9 +50,9 @@ impl Shape {
     pub(crate) const fn noun(&self) -> &'static str {
         match self {
             Self::Newtype(_) => "a newtype",
-            Self::ZeroWidth => "a struct of no field but markers",
+            Self::ZeroWidth(_) => "a zero-width struct",
             Self::Packed => "a struct of several fields",
-            Self::Fieldless => "a fieldless enum",
+            Self::Fieldless(_) => "a fieldless enum",
             Self::EnumWithFields => "an enum with fields",
         }
     }
@@ -74,6 +74,49 @@ impl Newtype {
     pub(crate) fn fields(&self) -> impl Iterator<Item = &Field> {
         self.markers_before.iter().chain(iter::once(&self.value)).chain(&self.markers_after)
     }
+}
+
+/// A zero-width struct: a unit struct, or one of `PhantomData` markers alone, so that its impl
+/// builds its one value alike on every decode.
+pub(crate) enum ZeroWidth {
+    /// `struct Marker;`, whose value is `Self`.
+    Unit,
+    /// The markers in braces or parentheses, in declaration order, each built as `PhantomData`;
+    /// none, for `struct Marker {}`.
+    Markers(Vec<Field>),
+}
+
+impl ZeroWidth {
+    /// Its markers, in declaration order: none for a unit struct.
+    pub(crate) fn markers(&self) -> &[Field] {
+        match self {
+            Self::Unit => &[],
+            Self::Markers(markers) => markers,
+        }
+    }
+}
+
+/// A fieldless enum's variants, each stored as its discriminant, and the integer that stores them.
+pub(crate) struct Fieldless {
+    /// Which integer its impl stores the discriminants as.
+    pub(crate) repr: EnumRepr,
+    /// Each variant's name, in declaration order.
+    pub(crate) variants: Vec<Ident>,
+}
+
+/// Which integer a fieldless enum's impl stores its discriminants as.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum EnumRepr {
+    /// The one its `#[repr]` names, `u8` of `#[repr(u8)]`: the discriminants' own type.
+    Integer(Ident),
+    /// C's `int`, which `#[repr(C)]`, the hint given, names, and which must hold each
+    /// discriminant: rustc widens the enum past it with a warning alone.
+    C(Ident),
+    /// The one `#[atom(repr = …)]` states where no `#[repr]` names one,
+    /// which each discriminant must fit.
+    Stated(Ident),
+    /// Where neither names one, the narrowest unsigned integer that holds each discriminant.
+    Selected,
 }
 
 /// A field, as an impl reads and builds it.

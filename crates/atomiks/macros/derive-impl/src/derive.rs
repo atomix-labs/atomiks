@@ -66,18 +66,25 @@ impl Capability {
 /// macro's definition site, where no name of the user's resolves in their place.
 #[must_use]
 pub fn expand_atom(input: TokenStream, def_site: Span) -> Expansion {
-    match parse::input(input) {
-        Ok(Input { implementor, shape: Ok(Shape::Newtype(newtype)) }) => {
-            Expansion::written(code::atom(&implementor, &newtype, def_site))
+    let Input { implementor, shape } = match parse::input(input) {
+        Ok(input) => input,
+        Err(errors) => return Expansion::refused(errors, TokenStream::new()),
+    };
+    match shape {
+        Ok(Shape::Newtype(newtype)) => {
+            Expansion::written(code::newtype(&implementor, &newtype, def_site))
         },
-        Ok(Input { implementor, shape: Ok(shape) }) => Expansion::refused(
+        Ok(Shape::ZeroWidth(zero_width)) => {
+            Expansion::written(code::zero_width(&implementor, &zero_width, def_site))
+        },
+        Ok(Shape::Fieldless(fieldless)) => {
+            Expansion::written(code::fieldless(&implementor, &fieldless, def_site))
+        },
+        Ok(shape @ (Shape::Packed | Shape::EnumWithFields)) => Expansion::refused(
             vec![not_yet_supported(&implementor, &shape)],
             code::stub(&implementor),
         ),
-        Ok(Input { implementor, shape: Err(errors) }) => {
-            Expansion::refused(errors, code::stub(&implementor))
-        },
-        Err(errors) => Expansion::refused(errors, TokenStream::new()),
+        Err(errors) => Expansion::refused(errors, code::stub(&implementor)),
     }
 }
 
@@ -105,8 +112,7 @@ fn not_yet_supported(implementor: &Implementor, shape: &Shape) -> DeriveError {
     )
     .note(
         None,
-        "only a newtype derives it so far: a struct of one field, beside any `PhantomData` markers"
-            .to_owned(),
+        "so far it derives for a newtype, a zero-width struct and a fieldless enum".to_owned(),
     )
 }
 
@@ -267,10 +273,174 @@ mod tests {
     }
 
     #[test]
+    fn a_fieldless_enum_reads_each_discriminant_by_casting_its_variant() {
+        let expected = quote! {
+            const _: () = ::atomiks::__private::assert_send_and_sync::<Sign>();
+            const _: () = {
+                type Repr = <::core::primitive::i8 as ::atomiks::__private::SelectRepr>::Repr;
+                const _: () = ::atomiks::__private::assert_width::<Sign>(::core::primitive::i8::BITS);
+                const discriminant_0: Repr = Sign::Minus as Repr;
+                const discriminant_1: Repr = Sign::Flat as Repr;
+                const discriminant_2: Repr = Sign::Plus as Repr;
+                #[automatically_derived]
+                const unsafe impl ::atomiks::Atom for Sign {
+                    type Repr = Repr;
+                    type Validity = <
+                        ::atomiks::__private::ValidityCode<{
+                            ::atomiks::__private::discriminant_validity_code([
+                                discriminant_0, discriminant_1, discriminant_2
+                            ])
+                        }>
+                        as ::atomiks::__private::SelectValidity
+                    >::Validity;
+                    const REPRS: ::atomiks::ReprRange<Repr> = ::atomiks::__private::discriminant_range([
+                        discriminant_0, discriminant_1, discriminant_2
+                    ]);
+                    #[inline]
+                    fn to_repr(self) -> Repr {
+                        match self {
+                            Self::Minus => discriminant_0,
+                            Self::Flat => discriminant_1,
+                            Self::Plus => discriminant_2,
+                        }
+                    }
+                    #[inline]
+                    fn from_repr(repr: Repr) -> ::core::option::Option<Self> {
+                        match repr {
+                            discriminant_0 => ::core::option::Option::Some(Self::Minus),
+                            discriminant_1 => ::core::option::Option::Some(Self::Flat),
+                            discriminant_2 => ::core::option::Option::Some(Self::Plus),
+                            _ => ::core::option::Option::None,
+                        }
+                    }
+                    #[inline]
+                    unsafe fn from_repr_unchecked(repr: Repr) -> Self {
+                        match repr {
+                            discriminant_0 => Self::Minus,
+                            discriminant_1 => Self::Flat,
+                            discriminant_2 => Self::Plus,
+                            _ => unsafe { ::core::hint::unreachable_unchecked() },
+                        }
+                    }
+                }
+            };
+        };
+        let sign = derive_atom(quote! { #[repr(i8)] enum Sign { Minus = -1, Flat, Plus } });
+        assert_eq!(written(&sign), expected.to_string(), "the impl");
+    }
+
+    #[test]
+    fn a_fieldless_enum_without_a_repr_selects_the_narrowest_that_holds_its_discriminants() {
+        let selected = quote! {
+            type Repr = <
+                ::atomiks::__private::Width<{
+                    ::atomiks::__private::narrowest_width(::atomiks::__private::discriminant_width([
+                        Side::Bid as ::core::primitive::i128,
+                        Side::Ask as ::core::primitive::i128
+                    ]))
+                }>
+                as ::atomiks::__private::SelectRepr
+            >::Repr;
+            const discriminant_0: Repr = Side::Bid as Repr;
+        };
+        let code = written(&derive_atom(quote! { enum Side { Bid, Ask } }));
+        assert!(code.contains(&selected.to_string()), "selected: {code}");
+    }
+
+    #[test]
+    fn a_stated_repr_is_checked_to_be_held_and_to_hold_each_discriminant() {
+        let stated = quote! {
+            type Repr = <::core::primitive::u32 as ::atomiks::__private::SelectRepr>::Repr;
+            const _: () = ::atomiks::__private::assert_width::<Phase>(::core::primitive::u32::BITS);
+            const _: () = ::atomiks::__private::assert_stated_width::<Phase, ::core::primitive::u32>(
+                ::atomiks::__private::discriminant_width([
+                    Phase::Pre as ::core::primitive::i128,
+                    Phase::Open as ::core::primitive::i128
+                ])
+            );
+        };
+        let code =
+            written(&derive_atom(quote! { #[atom(repr = u32)] enum Phase { Pre = 1, Open } }));
+        assert!(code.contains(&stated.to_string()), "checked: {code}");
+    }
+
+    #[test]
+    fn a_c_enum_is_stored_as_cs_int_checked_to_hold_each_discriminant() {
+        let c_int = quote! {
+            type Repr = <::core::ffi::c_int as ::atomiks::__private::SelectRepr>::Repr;
+            const _: () = ::atomiks::__private::assert_stated_width::<Mode, ::core::ffi::c_int>(
+                ::atomiks::__private::discriminant_width([
+                    Mode::Off as ::core::primitive::i128,
+                    Mode::On as ::core::primitive::i128
+                ])
+            );
+        };
+        let code = written(&derive_atom(quote! { #[repr(C)] enum Mode { Off, On = 4 } }));
+        assert!(code.contains(&c_int.to_string()), "C's int: {code}");
+    }
+
+    #[test]
+    fn a_unit_struct_is_zero_alone() {
+        let expected = quote! {
+            const _: () = ::atomiks::__private::assert_send_and_sync::<Marker>();
+            #[automatically_derived]
+            const unsafe impl ::atomiks::Atom for Marker {
+                type Repr = ::core::primitive::u8;
+                type Validity = ::atomiks::validity::ZeroValid;
+                const REPRS: ::atomiks::ReprRange<::core::primitive::u8> = ::atomiks::ReprRange::new(0, 0);
+                #[inline]
+                fn to_repr(self) -> ::core::primitive::u8 {
+                    0
+                }
+                #[inline]
+                fn from_repr(repr: ::core::primitive::u8) -> ::core::option::Option<Self> {
+                    match repr {
+                        0 => ::core::option::Option::Some(Self),
+                        _ => ::core::option::Option::None,
+                    }
+                }
+                #[inline]
+                unsafe fn from_repr_unchecked(_: ::core::primitive::u8) -> Self {
+                    Self
+                }
+            }
+        };
+        let marker = derive_atom(quote! { struct Marker; });
+        assert_eq!(written(&marker), expected.to_string(), "the impl");
+    }
+
+    #[test]
+    fn a_struct_of_markers_builds_each_and_bounds_it_by_its_thread_safety() {
+        let tag = written(&derive_atom(quote! { struct Tag<K>(PhantomData<K>); }));
+        let bounds = quote! {
+            where
+                Self: ::core::marker::Copy,
+                Self: ::core::marker::Send + ::core::marker::Sync
+        };
+        assert!(tag.contains(&bounds.to_string()), "a generic one is bounded: {tag}");
+        let built = quote!(Self(::core::marker::PhantomData)).to_string();
+        assert!(tag.contains(&built), "and built by position: {tag}");
+        let kind = written(&derive_atom(quote! {
+            #[atom(repr = u64)]
+            struct Kind { kind: PhantomData<Venue> }
+        }));
+        let check = quote! {
+            const _: () = ::atomiks::__private::assert_send_and_sync::<Kind>();
+        };
+        assert!(kind.starts_with(&check.to_string()), "a concrete one checked beside it: {kind}");
+        let built = quote!(Self { kind: ::core::marker::PhantomData }).to_string();
+        assert!(kind.contains(&built), "and built by name: {kind}");
+        let pinned = quote!(
+            type Repr = <::core::primitive::u64 as ::atomiks::__private::SelectRepr>::Repr;
+        );
+        assert!(kind.contains(&pinned.to_string()), "in the repr stated: {kind}");
+    }
+
+    #[test]
     fn a_shape_not_yet_supported_is_refused_beside_a_stub() {
         let stub = quote! {
             #[automatically_derived]
-            const unsafe impl ::atomiks::Atom for Side
+            const unsafe impl ::atomiks::Atom for Quote
             where
                 Self: ::core::marker::Copy,
             {
@@ -286,14 +456,25 @@ mod tests {
                 }
             }
         };
-        let (messages, code) = refused(derive_atom(quote! { enum Side { Bid, Ask } }));
-        assert_eq!(messages, ["deriving `Atom` for a fieldless enum is not yet supported"], "why");
+        let packed = derive_atom(quote! { struct Quote { qty: u32, live: bool } });
+        let (messages, code) = refused(packed);
+        assert_eq!(
+            messages,
+            ["deriving `Atom` for a struct of several fields is not yet supported"],
+            "why"
+        );
         assert_eq!(code, stub.to_string(), "and the stub");
     }
 
     #[test]
     fn each_shape_names_atomiks_by_the_path_stated_alone() {
-        let shapes = [quote! { struct Seq(u64); }, quote! { struct Wrap<T>(T); }];
+        let shapes = [
+            quote! { struct Seq(u64); },
+            quote! { struct Wrap<T>(T); },
+            quote! { struct Marker; },
+            quote! { struct Tag<K>(PhantomData<K>); },
+            quote! { enum Side { Bid, Ask } },
+        ];
         for shape in shapes {
             let code = written(&derive_atom(quote! { #[atom(crate = renamed)] #shape }));
             assert!(code.contains("renamed :: Atom for"), "the impl names it: {code}");

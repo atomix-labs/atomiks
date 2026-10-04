@@ -24,6 +24,15 @@ impl FieldLayout {
         self.width
     }
 
+    /// How a packed value stores a field of the integers from `start` up to `end`, of any width to
+    /// 128 bits: unsigned where none is negative and that is narrower, else two's complement.
+    #[inline]
+    #[must_use]
+    pub(crate) const fn from_signed(start: i128, end: i128) -> Self {
+        Span { start: start.cast_unsigned(), end: end.cast_unsigned(), width: u128::BITS }
+            .field_layout()
+    }
+
     /// How a packed value stores itself, whose top field, the last of nonzero width, is stored in
     /// `top` at `offset`: its bits run up to the field's end, and extend as the field's do.
     ///

@@ -7,13 +7,13 @@ use quote::ToTokens;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::{
-    Attribute, Data, DeriveInput, Error as SyntaxError, Expr, ExprPath, Field as FieldDefinition,
-    Fields, GenericArgument, GenericParam, Generics, Ident, Member, Meta, Path, PathArguments,
-    PathSegment, Token, Type, TypeGroup, TypeParen, parse2,
+    Attribute, Data, DataEnum, DeriveInput, Error as SyntaxError, Expr, ExprPath,
+    Field as FieldDefinition, Fields, GenericArgument, GenericParam, Generics, Ident, Member, Meta,
+    Path, PathArguments, PathSegment, Token, Type, TypeGroup, TypeParen, parse2,
 };
 
 use crate::errors::DeriveError;
-use crate::model::{Field, Implementor, Input, Newtype, Shape};
+use crate::model::{EnumRepr, Field, Fieldless, Implementor, Input, Newtype, Shape, ZeroWidth};
 
 /// The integer primitives `repr = …` may state.
 const INTEGERS: [&str; 12] =
@@ -27,7 +27,7 @@ pub(crate) fn input(input: TokenStream) -> Result<Input, Vec<DeriveError>> {
         })?;
     let mut errors = Vec::new();
     let (atomiks, repr) = options(&attrs, &mut errors);
-    let shape = shape(&ident, &generics, data, &mut errors);
+    let shape = shape(&ident, &generics, &attrs, repr.as_ref(), data, &mut errors);
     let implementor = Implementor { ident, generics, atomiks, repr };
     let shape = match shape {
         Some(shape) if errors.is_empty() => Ok(shape),
@@ -123,7 +123,7 @@ fn integer(key: &Meta) -> Result<Ident, DeriveError> {
     let value = value(key)?;
     if let Expr::Path(ExprPath { qself: None, path, .. }) = value
         && let Some(ident) = path.get_ident()
-        && INTEGERS.iter().any(|integer| ident == integer)
+        && is_integer(ident)
     {
         return Ok(ident.clone());
     }
@@ -134,36 +134,24 @@ fn integer(key: &Meta) -> Result<Ident, DeriveError> {
     .help("state one, such as `repr = u64`".to_owned()))
 }
 
-/// The shape of `data`, that of the type `ident` of `generics`, or `None` for a union or an enum of
-/// no variants, which have none an impl could encode. Each refusal adds an error.
+/// Whether `ident` names an integer primitive.
+fn is_integer(ident: &Ident) -> bool {
+    INTEGERS.iter().any(|integer| ident == integer)
+}
+
+/// The shape of `data`, that of the type `ident` of `generics` and `attrs`, which states `repr` in
+/// `#[atom]`; `None` for a union or an enum of no variants, which have none an impl could encode,
+/// or a fieldless enum refused. Each refusal adds an error.
 fn shape(
-    ident: &Ident, generics: &Generics, data: Data, errors: &mut Vec<DeriveError>,
+    ident: &Ident, generics: &Generics, attrs: &[Attribute], repr: Option<&Ident>, data: Data,
+    errors: &mut Vec<DeriveError>,
 ) -> Option<Shape> {
     match data {
-        Data::Struct(data) => Some(struct_shape(fields(data.fields, generics, errors))),
-        Data::Enum(data) => {
-            for variant in &data.variants {
-                refuse_atom(
-                    &variant.attrs,
-                    "a variant",
-                    "a variant's tag is its discriminant",
-                    errors,
-                );
-                variant.fields.iter().for_each(|field| refuse_atom_or_default(field, errors));
-            }
-            if data.variants.is_empty() {
-                errors.push(DeriveError::new(
-                    ident.span(),
-                    format!("`{ident}` has no variants, so no value to store"),
-                ));
-                return None;
-            }
-            Some(if data.variants.iter().all(|variant| variant.fields.is_empty()) {
-                Shape::Fieldless
-            } else {
-                Shape::EnumWithFields
-            })
+        Data::Struct(data) => {
+            let is_unit = matches!(data.fields, Fields::Unit);
+            Some(struct_shape(fields(data.fields, generics, errors), is_unit))
         },
+        Data::Enum(data) => enum_shape(ident, generics, attrs, repr, data, errors),
         Data::Union(data) => {
             errors.push(
                 DeriveError::new(
@@ -178,12 +166,17 @@ fn shape(
 }
 
 /// A struct's shape, by how many of its fields are not `PhantomData` markers: a newtype where one
-/// is, zero-width where none is, else packed.
-fn struct_shape(fields: Vec<Field>) -> Shape {
+/// is, zero-width where none is, else packed. A unit struct is zero-width.
+fn struct_shape(fields: Vec<Field>, is_unit: bool) -> Shape {
     let mut fields = fields.into_iter().peekable();
-    let markers_before = iter::from_fn(|| fields.next_if(|field| is_marker(&field.ty))).collect();
+    let markers_before: Vec<Field> =
+        iter::from_fn(|| fields.next_if(|field| is_marker(&field.ty))).collect();
     let Some(value) = fields.next() else {
-        return Shape::ZeroWidth;
+        return Shape::ZeroWidth(if is_unit {
+            ZeroWidth::Unit
+        } else {
+            ZeroWidth::Markers(markers_before)
+        });
     };
     let markers_after: Vec<Field> = fields.collect();
     if markers_after.iter().all(|field| is_marker(&field.ty)) {
@@ -191,6 +184,97 @@ fn struct_shape(fields: Vec<Field>) -> Shape {
     } else {
         Shape::Packed
     }
+}
+
+/// An enum's shape: fieldless where no variant holds a field, else payload; `None` where it has no
+/// variants, or is fieldless but refused. Each refusal adds an error.
+fn enum_shape(
+    ident: &Ident, generics: &Generics, attrs: &[Attribute], repr: Option<&Ident>, data: DataEnum,
+    errors: &mut Vec<DeriveError>,
+) -> Option<Shape> {
+    for variant in &data.variants {
+        refuse_atom(&variant.attrs, "a variant", "a variant's tag is its discriminant", errors);
+        variant.fields.iter().for_each(|field| refuse_atom_or_default(field, errors));
+    }
+    if data.variants.is_empty() {
+        errors.push(DeriveError::new(
+            ident.span(),
+            format!("`{ident}` has no variants, so no value to store"),
+        ));
+        return None;
+    }
+    if data.variants.iter().any(|variant| !variant.fields.is_empty()) {
+        return Some(Shape::EnumWithFields);
+    }
+    if !generics.params.is_empty() {
+        errors.push(
+            DeriveError::new(
+                generics.span(),
+                "a fieldless enum derives `Atom` without parameters".to_owned(),
+            )
+            .note(
+                None,
+                "no variant holds a field, so no parameter changes what is stored".to_owned(),
+            )
+            .help(
+                "remove them, or move them to a newtype of the enum and derive `Atom` for it"
+                    .to_owned(),
+            ),
+        );
+        return None;
+    }
+    let repr = enum_repr(attrs, repr, errors);
+    let variants = data.variants.into_iter().map(|variant| variant.ident).collect();
+    Some(Shape::Fieldless(Fieldless { repr, variants }))
+}
+
+/// The integer a fieldless enum's impl stores its discriminants as: the one the enum's `#[repr]`
+/// among `attrs` names, or `stated` by `#[atom]`, which must then be the same;
+/// adds an error where it is not.
+fn enum_repr(
+    attrs: &[Attribute], stated: Option<&Ident>, errors: &mut Vec<DeriveError>,
+) -> EnumRepr {
+    let named: Vec<Ident> = attrs
+        .iter()
+        .filter(|attr| attr.path().is_ident("repr"))
+        .filter_map(|attr| {
+            attr.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated).ok()
+        })
+        .flatten()
+        .filter_map(
+            |hint| if let Meta::Path(path) = hint { path.get_ident().cloned() } else { None },
+        )
+        .collect();
+    // The last integer decides, over `C` too, as it does for rustc: `#[repr(C, u8)]` stores `u8`s.
+    let integer = named.iter().rfind(|ident| is_integer(ident));
+    let c = named.iter().find(|ident| *ident == "C");
+    match (integer, c, stated) {
+        (Some(integer), _, Some(stated)) if stated != integer => {
+            let agreeing = integer.to_string();
+            errors.push(disagreement(stated, integer, &format!("a `{agreeing}`"), &agreeing));
+            EnumRepr::Integer(integer.clone())
+        },
+        (Some(integer), ..) => EnumRepr::Integer(integer.clone()),
+        // C's `int` is an `i32` on every target atomiks builds for.
+        (None, Some(c), Some(stated)) if stated != "i32" => {
+            errors.push(disagreement(stated, c, "C's `int`, an `i32`", "i32"));
+            EnumRepr::C(c.clone())
+        },
+        (None, Some(c), _) => EnumRepr::C(c.clone()),
+        (None, None, Some(stated)) => EnumRepr::Stated(stated.clone()),
+        (None, None, None) => EnumRepr::Selected,
+    }
+}
+
+/// The refusal of `stated`, the repr `#[atom]` states, beside `named`, the `#[repr]` hint that
+/// stores each discriminant as `stored_as`, which `repr = agreeing` would agree with.
+fn disagreement(stated: &Ident, named: &Ident, stored_as: &str, agreeing: &str) -> DeriveError {
+    DeriveError::new(
+        stated.span(),
+        format!("`#[atom(repr = {stated})]` disagrees with the enum's `#[repr({named})]`"),
+    )
+    .note(Some(named.span()), format!("`#[repr({named})]` stores each discriminant as {stored_as}"))
+    .help(format!("state `repr = {agreeing}`, or leave it out"))
 }
 
 /// Each of `fields`, as an impl reads it; each refusal adds an error.
@@ -309,11 +393,12 @@ fn ungrouped(ty: &Type) -> &Type {
 
 #[cfg(test)]
 mod tests {
-    use proc_macro2::{Delimiter, Group, TokenStream};
+    use proc_macro2::{Delimiter, Group, Span, TokenStream};
     use quote::{ToTokens, quote};
+    use syn::Ident;
 
     use super::input;
-    use crate::model::{Field, Input, Newtype, Shape};
+    use crate::model::{EnumRepr, Field, Fieldless, Input, Newtype, Shape, ZeroWidth};
 
     /// What `definition` reads as, which parses.
     fn read(definition: TokenStream) -> Input {
@@ -327,6 +412,38 @@ mod tests {
             Ok(shape) => panic!("a newtype, not {}", shape.noun()),
             Err(errors) => panic!("a newtype, not refused: {errors:?}"),
         }
+    }
+
+    /// The members of the markers of the zero-width struct `definition` reads as, or `None` for a
+    /// unit struct.
+    fn markers(definition: TokenStream) -> Option<Vec<String>> {
+        match read(definition).shape {
+            Ok(Shape::ZeroWidth(ZeroWidth::Unit)) => None,
+            Ok(Shape::ZeroWidth(ZeroWidth::Markers(markers))) => {
+                Some(markers.iter().map(|field| text(&field.member)).collect())
+            },
+            Ok(shape) => panic!("a zero-width struct, not {}", shape.noun()),
+            Err(errors) => panic!("a zero-width struct, not refused: {errors:?}"),
+        }
+    }
+
+    /// The fieldless enum `definition` reads as.
+    fn fieldless(definition: TokenStream) -> Fieldless {
+        match read(definition).shape {
+            Ok(Shape::Fieldless(fieldless)) => fieldless,
+            Ok(shape) => panic!("a fieldless enum, not {}", shape.noun()),
+            Err(errors) => panic!("a fieldless enum, not refused: {errors:?}"),
+        }
+    }
+
+    /// The repr the fieldless enum `definition` stores its discriminants as.
+    fn enum_repr(definition: TokenStream) -> EnumRepr {
+        fieldless(definition).repr
+    }
+
+    /// The integer primitive `name`.
+    fn integer(name: &str) -> Ident {
+        Ident::new(name, Span::call_site())
     }
 
     /// The field that holds the value of `struct Value<'a, T, const N: usize>(FIELD)`.
@@ -374,7 +491,7 @@ mod tests {
 
     #[test]
     fn each_other_shape_is_named() {
-        let zero_width = "a struct of no field but markers";
+        let zero_width = "a zero-width struct";
         assert_eq!(noun(quote! { struct Marker; }), zero_width, "a unit struct");
         assert_eq!(noun(quote! { struct Kind<K>(PhantomData<K>); }), zero_width, "a marker alone");
         assert_eq!(noun(quote! { struct Pair(u32, ()); }), "a struct of several fields", "two");
@@ -387,6 +504,97 @@ mod tests {
             noun(quote! { enum Slot { Empty, Full(u32) } }),
             "an enum with fields",
             "payload"
+        );
+    }
+
+    #[test]
+    fn a_zero_width_struct_is_a_unit_struct_or_its_markers() {
+        assert_eq!(markers(quote! { struct Marker; }), None, "a unit struct");
+        assert_eq!(markers(quote! { struct Marker {} }), Some(vec![]), "is not one with braces");
+        assert_eq!(
+            markers(quote! { struct Kind<K>(PhantomData<K>, PhantomData<fn() -> K>); }),
+            Some(vec!["0".to_owned(), "1".to_owned()]),
+            "and markers alone are each read, in order"
+        );
+    }
+
+    #[test]
+    fn a_fieldless_enum_reads_each_variant_whatever_its_discriminant() {
+        let level = fieldless(quote! { enum Level { Low = 1 << 3, High = OFFSET + 2, Next } });
+        let names: Vec<String> = level.variants.iter().map(ToString::to_string).collect();
+        assert_eq!(names, ["Low", "High", "Next"], "in declaration order");
+    }
+
+    #[test]
+    fn a_fieldless_enum_stores_the_integer_its_repr_names() {
+        assert_eq!(
+            enum_repr(quote! { #[repr(u8)] enum Side { Bid } }),
+            EnumRepr::Integer(integer("u8")),
+            "an integer"
+        );
+        assert_eq!(
+            enum_repr(quote! { #[repr(C)] enum Side { Bid } }),
+            EnumRepr::C(integer("C")),
+            "C's `int`"
+        );
+        assert_eq!(
+            enum_repr(quote! { #[repr(C, u16)] enum Side { Bid } }),
+            EnumRepr::Integer(integer("u16")),
+            "an integer over C's"
+        );
+        assert_eq!(
+            enum_repr(quote! { #[repr(u8, u16)] enum Side { Bid } }),
+            EnumRepr::Integer(integer("u16")),
+            "the last of two, as rustc reads them"
+        );
+        assert_eq!(
+            enum_repr(quote! { #[repr(align(8))] #[repr(i32)] enum Side { Bid } }),
+            EnumRepr::Integer(integer("i32")),
+            "beside other hints, in any attribute"
+        );
+        assert_eq!(
+            enum_repr(quote! { #[repr(align(8))] enum Side { Bid } }),
+            EnumRepr::Selected,
+            "and none, selected, where no hint names one"
+        );
+        assert_eq!(enum_repr(quote! { enum Side { Bid } }), EnumRepr::Selected, "or no `#[repr]`");
+    }
+
+    #[test]
+    fn a_repr_stated_beside_an_enums_must_name_its_integer() {
+        assert_eq!(
+            enum_repr(quote! { #[atom(repr = u32)] enum Side { Bid } }),
+            EnumRepr::Stated(integer("u32")),
+            "stated alone"
+        );
+        assert_eq!(
+            enum_repr(quote! { #[repr(u8)] #[atom(repr = u8)] enum Side { Bid } }),
+            EnumRepr::Integer(integer("u8")),
+            "agreeing"
+        );
+        assert_eq!(
+            enum_repr(quote! { #[repr(C)] #[atom(repr = i32)] enum Side { Bid } }),
+            EnumRepr::C(integer("C")),
+            "with C's `int`, an `i32`"
+        );
+        assert_eq!(
+            refusals(quote! { #[repr(u8)] #[atom(repr = u16)] enum Side { Bid } }),
+            ["`#[atom(repr = u16)]` disagrees with the enum's `#[repr(u8)]`"],
+            "but not disagreeing"
+        );
+        assert_eq!(
+            refusals(quote! { #[repr(C)] #[atom(repr = u32)] enum Side { Bid } }),
+            ["`#[atom(repr = u32)]` disagrees with the enum's `#[repr(C)]`"],
+            "with C's either"
+        );
+    }
+
+    #[test]
+    fn a_fieldless_enum_with_parameters_is_refused() {
+        assert_eq!(
+            refusals(quote! { enum Level<const N: usize> { Low } }),
+            ["a fieldless enum derives `Atom` without parameters"],
+            "a constant no variant holds"
         );
     }
 

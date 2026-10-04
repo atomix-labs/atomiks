@@ -4,7 +4,12 @@
 //! their bound is `const`, never `[const]`, so the call needs no `const_trait_impl` in the crate
 //! that derives.
 
+use core::any::type_name;
+
 use crate::atom::{Atom, AtomAdd, AtomBitwise, AtomOrd};
+use crate::message::{Message, refuse};
+use crate::primitive::{CompareExchange, ExactBits};
+use crate::range::ReprRange;
 pub use crate::range::{FieldLayout, NicheLayout};
 use crate::validity::{Partial, Total, TotalZeroNiche, Validity, ZeroNiche, ZeroValid};
 
@@ -57,6 +62,182 @@ pub const fn assert_atom_ord<T: AtomOrd>() {}
 #[inline]
 pub const fn assert_atom_bitwise<T: AtomBitwise>() {}
 
+/// The widest integer an atomic cell holds on this target, in bits.
+const WIDEST: u32 = if cfg!(wide) { u128::BITS } else { u64::BITS };
+
+/// A width in bits, 8 to 128, which [`SelectRepr`] maps to the unsigned integer that wide.
+#[derive(Debug)]
+pub struct Width<const BITS: u32>;
+
+/// The repr a derived value is stored as: the unsigned integer of a [`Width`], or the integer a
+/// `#[repr]` or `#[atom(repr = …)]` names.
+///
+/// Where no atomic cell on this target holds that integer, the widest one that is held, so the
+/// selection never fails and [`assert_width`] refuses the value once.
+pub impl(crate) trait SelectRepr {
+    /// The integer.
+    type Repr: const ExactBits + CompareExchange;
+}
+
+/// Implements `SelectRepr` for each width or integer, mapping it to its repr.
+macro_rules! select {
+    ($($from:ty => $repr:ty),+ $(,)?) => {$(
+        impl SelectRepr for $from {
+            type Repr = $repr;
+        }
+    )+};
+}
+
+select! {
+    Width<8> => u8, Width<16> => u16, Width<32> => u32, Width<64> => u64,
+    u8 => u8, u16 => u16, u32 => u32, u64 => u64, usize => usize,
+    i8 => i8, i16 => i16, i32 => i32, i64 => i64, isize => isize,
+}
+#[cfg(wide)]
+select!(Width<128> => u128, u128 => u128, i128 => i128);
+#[cfg(not(wide))]
+select!(u128 => u64, i128 => i64);
+
+/// The [`Width`] of the narrowest integer that holds `bits` bits: 8, 16, 32, 64 or 128.
+///
+/// Where none an atomic cell holds on this target is that wide, the widest, which [`assert_width`]
+/// refuses, so the selection itself never fails.
+#[inline]
+#[must_use]
+pub const fn narrowest_width(bits: u32) -> u32 {
+    if bits <= u8::BITS {
+        u8::BITS
+    } else if bits <= WIDEST {
+        bits.next_power_of_two()
+    } else {
+        WIDEST
+    }
+}
+
+/// Refuses the build of `T`, a value `bits` bits wide, where no integer an atomic cell holds on
+/// this target is that wide.
+///
+/// # Panics
+/// Where `bits` is past the widest such integer; in a constant, the build fails instead.
+#[inline]
+#[track_caller]
+pub const fn assert_width<T: ?Sized>(bits: u32) {
+    if bits <= WIDEST {
+        return;
+    }
+    let advice = if bits > u128::BITS {
+        " bits, but an atomic word holds at most 128: narrow a field, or split the value"
+    } else {
+        " bits, but an atomic word holds at most 64: build with `-C target-cpu=x86-64-v2` or newer for 128"
+    };
+    refuse_width::<T>(bits, &Message::new().text(advice));
+}
+
+/// Refuses the build of `T`, a value `bits` bits wide, where the integer `R` it states as its repr
+/// is narrower.
+///
+/// `R` is the integer stated, whether or not an atomic cell on this target holds it: where none
+/// does, [`assert_width`] refuses the type, and this, which reads `R`'s width alone, does not
+/// again.
+///
+/// # Panics
+/// Where `bits` is past `R`'s width; in a constant, the build fails instead.
+#[inline]
+#[track_caller]
+pub const fn assert_stated_width<T: ?Sized, R>(bits: u32) {
+    // An integer's bits are its bytes', of which it has at most 16.
+    let repr_bits = match u32::try_from(size_of::<R>()) {
+        Ok(bytes) => bytes.saturating_mul(u8::BITS),
+        Err(_never) => u32::MAX,
+    };
+    if bits <= repr_bits {
+        return;
+    }
+    let has = Message::new().text("` has ").number(u128::from(repr_bits));
+    let has = has.as_str();
+    refuse_width::<T>(
+        bits,
+        &Message::new().text(" bits, but its repr `").name(type_name::<R>(), has.len()).text(has),
+    );
+}
+
+/// Refuses the build of `T`, a value `bits` bits wide, with `advice` after the bits: "`Wide` needs
+/// 129 bits, but …".
+///
+/// Cuts `T`'s name short where the rest would not fit after it.
+#[track_caller]
+const fn refuse_width<T: ?Sized>(bits: u32, advice: &Message) -> ! {
+    let rest = Message::new().text("` needs ").number(u128::from(bits)).text(advice.as_str());
+    let rest = rest.as_str();
+    refuse(&Message::new().text("`").name(type_name::<T>(), rest.len()).text(rest))
+}
+
+/// How many bits a fieldless enum needs for its `discriminants`, read as `i128`s.
+///
+/// The width of the narrowest field that holds each, unsigned or two's complement, by which an enum
+/// without a `#[repr]` selects its repr.
+#[inline]
+#[must_use]
+pub const fn discriminant_width<const COUNT: usize>(discriminants: [i128; COUNT]) -> u32 {
+    // Zero widens neither field, unsigned or two's complement, so both extremes start there.
+    let (mut smallest, mut largest) = (0, 0);
+    let mut rest: &[i128] = &discriminants;
+    while let [discriminant, after @ ..] = rest {
+        smallest = if *discriminant < smallest { *discriminant } else { smallest };
+        largest = if *discriminant > largest { *discriminant } else { largest };
+        rest = after;
+    }
+    FieldLayout::from_signed(smallest, largest).width()
+}
+
+/// The number of a fieldless enum's validity, whose `discriminants` in its repr `R` are distinct.
+///
+/// [`Total`]'s where they are every repr, [`TotalZeroNiche`]'s every one but zero, else
+/// [`ZeroValid`]'s where one is zero and [`ZeroNiche`]'s where none is.
+#[inline]
+#[must_use]
+pub const fn discriminant_validity_code<R: const ExactBits, const COUNT: usize>(
+    discriminants: [R; COUNT],
+) -> u8 {
+    let mut zero_decodes = false;
+    let mut rest: &[R] = &discriminants;
+    while let [discriminant, after @ ..] = rest {
+        zero_decodes |= discriminant.to_bits() == 0;
+        rest = after;
+    }
+    // How many reprs `R` has, where a `usize` counts them; an enum of more variants cannot exist.
+    let reprs = 1_usize.checked_shl(R::BITS);
+    if zero_decodes {
+        if matches!(reprs, Some(reprs) if reprs == COUNT) { TOTAL } else { ZERO_VALID }
+    } else if matches!(reprs, Some(reprs) if reprs.wrapping_sub(1) == COUNT) {
+        TOTAL_ZERO_NICHE
+    } else {
+        ZERO_NICHE
+    }
+}
+
+/// The range of a fieldless enum whose discriminants in its repr `R` are `discriminants`: the
+/// narrowest that holds each, every repr but the longest run, counted round through zero, that
+/// holds none of them.
+///
+/// # Panics
+/// Where `discriminants` is empty, since a range holds at least one repr; in a constant,
+/// the build fails instead.
+#[inline]
+#[must_use]
+#[track_caller]
+pub const fn discriminant_range<R: const ExactBits, const COUNT: usize>(
+    discriminants: [R; COUNT],
+) -> ReprRange<R> {
+    let mut bits = [0; COUNT];
+    let (mut slots, mut rest): (&mut [u128], &[R]) = (&mut bits, &discriminants);
+    while let ([slot, slots_after @ ..], [discriminant, rest_after @ ..]) = (slots, rest) {
+        *slot = discriminant.to_bits();
+        (slots, rest) = (slots_after, rest_after);
+    }
+    ReprRange::enclosing(&mut bits)
+}
+
 /// A validity named by a number, which a constant computes and [`SelectValidity`] maps to the
 /// validity's type.
 #[derive(Debug)]
@@ -68,11 +249,12 @@ pub impl(crate) trait SelectValidity {
     type Validity: const Validity;
 }
 
-/// Names each validity by a number, and implements `SelectValidity` for it.
+/// Names each validity by a number, and implements `SelectValidity` for it: public where derived
+/// code names the number.
 macro_rules! validity_codes {
-    ($($name:ident = $number:literal => $validity:ident;)+) => {$(
+    ($($visibility:vis $name:ident = $number:literal => $validity:ident;)+) => {$(
         #[doc = concat!("The number of [`", stringify!($validity), "`].")]
-        pub const $name: u8 = $number;
+        $visibility const $name: u8 = $number;
 
         impl SelectValidity for ValidityCode<$number> {
             type Validity = $validity;
@@ -143,9 +325,12 @@ impl PackedValidity {
 
 #[cfg(test)]
 mod tests {
+    use core::array;
+
     use super::{
-        FieldLayout, PARTIAL, PackedValidity, SelectValidity, TOTAL, TOTAL_ZERO_NICHE,
-        ValidityCode, ZERO_NICHE, ZERO_VALID,
+        FieldLayout, PARTIAL, PackedValidity, SelectRepr, SelectValidity, TOTAL, TOTAL_ZERO_NICHE,
+        ValidityCode, Width, ZERO_NICHE, ZERO_VALID, assert_stated_width, assert_width,
+        discriminant_range, discriminant_validity_code, discriminant_width, narrowest_width,
     };
     use crate::range::ReprRange;
     use crate::validity::{Partial, Total, TotalZeroNiche, Validity, ZeroNiche, ZeroValid};
@@ -268,5 +453,116 @@ mod tests {
             ZeroNiche,
         >();
         names::<{ PackedValidity::EMPTY.with_field::<Total>(BYTE).code(8, 8) }, Total>();
+    }
+
+    /// Compiles only where `S` selects the repr `R`.
+    const fn selects<S: SelectRepr<Repr = R>, R>() {}
+
+    #[test]
+    fn a_width_selects_the_unsigned_integer_that_wide_and_an_integer_itself() {
+        selects::<Width<8>, u8>();
+        selects::<Width<16>, u16>();
+        selects::<Width<32>, u32>();
+        selects::<Width<64>, u64>();
+        selects::<i8, i8>();
+        selects::<usize, usize>();
+        selects::<isize, isize>();
+    }
+
+    #[test]
+    fn the_selected_width_is_the_narrowest_that_holds_the_bits() {
+        assert_eq!(narrowest_width(0), 8, "no bits, in a byte");
+        assert_eq!(narrowest_width(8), 8, "a byte");
+        assert_eq!(narrowest_width(9), 16, "one bit more, in two");
+        assert_eq!(narrowest_width(33), 64, "past 32, in 64");
+        assert_eq!(narrowest_width(64), 64, "64 bits");
+    }
+
+    /// The value whose width each test checks, and which a refusal names.
+    struct Wide;
+
+    #[cfg(wide)]
+    #[test]
+    fn a_target_with_128_bit_atomics_selects_and_holds_128_bits() {
+        selects::<Width<128>, u128>();
+        selects::<i128, i128>();
+        assert_eq!(narrowest_width(65), 128, "past 64, in 128");
+        assert_eq!(narrowest_width(200), 128, "and past 128, the widest, which is refused");
+        assert_width::<Wide>(128);
+    }
+
+    #[cfg(not(wide))]
+    #[test]
+    fn a_target_without_128_bit_atomics_selects_the_widest_it_holds() {
+        selects::<u128, u64>();
+        selects::<i128, i64>();
+        assert_eq!(narrowest_width(65), 64, "past 64, the widest, which is refused");
+    }
+
+    #[cfg(not(wide))]
+    #[test]
+    #[should_panic(
+        expected = "Wide` needs 65 bits, but an atomic word holds at most 64: build with `-C target-cpu=x86-64-v2` or newer for 128"
+    )]
+    fn a_value_wider_than_this_targets_atomic_words_is_refused() {
+        assert_width::<Wide>(65);
+    }
+
+    #[test]
+    #[should_panic(
+        expected = "Wide` needs 129 bits, but an atomic word holds at most 128: narrow a field, or split the value"
+    )]
+    fn a_value_wider_than_any_atomic_word_is_refused() {
+        assert_width::<Wide>(129);
+    }
+
+    #[test]
+    fn a_value_as_wide_as_its_stated_repr_is_held() {
+        assert_stated_width::<Wide, u64>(64);
+    }
+
+    #[test]
+    #[should_panic(expected = "Wide` needs 65 bits, but its repr `u64` has 64")]
+    fn a_value_wider_than_its_stated_repr_is_refused() {
+        assert_stated_width::<Wide, u64>(65);
+    }
+
+    #[test]
+    fn discriminants_need_the_narrower_of_an_unsigned_and_a_signed_field() {
+        assert_eq!(discriminant_width([0, 1]), 1, "0 and 1, unsigned");
+        assert_eq!(discriminant_width([-1, 0, 1]), 2, "-1 to 1, signed");
+        assert_eq!(discriminant_width([200, 201]), 8, "200 and 201, unsigned");
+        assert_eq!(discriminant_width([-128, 127]), 8, "a byte's signed extremes");
+        assert_eq!(discriminant_width([-129]), 9, "one below");
+        assert_eq!(discriminant_width([-5, -3]), 4, "negatives alone, signed");
+        assert_eq!(discriminant_width([0, 1 << 40]), 41, "past 32 bits");
+        assert_eq!(discriminant_width([i64::MIN.into()]), 64, "the lowest `isize`");
+        assert_eq!(discriminant_width([0]), 0, "zero alone, in no bits");
+    }
+
+    /// Every byte, as a discriminant.
+    fn every_byte() -> [u8; 256] {
+        array::from_fn(|byte| u8::try_from(byte).expect("an index below 256 is a byte"))
+    }
+
+    #[test]
+    fn discriminants_are_total_where_they_take_every_repr_and_else_say_whether_zero_decodes() {
+        assert_eq!(discriminant_validity_code(every_byte()), TOTAL, "every byte");
+        let nonzero: [u8; 255] = array::from_fn(|index| every_byte()[index + 1]);
+        assert_eq!(discriminant_validity_code(nonzero), TOTAL_ZERO_NICHE, "every byte but zero");
+        let below_the_top: [u8; 255] = array::from_fn(|index| every_byte()[index]);
+        assert_eq!(discriminant_validity_code(below_the_top), ZERO_VALID, "every byte but 255");
+        assert_eq!(discriminant_validity_code([0_u8, 1]), ZERO_VALID, "zero among a few");
+        assert_eq!(discriminant_validity_code([-1_i8, 0, 1]), ZERO_VALID, "and signed");
+        assert_eq!(discriminant_validity_code([1_u16, 2]), ZERO_NICHE, "no zero");
+        assert_eq!(discriminant_validity_code([1_u64]), ZERO_NICHE, "no zero in a wide repr");
+    }
+
+    #[test]
+    fn discriminants_take_the_narrowest_range_that_holds_their_bits() {
+        assert_eq!(discriminant_range([2_u8, 0, 1]), ReprRange::new(0, 2), "unsorted");
+        assert_eq!(discriminant_range([-1_i8, 0, 1]), ReprRange::from_signed(-1, 1), "signed");
+        assert_eq!(discriminant_range([0_u8, 255]), ReprRange::from_signed(-1, 0), "through zero");
+        assert_eq!(discriminant_range(every_byte()), ReprRange::FULL, "every byte");
     }
 }

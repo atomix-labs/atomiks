@@ -1,0 +1,12 @@
+error: `#[atom(repr = u16)]` disagrees with the enum's `#[repr(u8)]`
+ --> tests/compile_fail/derive_with_a_repr_other_than_the_enums.rs:8:15
+  |
+8 | #[atom(repr = u16)]
+  |               ^^^
+  |
+note: `#[repr(u8)]` stores each discriminant as a `u8`
+ --> tests/compile_fail/derive_with_a_repr_other_than_the_enums.rs:7:8
+  |
+7 | #[repr(u8)]
+  |        ^^
+  = help: state `repr = u8`, or leave it out

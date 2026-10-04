@@ -16,9 +16,21 @@ use proc_macro::{Diagnostic, Level, Span, TokenStream};
 
 /// Derives `Atom`, so that an `Atomic` holds the type.
 ///
-/// So far it derives for a newtype, a struct of one field beside any `PhantomData` markers, whose
-/// repr, range, validity and conversions are that field's. A crate that derives it for a type with
-/// a parameter in that field enables `#![feature(const_trait_impl)]`; any other needs no feature.
+/// So far it derives for three shapes:
+///
+/// - **A newtype**, a struct of one field beside any `PhantomData` markers: its repr, range,
+///   validity and conversions are that field's.
+/// - **A zero-width struct**, a unit struct or one of markers alone: its one value is zero, in a
+///   `u8`.
+/// - **A fieldless enum** without parameters: each variant is its discriminant, exactly as rustc
+///   evaluates it, in the integer its `#[repr]` names, C's `int` for `#[repr(C)]`, which must hold
+///   each, or else the narrowest unsigned integer that holds each, sign-extended where one is
+///   negative. Its validity says which reprs the discriminants take: `Total` where they are every
+///   one, `TotalZeroNiche` every one but zero, else `ZeroValid` or `ZeroNiche` as zero is one or
+///   not.
+///
+/// A crate that derives it for a newtype with a parameter in its field enables
+/// `#![feature(const_trait_impl)]`; any other needs no feature.
 ///
 /// An `Atomic` may cross threads, so the type must be `Send` and `Sync`: checked beside the impl,
 /// or bounded where it has parameters, so `Wrap<*mut u8>` is refused, as is a type whose negative
@@ -27,7 +39,9 @@ use proc_macro::{Diagnostic, Level, Span, TokenStream};
 /// are checked.
 ///
 /// `#[atom(crate = path)]` names atomiks where `::atomiks` does not, and `#[atom(repr = u64)]`
-/// states the repr, which the field's must be.
+/// states the repr: a newtype's field must have it, a zero-width struct or a fieldless enum without
+/// a `#[repr]` takes it, and an enum's `#[repr]` must name it. A 128-bit repr is refused on a
+/// target without 128-bit atomics.
 #[proc_macro_derive(Atom, attributes(atom))]
 #[allow_internal_unstable(const_trait_impl)]
 pub fn derive_atom(input: TokenStream) -> TokenStream {

@@ -213,6 +213,17 @@ fn a_span_packs_into_the_narrower_of_unsigned_and_signed() {
 }
 
 #[test]
+fn a_signed_span_of_any_width_packs_into_the_narrowest_field_that_holds_its_ends() {
+    let ends = [i128::from(i64::MIN), -256, -129, -128, -2, -1, 0, 1, 127, 128, 255, 256];
+    for (index, &start) in ends.iter().enumerate() {
+        for &end in &ends[index..] {
+            let narrowest = layout_by_search(&[start.cast_unsigned(), end.cast_unsigned()], 128);
+            assert_eq!(FieldLayout::from_signed(start, end), narrowest, "{start} to {end}");
+        }
+    }
+}
+
+#[test]
 fn none_takes_the_repr_each_rule_names() {
     assert_eq!(ReprRange::<u8>::new(0, 1).spare_for_none(), Some(2), "from zero: after the end");
     assert_eq!(ReprRange::<u8>::new(200, 201).spare_for_none(), Some(199), "a tie: before");

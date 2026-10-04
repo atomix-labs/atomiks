@@ -152,11 +152,10 @@ impl<R: Primitive> ReprRange<R> {
     /// # Panics
     /// Where `bits` is empty, since a range holds at least one repr; in a constant, the build fails
     /// instead.
-    #[doc(hidden)]
     #[inline]
     #[must_use]
     #[track_caller]
-    pub const fn enclosing(bits: &mut [u128]) -> Self {
+    pub(crate) const fn enclosing(bits: &mut [u128]) -> Self {
         let Some(span) = Span::enclosing(bits, R::BITS) else {
             refuse_call::<R>(
                 &Message::new().text("enclosing(&mut [])"),
