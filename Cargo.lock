@@ -17,6 +17,7 @@ version = "0.1.0"
 dependencies = [
  "atomiks-core",
  "atomiks-derive",
+ "proptest",
  "trybuild",
 ]
 

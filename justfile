@@ -33,27 +33,28 @@ check-targets:
     RUSTFLAGS='-C target-cpu=x86-64-v2' cargo clippy --workspace --all-targets --all-features --target x86_64-unknown-linux-gnu --target-dir target/x86-64-v2 -- -D warnings
     RUSTFLAGS='-C target-cpu=x86-64' cargo clippy --workspace --all-targets --all-features --target x86_64-unknown-linux-gnu --target-dir target/x86-64 -- -D warnings
 
-# Checks the codegen fixture's formatting, which `cargo fmt --all` misses: it is its own workspace.
+# Checks the codegen fixtures' formatting, which `cargo fmt --all` misses: each is its own workspace.
 [metadata("rust")]
 check-codegen-fmt:
-    rustfmt --check crates/atomiks-core/tests/codegen/src/lib.rs
+    rustfmt --check crates/atomiks-core/tests/codegen/src/lib.rs crates/atomiks/tests/codegen/src/lib.rs
 
-# Formats the codegen fixture.
+# Formats the codegen fixtures.
 fix-codegen-fmt:
-    rustfmt crates/atomiks-core/tests/codegen/src/lib.rs
+    rustfmt crates/atomiks-core/tests/codegen/src/lib.rs crates/atomiks/tests/codegen/src/lib.rs
 
 # macOS's aarch64 floor has LSE2, whose 128-bit load is `ldp`; Linux's floor reads with a
 # compare-exchange. x86_64's floor has AVX; x86-64-v2's 128-bit load is a compare-exchange. x86_64
 # macOS builds as x86_64 Linux does.
 
-# Runs the tests under Miri on aarch64 Linux and macOS, and on x86_64 with the floor and x86-64-v2.
+# Runs every feature's tests under Miri on aarch64 Linux and macOS, and on x86_64 with the floor and
+# x86-64-v2.
 [metadata("rust")]
 nightly-miri:
     rustup component add miri
-    {{ miri }} cargo miri test --workspace --target aarch64-unknown-linux-gnu
-    {{ miri }} cargo miri test --workspace --target aarch64-apple-darwin
-    {{ miri }} cargo miri test --workspace --target x86_64-unknown-linux-gnu
-    {{ miri }} RUSTFLAGS='-C target-cpu=x86-64-v2' cargo miri test --workspace --target x86_64-unknown-linux-gnu --target-dir target/miri-x86-64-v2
+    {{ miri }} cargo miri test --workspace --all-features --target aarch64-unknown-linux-gnu
+    {{ miri }} cargo miri test --workspace --all-features --target aarch64-apple-darwin
+    {{ miri }} cargo miri test --workspace --all-features --target x86_64-unknown-linux-gnu
+    {{ miri }} RUSTFLAGS='-C target-cpu=x86-64-v2' cargo miri test --workspace --all-features --target x86_64-unknown-linux-gnu --target-dir target/miri-x86-64-v2
 
 # >>> devset: just >>>
 # Each active profile's recipes.
