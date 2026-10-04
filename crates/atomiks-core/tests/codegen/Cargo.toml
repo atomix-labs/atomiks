@@ -10,7 +10,9 @@ aarch64-only    = []
 aarch64-refused = []
 
 [dependencies]
+# external
+deranged = { version = "0.5.8", default-features = false }
 # internal
-atomiks-core = { path = "../.." }
+atomiks-core = { path = "../..", features = ["deranged-05"] }
 
 [workspace]

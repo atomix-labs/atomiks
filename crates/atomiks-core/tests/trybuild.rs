@@ -35,6 +35,9 @@ mod tests {
         if cfg!(feature = "arbitrary-int") {
             cases.compile_fail("tests/compile_fail/arbitrary_int/*.rs");
         }
+        if cfg!(feature = "deranged-05") {
+            cases.compile_fail("tests/compile_fail/deranged/*.rs");
+        }
         if cfg!(feature = "zerocopy-08") {
             cases.compile_fail("tests/compile_fail/zerocopy/*.rs");
         }

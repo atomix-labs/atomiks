@@ -4,6 +4,7 @@
 //! the test that `x86_64` refuses each; the `aarch64-refused` feature adds a probe of each
 //! capability `aarch64` Linux's floor lacks for 128 bits (load, store, exchange, maximum), for the
 //! tests that it refuses them and that macOS's floor, with LSE2, refuses the exchange and maximum.
+//! atomiks-core's `deranged-05` feature is always on, for the probes of its conversions.
 //!
 //! The empty `[workspace]` in its manifest makes it a workspace of its own: the repository's does
 //! not list it, and the test builds it alone.
@@ -18,7 +19,11 @@ use atomiks_core::AtomicI64;
 #[cfg(any(target_arch = "aarch64", target_feature = "cmpxchg16b"))]
 use atomiks_core::AtomicU128;
 use atomiks_core::ordering::{AcqRel, Acquire, Relaxed, Release, SeqCst, StoreStore};
-use atomiks_core::{Atomic, AtomicBool, AtomicPtr, AtomicU64, RangedU64, compiler_fence, fence};
+use atomiks_core::{
+    Atomic, AtomicBool, AtomicPtr, AtomicU64, RangedI16, RangedU32, RangedU64, compiler_fence,
+    fence,
+};
+use deranged::{RangedI16 as DerangedI16, RangedU32 as DerangedU32};
 
 #[unsafe(no_mangle)]
 pub fn u64_load(atomic: &AtomicU64) -> u64 {
@@ -169,6 +174,19 @@ pub fn ranged_load(atomic: &Atomic<RangedU64<3>>) -> RangedU64<3> {
 #[unsafe(no_mangle)]
 pub fn ranged_below_min(value: RangedU64<3>) -> bool {
     value.get() < 3
+}
+
+/// Converts to deranged's ranged integer of the same bounds: the saturation never moves the
+/// integer, which LLVM knows from the range `get` tells it.
+#[unsafe(no_mangle)]
+pub fn ranged_to_deranged(value: RangedU32<3, 100>) -> DerangedU32<3, 100> {
+    value.into()
+}
+
+/// Converts back from deranged's, for a signed integer.
+#[unsafe(no_mangle)]
+pub fn ranged_from_deranged(value: DerangedI16<-5, 5>) -> RangedI16<-5, 5> {
+    value.into()
 }
 
 #[cfg(any(target_feature = "avx", target_feature = "lse2", feature = "aarch64-refused"))]

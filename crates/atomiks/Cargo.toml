@@ -12,13 +12,22 @@ repository.workspace   = true
 ignored-paths = ["tests/compile_fail/*.rs", "tests/compile_pass/*.rs"]
 
 [package.metadata.docs.rs]
-features = ["arbitrary", "arbitrary-int", "bytemuck", "derive", "serde", "zerocopy-08"]
+features = [
+    "arbitrary",
+    "arbitrary-int",
+    "bytemuck",
+    "deranged-05",
+    "derive",
+    "serde",
+    "zerocopy-08",
+]
 
 [features]
 default       = []
 arbitrary     = ["atomiks-core/arbitrary"]
 arbitrary-int = ["atomiks-core/arbitrary-int"]
 bytemuck      = ["atomiks-core/bytemuck"]
+deranged-05   = ["atomiks-core/deranged-05"]
 derive        = ["dep:atomiks-derive"]
 loom          = ["atomiks-core/loom"]
 serde         = ["atomiks-core/serde"]
@@ -37,6 +46,7 @@ atomiks-derive = { path = "macros/derive", version = "=0.1.0", optional = true }
 arbitrary     = { workspace = true }
 arbitrary-int = { workspace = true }
 bytemuck      = { workspace = true, features = ["derive"] }
+deranged      = { workspace = true }
 proptest      = { workspace = true }
 serde         = { workspace = true, features = ["derive"] }
 serde_json    = { workspace = true }

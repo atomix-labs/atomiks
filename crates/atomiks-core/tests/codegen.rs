@@ -4,7 +4,8 @@
 //! with LSE2 too. Each operation is the instructions and barriers its name promises, with no
 //! compare-exchange loop but `update`'s, and each target refuses each operation it lacks: `x86_64`
 //! those only `aarch64` has, and `aarch64` each 128-bit one it has no instruction for. A ranged
-//! integer's range reaches LLVM, so a comparison outside it folds to a constant.
+//! integer's range reaches LLVM, so a comparison outside it folds to a constant, and a conversion
+//! to or from deranged's of the same bounds, which saturates, is a move at most.
 
 // Miri cannot run the compiler, and loom's atomics are not what ships.
 #![cfg(on_hardware)]
@@ -52,6 +53,8 @@ mod tests {
         ("release_fence", Only(&["dmb ish", "ret"])),
         ("seq_cst_fence", Only(&["dmb ish", "ret"])),
         ("ranged_below_min", Only(&["mov", "ret"])),
+        ("ranged_to_deranged", Only(&["ret"])),
+        ("ranged_from_deranged", Only(&["ret"])),
     ];
 
     /// The rest on `aarch64` with the `+lse` floor, which has no LSE2.
@@ -117,6 +120,8 @@ mod tests {
         ("release_fence", Only(&["retq"])),
         ("seq_cst_fence", Only(&["lock orl", "retq"])),
         ("ranged_below_min", Only(&["xorl", "retq"])),
+        ("ranged_to_deranged", Only(&["movl", "retq"])),
+        ("ranged_from_deranged", Only(&["movl", "retq"])),
     ];
 
     #[test]

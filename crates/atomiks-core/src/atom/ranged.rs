@@ -10,16 +10,23 @@ use crate::ranged::{
 use crate::ranged::{RangedI128, RangedU128};
 use crate::validity::Partial;
 
-/// Implements `Atom` and `AtomOrd` for each ranged integer, its range built by `$constructor`, the
-/// `ReprRange` constructor in the integer's own order: `new` unsigned, `from_signed` signed.
+/// Implements `Atom` and `AtomOrd` for each ranged integer `$name`, its range built by
+/// `$constructor`, the `ReprRange` constructor in the integer's own order: `new` unsigned,
+/// `from_signed` signed.
+///
+/// `$name` is the type of that name where the macro is called: atomiks' own here, and deranged's in
+/// `interop/deranged.rs`. Each keeps its integer from `MIN` to `MAX`, and has `new`,
+/// `new_unchecked` and `get` alike.
 ///
 /// Neither `AtomAdd` nor `AtomBitwise`: a sum or an or of two values in the range can leave it.
-macro_rules! ranged {
+macro_rules! ranged_atom {
     ($($constructor:ident: $($name:ident($int:ident)),+);+ $(;)?) => {$($(
-        // SAFETY: the repr is the integer, from `MIN` to `MAX`, so within `REPRS`, which holds the
-        // bits of each integer from `MIN` to `MAX` in its own order, signed or unsigned; `new`
-        // decodes exactly those, each as itself, by the repr alone, and `new_unchecked` builds the
-        // same value from each; `Partial` promises nothing; an integer may cross threads.
+        /// Stored as its integer, from `MIN` to `MAX`.
+        // SAFETY: the repr is the integer, which the type keeps from `MIN` to `MAX`, so within
+        // `REPRS`, which holds the bits of each integer from `MIN` to `MAX` in its own order, signed
+        // or unsigned; `new` decodes exactly those, each as itself, by the repr alone, and
+        // `new_unchecked` builds the same value from each; `Partial` promises nothing; an integer
+        // may cross threads.
         #[expect(unsafe_code, reason = "an `Atom` impl promises what loads rely on")]
         const unsafe impl<const MIN: $int, const MAX: $int> Atom for $name<MIN, MAX> {
             type Repr = $int;
@@ -41,18 +48,23 @@ macro_rules! ranged {
                 unsafe { Self::new_unchecked(repr) }
             }
         }
+
+        /// Ordered as its integer.
         impl<const MIN: $int, const MAX: $int> AtomOrd for $name<MIN, MAX> {}
     )+)+};
 }
 
-ranged! {
+#[cfg(feature = "deranged-05")]
+pub(crate) use ranged_atom;
+
+ranged_atom! {
     new: RangedU8(u8), RangedU16(u16), RangedU32(u32), RangedU64(u64), RangedUsize(usize);
     from_signed: RangedI8(i8), RangedI16(i16), RangedI32(i32), RangedI64(i64), RangedIsize(isize);
 }
 
 // The 128-bit ones, where a 16-byte compare-exchange exists, as `u128` and `i128`.
 #[cfg(wide)]
-ranged! {
+ranged_atom! {
     new: RangedU128(u128);
     from_signed: RangedI128(i128);
 }
