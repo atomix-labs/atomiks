@@ -7,7 +7,9 @@ extern crate alloc;
 use alloc::vec::Vec;
 use alloc::{format, vec};
 
-use super::{FieldLayout, NicheLayout, ReprRange, Span, mask, sign_extend};
+use super::{
+    FieldLayout, NicheLayout, PackedField, PackedLayout, ReprRange, Span, mask, sign_extend,
+};
 
 /// The span `start..=end` of `width`-bit numbers, whose bounds the caller keeps within the width.
 const fn span(start: u128, end: u128, width: u32) -> Span {
@@ -208,7 +210,7 @@ fn a_span_packs_into_the_narrower_of_unsigned_and_signed() {
     assert_eq!(byte(200, 201), signed(7), "200 and 201, -56 and -55 as two's complement");
     assert_eq!(byte(0x80, 0xFF), unsigned(8), "-128 to -1, unsigned on a tie");
     assert_eq!(byte(100, 0), unsigned(8), "through zero and through 127 to -128, every bit");
-    let signs = ReprRange::<i8>::from_signed(-1, 1).field_layout();
+    let signs = ReprRange::<i8>::from_signed(-1, 1).span().field_layout();
     assert_eq!(signs, signed(2), "and a range's, as its span's");
 }
 
@@ -448,13 +450,13 @@ fn every_field_reads_back_what_it_holds_at_any_offset() {
 
 #[test]
 fn a_field_reads_back_to_its_primitive() {
-    let signs = ReprRange::<i8>::from_signed(-1, 1).field_layout();
+    let signs = ReprRange::<i8>::from_signed(-1, 1).span().field_layout();
     let packed = signs.pack(0xFF, 6);
     assert_eq!(packed, 0b1100_0000, "-1 packs into its two bits");
     assert_eq!(signs.unpack(packed, 6, 8), 0xFF, "and reads back as an `i8`'s -1");
     assert_eq!(signs.unpack(packed, 6, 16), 0xFFFF, "or an `i16`'s");
     assert!(signs.holds(0xFF, 8) && !signs.holds(0x02, 8), "it holds -1, not 2");
-    let side = ReprRange::<u8>::new(0, 1).field_layout();
+    let side = ReprRange::<u8>::new(0, 1).span().field_layout();
     assert_eq!(side.unpack(0b10, 1, 8), 1, "an unsigned field reads back zero-extended");
     assert!(!side.holds(0xFF, 8), "and holds no bit above its own");
 }
@@ -608,7 +610,7 @@ const FIELD_WIDTHS: &[u32] = if cfg!(miri) { &[1, 2] } else { &[1, 2, 3, 4] };
 /// exactly those, or their hull where the field wraps both ways below the value's top.
 fn packs_as_top_field(field: Span, offset: u32, width: u32) {
     let layout = field.field_layout();
-    let value_layout = FieldLayout::from_top_field(layout, offset);
+    let value_layout = FieldLayout::from_top_field(PackedField { reprs: field, layout, offset });
     let below = 0..=mask(offset);
     let mut packed: Vec<u128> = numbers(field)
         .into_iter()
@@ -638,8 +640,8 @@ fn a_top_field_gives_its_value_exactly_the_patterns_it_packs() {
         let largest = mask(field_width);
         for field in (0..=largest).flat_map(|start| (0..=largest).map(move |end| (start, end))) {
             let field = span(field.0, field.1, field_width);
-            for offset in 0..=3 {
-                let end = FieldLayout::from_top_field(field.field_layout(), offset).width;
+            for offset in 0..=3_u32 {
+                let end = offset.wrapping_add(field.field_layout().width);
                 for width in [end.max(1), 8] {
                     packs_as_top_field(field, offset, width);
                 }
@@ -651,21 +653,54 @@ fn a_top_field_gives_its_value_exactly_the_patterns_it_packs() {
 #[test]
 fn a_packed_value_takes_its_range_from_its_top_field() {
     let side = ReprRange::<u8>::new(0, 1);
-    let quote = ReprRange::<u64>::from_top_field(side, 32);
+    let quote = ReprRange::<u64>::from_top_field(PackedField::new(side, 32));
     assert_eq!(quote, ReprRange::new(0, (1 << 33) - 1), "unsigned: zeros above the field");
-    let signs = ReprRange::<i8>::from_signed(-1, 1);
-    let signed = ReprRange::<u16>::from_top_field(signs, 4);
+    let signs = PackedField::new(ReprRange::<i8>::from_signed(-1, 1), 4);
+    let signed = ReprRange::<u16>::from_top_field(signs);
     assert_eq!(signed, ReprRange::from_signed(-16, 31), "signed: its top bit above it");
     let offsets = ReprRange::<i8>::from_signed(-3, -1);
-    let negative = ReprRange::<u8>::from_top_field(offsets, 5);
+    let negative = ReprRange::<u8>::from_top_field(PackedField::new(offsets, 5));
     assert_eq!(negative, ReprRange::from_signed(-96, -1), "all negative: it does not wrap");
     let both_ways = ReprRange::<u8>::from_bounds(100, 0);
-    let hull = ReprRange::<u16>::from_top_field(both_ways, 4);
+    let hull = ReprRange::<u16>::from_top_field(PackedField::new(both_ways, 4));
     assert_eq!(hull, ReprRange::new(0, 0xFFF), "wrapping both ways: the hull");
-    let exact = ReprRange::<u16>::from_top_field(both_ways, 8);
+    let exact = ReprRange::<u16>::from_top_field(PackedField::new(both_ways, 8));
     assert_eq!(exact.span(), span(100 << 8, 0xFF, 16), "at the top bit: it wraps as the field");
-    let layout = FieldLayout::from_top_field(signs.field_layout(), 4);
+    let layout = FieldLayout::from_top_field(signs);
     assert_eq!(layout, FieldLayout { width: 6, signed: true }, "and its layout, the field's end");
+}
+
+/// A byte, as a field.
+const BYTE: ReprRange<u8> = ReprRange::FULL;
+/// -1 to 1, as a field: two bits, signed.
+const SIGNS: ReprRange<i8> = ReprRange::from_signed(-1, 1);
+/// Zero alone, as a field: no bits.
+const NOTHING: ReprRange<u8> = ReprRange::new(0, 0);
+
+#[test]
+fn each_field_lies_where_the_one_before_it_ends() {
+    let length = PackedField::new(BYTE, 0);
+    let sign = PackedField::new(SIGNS, length.next_offset());
+    assert_eq!((length.next_offset(), sign.next_offset()), (8, 10), "a byte, then two bits");
+    assert_eq!(sign.pack(0xFF), 0b11 << 8, "-1 in its two bits");
+    assert_eq!(sign.unpack(0b11 << 8 | 0x55), 0xFF, "and read back as an `i8`'s, beside a byte");
+    let nothing = PackedField::new(NOTHING, 10);
+    assert_eq!(nothing.next_offset(), 10, "and a field of no bits takes none");
+}
+
+#[test]
+fn a_packed_value_extends_its_last_field_of_any_bits() {
+    let length = PackedField::new(BYTE, 0);
+    let sign = PackedField::new(SIGNS, length.next_offset());
+    let step = PackedLayout::new(&[length, sign, PackedField::new(NOTHING, sign.next_offset())]);
+    assert_eq!(step.width(), 10, "ten bits, the field of none above taking no more");
+    assert_eq!(step.range::<u16>(), ReprRange::from_signed(-256, 511), "the sign's, extended");
+    assert_eq!(step.repr::<u16>(0b11 << 8 | 5), 0xFF05, "-1 extends to the top");
+    assert_eq!(step.canonical_bits(0xFF05_u16), Some(0xFF05), "which is canonical");
+    assert_eq!(step.canonical_bits(0x0705_u16), None, "but bits that do not extend it are not");
+    let markers = PackedLayout::new(&[PackedField::new(NOTHING, 0), PackedField::new(NOTHING, 0)]);
+    assert_eq!(markers.width(), 0, "fields of no bits take none");
+    assert_eq!(markers.range::<u8>(), ReprRange::new(0, 0), "and leave zero alone");
 }
 
 /// The reprs `units` unit variants take beside `payload`, whose numbers' extremes are

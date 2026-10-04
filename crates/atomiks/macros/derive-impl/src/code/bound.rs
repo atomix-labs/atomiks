@@ -12,13 +12,21 @@ use crate::model::{Field, Implementor};
 pub(crate) fn where_clause<I: IntoIterator<Item = TokenStream>>(
     implementor: &Implementor, predicates: I,
 ) -> Option<TokenStream> {
-    let own = implementor.generics.where_clause.iter().flat_map(|clause| &clause.predicates);
     // A derived `Copy` bounds each parameter by `Copy`, so a generic type is `Copy`, as `Atom`
     // asks, only where it says so.
     let copy =
         (!implementor.generics.params.is_empty()).then(|| quote!(Self: ::core::marker::Copy));
+    own_where_clause(implementor, copy.into_iter().chain(predicates))
+}
+
+/// The where clause of an item beside the impl, which names no `Self`: the type's own predicates,
+/// then `predicates`; none where that is nothing.
+pub(crate) fn own_where_clause<I: IntoIterator<Item = TokenStream>>(
+    implementor: &Implementor, predicates: I,
+) -> Option<TokenStream> {
+    let own = implementor.generics.where_clause.iter().flat_map(|clause| &clause.predicates);
     let predicates: Vec<TokenStream> =
-        own.map(ToTokens::to_token_stream).chain(copy).chain(predicates).collect();
+        own.map(ToTokens::to_token_stream).chain(predicates).collect();
     (!predicates.is_empty()).then(|| quote!(where #(#predicates),*))
 }
 

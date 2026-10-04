@@ -8,11 +8,13 @@ mod bound;
 mod field;
 mod fieldless;
 mod newtype;
+mod packed;
 mod repr;
 mod stub;
 mod zero_width;
 
 pub(crate) use self::fieldless::fieldless;
 pub(crate) use self::newtype::{capability, newtype};
+pub(crate) use self::packed::packed;
 pub(crate) use self::stub::stub;
 pub(crate) use self::zero_width::zero_width;

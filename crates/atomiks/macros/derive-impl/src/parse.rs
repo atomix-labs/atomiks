@@ -141,7 +141,7 @@ fn is_integer(ident: &Ident) -> bool {
 
 /// The shape of `data`, that of the type `ident` of `generics` and `attrs`, which states `repr` in
 /// `#[atom]`; `None` for a union or an enum of no variants, which have none an impl could encode,
-/// or a fieldless enum refused. Each refusal adds an error.
+/// or a fieldless enum or a packed struct refused. Each refusal adds an error.
 fn shape(
     ident: &Ident, generics: &Generics, attrs: &[Attribute], repr: Option<&Ident>, data: Data,
     errors: &mut Vec<DeriveError>,
@@ -149,7 +149,27 @@ fn shape(
     match data {
         Data::Struct(data) => {
             let is_unit = matches!(data.fields, Fields::Unit);
-            Some(struct_shape(fields(data.fields, generics, errors), is_unit))
+            let shape = struct_shape(fields(data.fields, generics, errors), is_unit);
+            if matches!(shape, Shape::Packed(_)) && !generics.params.is_empty() && repr.is_none() {
+                errors.push(
+                    DeriveError::new(
+                        generics.span(),
+                        "a struct of several fields derives `Atom` with parameters only where it states its repr"
+                            .to_owned(),
+                    )
+                    .note(
+                        None,
+                        "each instance lays its fields out by their reprs, so how many bits it needs is known only once they are"
+                            .to_owned(),
+                    )
+                    .help(
+                        "state a repr every instance fits, such as `#[atom(repr = u64)]`, which each one is checked against as it is built"
+                            .to_owned(),
+                    ),
+                );
+                return None;
+            }
+            Some(shape)
         },
         Data::Enum(data) => enum_shape(ident, generics, attrs, repr, data, errors),
         Data::Union(data) => {
@@ -165,9 +185,12 @@ fn shape(
     }
 }
 
-/// A struct's shape, by how many of its fields are not `PhantomData` markers: a newtype where one
-/// is, zero-width where none is, else packed. A unit struct is zero-width.
+/// A struct's shape, by how many of its fields are not `PhantomData` markers: packed where several
+/// are, a newtype where one is, zero-width where none is. A unit struct is zero-width.
 fn struct_shape(fields: Vec<Field>, is_unit: bool) -> Shape {
+    if fields.iter().filter(|field| !is_marker(&field.ty)).count() > 1 {
+        return Shape::Packed(fields);
+    }
     let mut fields = fields.into_iter().peekable();
     let markers_before: Vec<Field> =
         iter::from_fn(|| fields.next_if(|field| is_marker(&field.ty))).collect();
@@ -178,12 +201,7 @@ fn struct_shape(fields: Vec<Field>, is_unit: bool) -> Shape {
             ZeroWidth::Markers(markers_before)
         });
     };
-    let markers_after: Vec<Field> = fields.collect();
-    if markers_after.iter().all(|field| is_marker(&field.ty)) {
-        Shape::Newtype(Newtype { markers_before, value, markers_after })
-    } else {
-        Shape::Packed
-    }
+    Shape::Newtype(Newtype { markers_before, value, markers_after: fields.collect() })
 }
 
 /// An enum's shape: fieldless where no variant holds a field, else payload; `None` where it has no
@@ -515,6 +533,41 @@ mod tests {
             markers(quote! { struct Kind<K>(PhantomData<K>, PhantomData<fn() -> K>); }),
             Some(vec!["0".to_owned(), "1".to_owned()]),
             "and markers alone are each read, in order"
+        );
+    }
+
+    /// The members of the fields of the packed struct `definition` reads as.
+    fn packed(definition: TokenStream) -> Vec<String> {
+        match read(definition).shape {
+            Ok(Shape::Packed(fields)) => fields.iter().map(|field| text(&field.member)).collect(),
+            Ok(shape) => panic!("a struct of several fields, not {}", shape.noun()),
+            Err(errors) => panic!("a struct of several fields, not refused: {errors:?}"),
+        }
+    }
+
+    #[test]
+    fn a_struct_of_several_fields_reads_its_markers_too_in_order() {
+        assert_eq!(
+            packed(quote! { struct Quote { qty: u32, kind: PhantomData<Venue>, live: bool } }),
+            ["qty", "kind", "live"],
+            "by name"
+        );
+        assert_eq!(packed(quote! { struct Pair(u32, ()); }), ["0", "1"], "or by position");
+    }
+
+    #[test]
+    fn a_struct_of_several_fields_with_parameters_states_its_repr() {
+        assert_eq!(
+            refusals(quote! { struct Pair<A, B> { first: A, second: B } }),
+            [
+                "a struct of several fields derives `Atom` with parameters only where it states its repr"
+            ],
+            "with none stated"
+        );
+        assert_eq!(
+            packed(quote! { #[atom(repr = u64)] struct Pair<A, B> { first: A, second: B } }),
+            ["first", "second"],
+            "but read where it does"
         );
     }
 

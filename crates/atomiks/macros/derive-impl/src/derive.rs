@@ -77,10 +77,13 @@ pub fn expand_atom(input: TokenStream, def_site: Span) -> Expansion {
         Ok(Shape::ZeroWidth(zero_width)) => {
             Expansion::written(code::zero_width(&implementor, &zero_width, def_site))
         },
+        Ok(Shape::Packed(fields)) => {
+            Expansion::written(code::packed(&implementor, &fields, def_site))
+        },
         Ok(Shape::Fieldless(fieldless)) => {
             Expansion::written(code::fieldless(&implementor, &fieldless, def_site))
         },
-        Ok(shape @ (Shape::Packed | Shape::EnumWithFields)) => Expansion::refused(
+        Ok(shape @ Shape::EnumWithFields) => Expansion::refused(
             vec![not_yet_supported(&implementor, &shape)],
             code::stub(&implementor),
         ),
@@ -112,7 +115,8 @@ fn not_yet_supported(implementor: &Implementor, shape: &Shape) -> DeriveError {
     )
     .note(
         None,
-        "so far it derives for a newtype, a zero-width struct and a fieldless enum".to_owned(),
+        "so far it derives for a newtype, a zero-width struct, a struct of several fields and a fieldless enum"
+            .to_owned(),
     )
 }
 
@@ -437,10 +441,158 @@ mod tests {
     }
 
     #[test]
+    fn a_packed_struct_places_each_field_where_the_one_before_it_ends() {
+        let expected = quote! {
+            const _: () = ::atomiks::__private::assert_send_and_sync::<Step>();
+            const _: () = {
+                const placement_0: ::atomiks::__private::PackedField =
+                    ::atomiks::__private::PackedField::new(<u8 as ::atomiks::Atom>::REPRS, 0);
+                const placement_1: ::atomiks::__private::PackedField =
+                    ::atomiks::__private::PackedField::new(<Sign as ::atomiks::Atom>::REPRS, placement_0.next_offset());
+                const layout: ::atomiks::__private::PackedLayout =
+                    ::atomiks::__private::PackedLayout::new(&[placement_0, placement_1]);
+                type Repr = <
+                    ::atomiks::__private::Width<{ ::atomiks::__private::narrowest_width(layout.width()) }>
+                    as ::atomiks::__private::SelectRepr
+                >::Repr;
+                const _: () = ::atomiks::__private::assert_width::<Step>(layout.width());
+                #[automatically_derived]
+                const unsafe impl ::atomiks::Atom for Step {
+                    type Repr = Repr;
+                    type Validity = <
+                        ::atomiks::__private::ValidityCode<{
+                            ::atomiks::__private::PackedValidity::EMPTY
+                                .with_field::<<u8 as ::atomiks::Atom>::Validity>(placement_0.layout())
+                                .with_field::<<Sign as ::atomiks::Atom>::Validity>(placement_1.layout())
+                                .code(layout.width(), <Repr as ::atomiks::Primitive>::BITS)
+                        }>
+                        as ::atomiks::__private::SelectValidity
+                    >::Validity;
+                    const REPRS: ::atomiks::ReprRange<Repr> = layout.range();
+                    #[inline]
+                    fn to_repr(self) -> Repr {
+                        layout.repr(
+                            placement_0.pack(::atomiks::__private::to_bits::<u8>(self.length))
+                                | placement_1.pack(::atomiks::__private::to_bits::<Sign>(self.sign))
+                        )
+                    }
+                    #[inline]
+                    fn from_repr(repr: Repr) -> ::core::option::Option<Self> {
+                        match layout.canonical_bits(repr) {
+                            ::core::option::Option::Some(bits) => match (
+                                ::atomiks::__private::from_bits::<u8>(placement_0.unpack(bits)),
+                                ::atomiks::__private::from_bits::<Sign>(placement_1.unpack(bits)),
+                            ) {
+                                (
+                                    ::core::option::Option::Some(value_0),
+                                    ::core::option::Option::Some(value_1),
+                                ) => ::core::option::Option::Some(Self { length: value_0, sign: value_1 }),
+                                _ => ::core::option::Option::None,
+                            },
+                            ::core::option::Option::None => ::core::option::Option::None,
+                        }
+                    }
+                    #[inline]
+                    unsafe fn from_repr_unchecked(repr: Repr) -> Self {
+                        let bits = ::atomiks::__private::to_bits(repr);
+                        Self {
+                            length: unsafe {
+                                ::atomiks::__private::from_bits_unchecked::<u8>(placement_0.unpack(bits))
+                            },
+                            sign: unsafe {
+                                ::atomiks::__private::from_bits_unchecked::<Sign>(placement_1.unpack(bits))
+                            }
+                        }
+                    }
+                }
+            };
+        };
+        let step = derive_atom(quote! { struct Step { length: u8, sign: Sign } });
+        assert_eq!(written(&step), expected.to_string(), "the impl");
+    }
+
+    #[test]
+    fn a_packed_struct_is_checked_against_the_repr_it_states() {
+        let stated = quote! {
+            type Repr = <::core::primitive::u32 as ::atomiks::__private::SelectRepr>::Repr;
+            const _: () = ::atomiks::__private::assert_width::<Quote>(::core::primitive::u32::BITS);
+            const _: () =
+                ::atomiks::__private::assert_stated_width::<Quote, ::core::primitive::u32>(layout.width());
+        };
+        let quote =
+            derive_atom(quote! { #[atom(repr = u32)] struct Quote { qty: u8, live: bool } });
+        let code = written(&quote);
+        assert!(code.contains(&stated.to_string()), "checked: {code}");
+    }
+
+    #[test]
+    fn a_packed_tuple_struct_is_built_by_position() {
+        let code = written(&derive_atom(quote! { struct Pair(u8, bool); }));
+        let built = quote!(Self(value_0, value_1)).to_string();
+        assert!(code.contains(&built), "built by position: {code}");
+    }
+
+    #[test]
+    fn a_generic_packed_struct_lays_out_each_instance_in_the_repr_it_states() {
+        let layout = quote! {
+            const fn lay_out<A, B>(_: ::core::marker::PhantomData<Pair<A, B> >) -> (
+                [::atomiks::__private::PackedField; 3], ::atomiks::__private::PackedLayout
+            )
+            where
+                A: ::atomiks::Atom,
+                B: ::atomiks::Atom
+            {
+                let placement_0 = ::atomiks::__private::PackedField::new(<A as ::atomiks::Atom>::REPRS, 0);
+                let placement_1 = ::atomiks::__private::PackedField::new(<u8 as ::atomiks::Atom>::REPRS, placement_0.next_offset());
+                let placement_2 = ::atomiks::__private::PackedField::new(<B as ::atomiks::Atom>::REPRS, placement_1.next_offset());
+                let layout = ::atomiks::__private::PackedLayout::new(&[placement_0, placement_1, placement_2]);
+                ::atomiks::__private::assert_stated_width::<Pair<A, B>, ::core::primitive::u64>(
+                    layout.width()
+                );
+                ([placement_0, placement_1, placement_2], layout)
+            }
+        };
+        let bounds = quote! {
+            where
+                Self: ::core::marker::Copy,
+                A: [const] ::atomiks::Atom<Repr: [const] ::atomiks::__private::FieldRepr>,
+                B: [const] ::atomiks::Atom<Repr: [const] ::atomiks::__private::FieldRepr>,
+                Self: ::core::marker::Send + ::core::marker::Sync
+        };
+        let validity = quote! {
+            type Validity =
+                <<A as ::atomiks::Atom>::Validity as ::atomiks::validity::Validity>::ZeroValidityWith<
+                    <<u8 as ::atomiks::Atom>::Validity as ::atomiks::validity::Validity>::ZeroValidityWith<
+                        <<B as ::atomiks::Atom>::Validity as ::atomiks::validity::Validity>::ZeroValidityWith<
+                            ::atomiks::validity::ZeroValid
+                        >
+                    >
+                >;
+        };
+        let bound = quote! {
+            let ([placement_0, placement_1, placement_2], layout) =
+                const { lay_out(::core::marker::PhantomData::<Self>) };
+        };
+        let pair = derive_atom(quote! {
+            #[atom(repr = u64)]
+            struct Pair<A, B> { first: A, tag: u8, second: B }
+        });
+        let code = written(&pair);
+        let check = quote!(
+            const _: () = ::atomiks::__private::assert_send_and_sync::<u8>();
+        );
+        assert!(code.starts_with(&check.to_string()), "the concrete field checked: {code}");
+        assert!(code.contains(&layout.to_string()), "laid out for each instance: {code}");
+        assert!(code.contains(&bounds.to_string()), "each generic field bounded: {code}");
+        assert!(code.contains(&validity.to_string()), "zero valid where each field is: {code}");
+        assert!(code.contains(&bound.to_string()), "and each conversion reaches it: {code}");
+    }
+
+    #[test]
     fn a_shape_not_yet_supported_is_refused_beside_a_stub() {
         let stub = quote! {
             #[automatically_derived]
-            const unsafe impl ::atomiks::Atom for Quote
+            const unsafe impl ::atomiks::Atom for Slot
             where
                 Self: ::core::marker::Copy,
             {
@@ -456,11 +608,11 @@ mod tests {
                 }
             }
         };
-        let packed = derive_atom(quote! { struct Quote { qty: u32, live: bool } });
-        let (messages, code) = refused(packed);
+        let payload = derive_atom(quote! { enum Slot { Empty, Full(u32) } });
+        let (messages, code) = refused(payload);
         assert_eq!(
             messages,
-            ["deriving `Atom` for a struct of several fields is not yet supported"],
+            ["deriving `Atom` for an enum with fields is not yet supported"],
             "why"
         );
         assert_eq!(code, stub.to_string(), "and the stub");
@@ -474,6 +626,8 @@ mod tests {
             quote! { struct Marker; },
             quote! { struct Tag<K>(PhantomData<K>); },
             quote! { enum Side { Bid, Ask } },
+            quote! { #[atom(repr = u16)] struct Step { length: u8, sign: Sign } },
+            quote! { #[atom(repr = u64)] struct Pair<A, B> { first: A, second: B } },
         ];
         for shape in shapes {
             let code = written(&derive_atom(quote! { #[atom(crate = renamed)] #shape }));

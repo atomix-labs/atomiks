@@ -16,12 +16,19 @@ use proc_macro::{Diagnostic, Level, Span, TokenStream};
 
 /// Derives `Atom`, so that an `Atomic` holds the type.
 ///
-/// So far it derives for three shapes:
+/// So far it derives for four shapes:
 ///
 /// - **A newtype**, a struct of one field beside any `PhantomData` markers: its repr, range,
 ///   validity and conversions are that field's.
 /// - **A zero-width struct**, a unit struct or one of markers alone: its one value is zero, in a
 ///   `u8`.
+/// - **A struct of several fields**: each field takes bits of its own, from bit 0 in declaration
+///   order, as few as its reprs need, two's complement where that is fewer; the bits above extend
+///   the last field of any bits, so a signed one's sign fills them. Its repr is the narrowest
+///   unsigned integer that holds them, and its validity what its fields promise of their bits. With
+///   parameters, it states its repr, which each instance is checked against as it is built, and
+///   promises only that zero decodes, where each field's does. A field stored as a pointer is
+///   refused.
 /// - **A fieldless enum** without parameters: each variant is its discriminant, exactly as rustc
 ///   evaluates it, in the integer its `#[repr]` names, C's `int` for `#[repr(C)]`, which must hold
 ///   each, or else the narrowest unsigned integer that holds each, sign-extended where one is
@@ -29,8 +36,11 @@ use proc_macro::{Diagnostic, Level, Span, TokenStream};
 ///   one, `TotalZeroNiche` every one but zero, else `ZeroValid` or `ZeroNiche` as zero is one or
 ///   not.
 ///
-/// A crate that derives it for a newtype with a parameter in its field enables
-/// `#![feature(const_trait_impl)]`; any other needs no feature.
+/// A crate enables `#![feature(const_trait_impl)]` where the impl converts a field that names one
+/// of the type's parameters, a lifetime too: a newtype's field that holds the value, or any field
+/// of a struct of several fields, a `PhantomData` among them. Every other field converts through
+/// functions bounded `const`, so a newtype whose markers alone name its parameters, a zero-width
+/// struct, or a type whose `const` parameter no field names needs no gate.
 ///
 /// An `Atomic` may cross threads, so the type must be `Send` and `Sync`: checked beside the impl,
 /// or bounded where it has parameters, so `Wrap<*mut u8>` is refused, as is a type whose negative
@@ -39,9 +49,9 @@ use proc_macro::{Diagnostic, Level, Span, TokenStream};
 /// are checked.
 ///
 /// `#[atom(crate = path)]` names atomiks where `::atomiks` does not, and `#[atom(repr = u64)]`
-/// states the repr: a newtype's field must have it, a zero-width struct or a fieldless enum without
-/// a `#[repr]` takes it, and an enum's `#[repr]` must name it. A 128-bit repr is refused on a
-/// target without 128-bit atomics.
+/// states the repr: a newtype's field must have it, a zero-width struct, a struct of several fields
+/// that fit it or a fieldless enum without a `#[repr]` takes it, and an enum's `#[repr]` must name
+/// it. A 128-bit repr is refused on a target without 128-bit atomics.
 #[proc_macro_derive(Atom, attributes(atom))]
 #[allow_internal_unstable(const_trait_impl)]
 pub fn derive_atom(input: TokenStream) -> TokenStream {

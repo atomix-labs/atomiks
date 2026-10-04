@@ -1,15 +1,7 @@
-error: deriving `Atom` for a struct of several fields is not yet supported
- --> tests/compile_fail/derive_on_a_shape_not_yet_supported.rs:7:8
-  |
-7 | struct Quote {
-  |        ^^^^^
-  |
-  = note: so far it derives for a newtype, a zero-width struct and a fieldless enum
-
 error: deriving `Atom` for an enum with fields is not yet supported
-  --> tests/compile_fail/derive_on_a_shape_not_yet_supported.rs:13:6
-   |
-13 | enum Slot {
-   |      ^^^^
-   |
-   = note: so far it derives for a newtype, a zero-width struct and a fieldless enum
+ --> tests/compile_fail/derive_on_a_shape_not_yet_supported.rs:7:6
+  |
+7 | enum Slot {
+  |      ^^^^
+  |
+  = note: so far it derives for a newtype, a zero-width struct, a struct of several fields and a fieldless enum

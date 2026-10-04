@@ -8,9 +8,9 @@ use core::any::type_name;
 
 use crate::atom::{Atom, AtomAdd, AtomBitwise, AtomOrd};
 use crate::message::{Message, refuse};
-use crate::primitive::{CompareExchange, ExactBits};
-use crate::range::ReprRange;
-pub use crate::range::{FieldLayout, NicheLayout};
+use crate::primitive::{CompareExchange, ExactBits, Primitive};
+use crate::range::{FieldLayout, ReprRange};
+pub use crate::range::{NicheLayout, PackedField, PackedLayout};
 use crate::validity::{Partial, Total, TotalZeroNiche, Validity, ZeroNiche, ZeroValid};
 
 /// `value`'s repr: [`Atom::to_repr`].
@@ -37,6 +37,48 @@ pub const fn from_repr<T: const Atom>(repr: T::Repr) -> Option<T> {
 pub const unsafe fn from_repr_unchecked<T: const Atom>(repr: T::Repr) -> T {
     // SAFETY: the caller's repr decodes.
     unsafe { T::from_repr_unchecked(repr) }
+}
+
+/// A repr a packed value stores a field as: one whose bits are its whole value, never a pointer,
+/// whose bits do not hold its provenance.
+#[diagnostic::on_unimplemented(
+    message = "a field stored as `{Self}` cannot be packed beside others",
+    label = "a pointer, whose bits do not hold its provenance",
+    note = "a newtype, a struct of one field beside any `PhantomData` markers, stores a pointer"
+)]
+pub impl(crate) const trait FieldRepr: [const] ExactBits {}
+
+#[diagnostic::do_not_recommend]
+const impl<R: [const] ExactBits> FieldRepr for R {}
+
+/// The unsigned bits of `value`'s repr, as a packed value stores its field of `F`.
+///
+/// `F`'s repr must be a [`FieldRepr`]; the decodes need no more than a [`Primitive`], so a field
+/// stored as a pointer is refused here alone.
+#[inline]
+#[must_use]
+pub const fn to_bits<F: const Atom<Repr: const FieldRepr>>(value: F) -> u128 {
+    value.to_repr().to_bits()
+}
+
+/// The value whose repr's unsigned bits are `bits`, or `None` where that repr does not decode: a
+/// packed value's field of `F`, read back.
+#[inline]
+#[must_use]
+pub const fn from_bits<F: const Atom>(bits: u128) -> Option<F> {
+    F::from_repr(Primitive::from_bits(bits))
+}
+
+/// The value whose repr's unsigned bits are `bits`, without the check: [`from_bits`].
+///
+/// # Safety
+/// The repr decodes: `from_bits::<F>(bits)` is `Some`.
+#[expect(unsafe_code, reason = "forwards `Atom::from_repr_unchecked`, and its contract")]
+#[inline]
+#[must_use]
+pub const unsafe fn from_bits_unchecked<F: const Atom>(bits: u128) -> F {
+    // SAFETY: the caller's bits are a repr that decodes.
+    unsafe { F::from_repr_unchecked(Primitive::from_bits(bits)) }
 }
 
 /// Compiles only where `T` is `Send` and `Sync`, as a derived value must be, or each marker beside
@@ -326,19 +368,33 @@ impl PackedValidity {
 #[cfg(test)]
 mod tests {
     use core::array;
+    use core::num::NonZero;
 
     use super::{
-        FieldLayout, PARTIAL, PackedValidity, SelectRepr, SelectValidity, TOTAL, TOTAL_ZERO_NICHE,
-        ValidityCode, Width, ZERO_NICHE, ZERO_VALID, assert_stated_width, assert_width,
-        discriminant_range, discriminant_validity_code, discriminant_width, narrowest_width,
+        FieldLayout, PARTIAL, PackedField, PackedValidity, SelectRepr, SelectValidity, TOTAL,
+        TOTAL_ZERO_NICHE, ValidityCode, Width, ZERO_NICHE, ZERO_VALID, assert_stated_width,
+        assert_width, discriminant_range, discriminant_validity_code, discriminant_width,
+        from_bits, from_bits_unchecked, narrowest_width, to_bits,
     };
     use crate::range::ReprRange;
     use crate::validity::{Partial, Total, TotalZeroNiche, Validity, ZeroNiche, ZeroValid};
 
+    #[test]
+    fn a_fields_bits_are_its_reprs_and_decode_as_it_does() {
+        assert_eq!(to_bits(-1_i8), 0xFF, "an `i8`'s -1, unsigned");
+        assert_eq!(to_bits(NonZero::<u16>::MAX), 0xFFFF, "a `NonZero`'s, its integer's");
+        assert_eq!(from_bits::<NonZero<u8>>(7), NonZero::new(7), "a repr that decodes");
+        assert_eq!(from_bits::<NonZero<u8>>(0), None, "and not one that does not");
+        // SAFETY: 7 is a `NonZero<u8>`'s repr.
+        #[expect(unsafe_code, reason = "the unchecked decode under test")]
+        let seven = unsafe { from_bits_unchecked::<NonZero<u8>>(7) };
+        assert_eq!(Some(seven), NonZero::new(7), "alike unchecked");
+    }
+
     /// How a field of eight bits is stored.
-    const BYTE: FieldLayout = ReprRange::<u8>::FULL.field_layout();
+    const BYTE: FieldLayout = PackedField::new(ReprRange::<u8>::FULL, 0).layout();
     /// How a field of no bits, whose one repr is zero, is stored.
-    const NO_BITS: FieldLayout = ReprRange::<u8>::new(0, 0).field_layout();
+    const NO_BITS: FieldLayout = PackedField::new(ReprRange::<u8>::new(0, 0), 0).layout();
 
     /// Compiles only where `ValidityCode<CODE>` names `V`.
     const fn names<const CODE: u8, V: Validity>()

@@ -3,6 +3,7 @@
 
 use core::fmt::Debug;
 
+use atomiks_core::__private::{PackedField, PackedLayout};
 use atomiks_core::validity::Validity;
 use atomiks_core::{Atom, Primitive, ReprRange};
 
@@ -11,7 +12,7 @@ pub(crate) const fn repr_and_validity_are<T: Atom<Repr = R, Validity = V>, R, V:
 
 /// How many bits a packed value takes for a field of `reprs`.
 pub(crate) fn field_width<R: Primitive>(reprs: ReprRange<R>) -> u32 {
-    reprs.field_layout().width()
+    PackedLayout::new(&[PackedField::new(reprs, 0)]).width()
 }
 
 /// Checks that `T` decodes each of `reprs` as the one of `values` whose repr it is, alike
@@ -28,6 +29,25 @@ where
         assert_eq!(T::from_repr(repr), expected, "{repr:?} decodes as the value it is, alone");
         assert_eq!(decoded_unchecked::<T>(repr), expected, "{repr:?} decodes alike unchecked");
     }
+}
+
+/// Checks that `T` decodes exactly `count` of `reprs`, its values' number, each as a value that
+/// encodes to it, alike unchecked: every other repr is refused.
+pub(crate) fn decodes_exactly_its_values<T, R>(reprs: R, count: usize)
+where
+    T: Atom + PartialEq + Debug,
+    R: IntoIterator<Item = T::Repr>,
+    T::Repr: PartialEq + Debug,
+{
+    let mut decoded = Vec::new();
+    for repr in reprs {
+        if let Some(value) = T::from_repr(repr) {
+            assert_eq!(value.to_repr(), repr, "{repr:?} decodes as a value that encodes to it");
+            assert_eq!(decoded_unchecked::<T>(repr), Some(value), "and decodes alike unchecked");
+            decoded.push(value);
+        }
+    }
+    assert_eq!(decoded.len(), count, "one repr decodes for each value");
 }
 
 /// The value `repr` decodes as without the check, where it decodes with it; else `None`.

@@ -37,8 +37,8 @@ pub(crate) enum Shape {
     Newtype(Newtype),
     /// A unit struct, or one of markers alone.
     ZeroWidth(ZeroWidth),
-    /// Several fields that hold a value, as a struct packs them.
-    Packed,
+    /// Several fields that hold a value, each in declaration order, as a struct packs them.
+    Packed(Vec<Field>),
     /// Variants that hold no fields.
     Fieldless(Fieldless),
     /// Variants, one of them at least holding fields.
@@ -51,7 +51,7 @@ impl Shape {
         match self {
             Self::Newtype(_) => "a newtype",
             Self::ZeroWidth(_) => "a zero-width struct",
-            Self::Packed => "a struct of several fields",
+            Self::Packed(_) => "a struct of several fields",
             Self::Fieldless(_) => "a fieldless enum",
             Self::EnumWithFields => "an enum with fields",
         }

@@ -7,7 +7,8 @@ use core::any::type_name;
 use core::fmt;
 use core::marker::PhantomData;
 
-pub use self::layout::{FieldLayout, NicheLayout};
+pub(crate) use self::layout::FieldLayout;
+pub use self::layout::{NicheLayout, PackedField, PackedLayout};
 use crate::message::{Message, refuse};
 use crate::primitive::Primitive;
 
@@ -130,16 +131,6 @@ impl<R: Primitive> ReprRange<R> {
         self.span().contains(bits)
     }
 
-    /// How a packed value stores a field of this range: unsigned, or two's complement where that is
-    /// narrower, unsigned on a tie; the repr's whole width where the range wraps both through zero
-    /// and through the signed numbers' ends.
-    #[doc(hidden)]
-    #[inline]
-    #[must_use]
-    pub const fn field_layout(self) -> FieldLayout {
-        self.span().field_layout()
-    }
-
     /// The narrowest range that holds each of `bits`, reprs as unsigned bits, such as an enum's
     /// discriminants: every repr of `R` but the longest run, counted round through zero, that holds
     /// none of them.
@@ -165,24 +156,23 @@ impl<R: Primitive> ReprRange<R> {
         Self::from_bounds(span.start, span.end)
     }
 
-    /// The range of a packed value, of repr `R`, whose top field holds the reprs of `field` at
-    /// `offset`, beside any bits below it.
+    /// The range of a packed value, of repr `R`, whose top field is `top`, beside any bits below
+    /// it.
     ///
     /// Named for the one field that decides it, the last of nonzero width: the fields below it fill
     /// the low bits, and a range, which has no holes, holds their every pattern, so the value's
-    /// range is the field's moved up to `offset`, its low bits all clear at its start and all set
-    /// at its end. Above the field, the value's bits extend it as its [`FieldLayout`] reads it
+    /// range is the field's moved up to its offset, its low bits all clear at its start and all
+    /// set at its end. Above the field, the value's bits extend it as its [`FieldLayout`] reads it
     /// back: with zeros, or with copies of its top bit where it is signed, so the range may wrap.
     ///
     /// Where the field wraps both through zero and through the signed numbers' ends, it takes its
     /// repr's every bit, and the range is every repr up to the field's end; at `R`'s top bit that
     /// is exact, and the range wraps as the field does. Bits past `R`'s width are dropped, not
     /// refused: the derive refuses a value wider than its repr where it checks the width, once.
-    #[doc(hidden)]
     #[inline]
     #[must_use]
-    pub const fn from_top_field<F: Primitive>(field: ReprRange<F>, offset: u32) -> Self {
-        let span = Span::from_top_field(field.span(), offset, R::BITS);
+    const fn from_top_field(top: PackedField) -> Self {
+        let span = Span::from_top_field(top.reprs, top.offset, R::BITS);
         Self::from_bounds(span.start, span.end)
     }
 
@@ -394,7 +384,9 @@ impl Span {
         Some(if goes_above { (above, after_end) } else { (below, below.start) })
     }
 
-    /// How a packed value stores a field of the span's numbers, as [`ReprRange::field_layout`].
+    /// How a packed value stores a field of the span's numbers: unsigned, or two's complement where
+    /// that is narrower, unsigned on a tie; the whole width where the span wraps both through zero
+    /// and through the signed numbers' ends.
     #[inline]
     #[must_use]
     const fn field_layout(self) -> FieldLayout {

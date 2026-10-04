@@ -14,9 +14,8 @@ pub(crate) fn selected_from(atomiks: &Path, integer: &Ident) -> TokenStream {
     quote!(<::core::primitive::#integer as #atomiks::__private::SelectRepr>::Repr)
 }
 
-/// A constant that refuses `implementor`'s type where no atomic cell on the target holds
-/// `integer`, which a `#[repr]` or `#[atom(repr = …)]` names: a 128-bit one without 128-bit
-/// atomics.
+/// A constant that refuses `implementor`'s type where no atomic cell on the target holds `integer`,
+/// which a `#[repr]` or `#[atom(repr = …)]` names: a 128-bit one without 128-bit atomics.
 ///
 /// It names the type, or the integer where the type has parameters, which no constant beside the
 /// impl can name.
@@ -37,22 +36,36 @@ pub(crate) fn narrowest(atomiks: &Path, width: &TokenStream) -> TokenStream {
     quote!(<#private::Width<{ #private::narrowest_width(#width) }> as #private::SelectRepr>::Repr)
 }
 
+/// A constant that refuses `ty`, a value `width` bits wide, a constant expression, where no atomic
+/// word on the target holds it: located at `ty`, the type's name.
+pub(crate) fn width_check(atomiks: &Path, ty: &Ident, width: &TokenStream) -> TokenStream {
+    let check = quote!(const _: () = #atomiks::__private::assert_width::<#ty>(#width););
+    located_at(check, ty.span())
+}
+
 /// A constant that refuses `ty`, a value `width` bits wide, a constant expression, where the
 /// integer `integer`, which `stated` names in an attribute, is narrower.
-///
-/// It names the integer stated, not the repr selected from it, so where no atomic cell on the
-/// target holds the integer, [`integer_check`] alone refuses it.
 pub(crate) fn stated_width_check(
     atomiks: &Path, ty: &Ident, integer: &TokenStream, stated: &Ident, width: &TokenStream,
 ) -> TokenStream {
-    let check = quote! {
-        const _: () = #atomiks::__private::assert_stated_width::<#ty, #integer>(#width);
-    };
-    located_at(check, stated.span())
+    let assertion = stated_width_assertion(atomiks, ty, integer, stated, width);
+    quote!(const _: () = #assertion;)
+}
+
+/// The call of [`stated_width_check`], for `ty`, a type or an instance of one, whose width only an
+/// instance knows: located at `stated`.
+///
+/// It names the integer stated, not the repr selected from it, so where no atomic cell on the
+/// target holds the integer, [`integer_check`] alone refuses it.
+pub(crate) fn stated_width_assertion<T: ToTokens>(
+    atomiks: &Path, ty: &T, integer: &TokenStream, stated: &Ident, width: &TokenStream,
+) -> TokenStream {
+    let assertion = quote!(#atomiks::__private::assert_stated_width::<#ty, #integer>(#width));
+    located_at(assertion, stated.span())
 }
 
 /// `tokens`, each located at `span`, where an error they raise points, but resolved where it was.
-fn located_at(tokens: TokenStream, span: Span) -> TokenStream {
+pub(super) fn located_at(tokens: TokenStream, span: Span) -> TokenStream {
     tokens
         .into_iter()
         .map(|mut token| {
