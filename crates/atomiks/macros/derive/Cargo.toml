@@ -17,3 +17,7 @@ proc-macro = true
 [dependencies]
 # internal
 atomiks-derive-impl = { path = "../derive-impl", version = "=0.1.0" }
+
+[dev-dependencies]
+# internal
+atomiks-core = { workspace = true }

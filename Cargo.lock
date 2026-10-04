@@ -37,6 +37,7 @@ dependencies = [
 name = "atomiks-derive"
 version = "0.1.0"
 dependencies = [
+ "atomiks-core",
  "atomiks-derive-impl",
 ]
 
