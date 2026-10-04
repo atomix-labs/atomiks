@@ -18,10 +18,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3d036a3c4ab069c7b410a2ce876bd74808d2d0888a82667669f8e783a898bf1"
 
 [[package]]
+name = "arbitrary-int"
+version = "2.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0ab387a0c4143b4fd3804e193946e78c8ab16cf26c5fde2048e4ac3d618c3b64"
+
+[[package]]
 name = "atomiks"
 version = "0.1.0"
 dependencies = [
  "arbitrary",
+ "arbitrary-int",
  "atomiks-core",
  "atomiks-derive",
  "bytemuck",
@@ -37,6 +44,7 @@ name = "atomiks-core"
 version = "0.1.0"
 dependencies = [
  "arbitrary",
+ "arbitrary-int",
  "bytemuck",
  "cfg_aliases",
  "loom",

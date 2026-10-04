@@ -25,11 +25,11 @@ mod tests {
     use atomiks_core::ordering::Relaxed;
     use atomiks_core::validity::{Partial, Total, TotalZeroNiche, ZeroValid};
     use atomiks_core::{
-        Atom, AtomOrd, ExactBits, Primitive, RangedI8, RangedI16, RangedI32, RangedI64,
-        RangedIsize, RangedU8, RangedU16, RangedU32, RangedU64, RangedUsize,
+        Atom, ExactBits, Primitive, RangedI8, RangedI16, RangedI32, RangedI64, RangedIsize,
+        RangedU8, RangedU16, RangedU32, RangedU64, RangedUsize,
     };
     #[cfg(target_arch = "aarch64")]
-    use atomiks_core::{Atomic, Load, MinMax};
+    use atomiks_core::{AtomOrd, Atomic, Load, MinMax};
     #[cfg(wide)]
     use atomiks_core::{RangedI128, RangedU128};
     use proptest::prelude::prop_oneof;
@@ -38,7 +38,7 @@ mod tests {
 
     use crate::testing::law::{
         assert_holds, canonical, decodes_as_promised, edge_or_random_bits, edges, none_laws,
-        none_takes_a_spare_repr, round_trips,
+        none_takes_a_spare_repr, ranged_integer_laws, reprs_order_as_ord, round_trips,
     };
 
     /// The last scalar value, and the first and last surrogates.
@@ -71,16 +71,6 @@ mod tests {
         prop_assert!(T::REPRS.contains(unsigned), "the bits {unsigned:#x} lie in {:?}", T::REPRS);
         prop_assert_eq!(from_bits(repr).to_repr(), repr, "the repr is the bits");
         decodes_as_promised::<Total, T>(repr)
-    }
-
-    /// The order law for `a` and `b`: the reprs' own order is the values'.
-    fn reprs_order_as_ord<T: AtomOrd + Debug>(a: T, b: T) -> Result<(), TestCaseError>
-    where
-        T::Repr: Ord,
-    {
-        let (values, reprs) = (a.cmp(&b), a.to_repr().cmp(&b.to_repr()));
-        prop_assert_eq!(reprs, values, "{:?} and {:?} order as their reprs do", a, b);
-        Ok(())
     }
 
     /// The order law for `a` and `b` through the atomic maximum and minimum, which compare reprs:
@@ -144,31 +134,6 @@ mod tests {
         Ok(())
     }
 
-    /// The ranged integer laws for the low bits of `bits` as `T`'s repr: it decodes, as the integer
-    /// it is, exactly where it lies in `T`'s range, alike unchecked; and where the low bits of
-    /// `other` decode too, the two order as their reprs.
-    fn ranged_integer_laws<T>(bits: u128, other: u128) -> Result<(), TestCaseError>
-    where
-        T: AtomOrd<Validity = Partial> + Into<T::Repr> + Debug,
-        T::Repr: ExactBits + Ord + Debug,
-    {
-        let [repr, other] = [bits, other].map(<T::Repr as Primitive>::from_bits);
-        let decoded = T::from_repr(repr);
-        prop_assert_eq!(
-            decoded.map(Into::into),
-            T::REPRS.contains(repr.to_bits()).then_some(repr),
-            "{:?} decodes as itself exactly where it lies in {:?}",
-            repr,
-            T::REPRS
-        );
-        decodes_as_promised::<Partial, T>(repr)?;
-        if let (Some(a), Some(b)) = (decoded, T::from_repr(other)) {
-            round_trips(a)?;
-            reprs_order_as_ord(a, b)?;
-        }
-        Ok(())
-    }
-
     /// The atomic order law for the low bits of `bits` and `other` as `T`'s reprs, where both
     /// decode.
     #[cfg(target_arch = "aarch64")]
@@ -190,7 +155,7 @@ mod tests {
     /// reprs, and on `aarch64` the atomic order law.
     macro_rules! ranged_laws {
         ($bits:expr, $other:expr; $($ranged:ty),+ $(,)?) => {$(
-            ranged_integer_laws::<$ranged>($bits, $other)?;
+            ranged_integer_laws::<Partial, $ranged>($bits, $other)?;
             #[cfg(target_arch = "aarch64")]
             ranged_atomics_order_as_ord::<$ranged>($bits, $other)?;
         )+};
@@ -231,9 +196,9 @@ mod tests {
     #[cfg(wide)]
     fn wide_laws(bits: u128, other: u128) -> Result<(), TestCaseError> {
         integer_laws!(bits, other; u128, i128);
-        ranged_integer_laws::<RangedU128<1>>(bits, other)?;
-        ranged_integer_laws::<RangedI128<{ i128::MIN }, -1>>(bits, other)?;
-        ranged_integer_laws::<RangedI128<-5, 5>>(bits, other)?;
+        ranged_integer_laws::<Partial, RangedU128<1>>(bits, other)?;
+        ranged_integer_laws::<Partial, RangedI128<{ i128::MIN }, -1>>(bits, other)?;
+        ranged_integer_laws::<Partial, RangedI128<-5, 5>>(bits, other)?;
         keeps_every_bit(bits, f128::from_bits)
     }
 

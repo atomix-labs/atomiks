@@ -21,13 +21,14 @@
 //!
 //! None is on by default.
 //!
-//! | Feature       | Adds                                                                       |
-//! | ------------- | -------------------------------------------------------------------------- |
-//! | `arbitrary`   | `Arbitrary`: an atomic as its value, and a ranged integer inside its range |
-//! | `bytemuck`    | an atomic's `Zeroable`, off under loom, and a ranged integer's byte traits |
-//! | `loom`        | loom's types under `--cfg loom`; nothing without the cfg                   |
-//! | `serde`       | serde: an atomic by a `Relaxed` load; a ranged integer, held to its range  |
-//! | `zerocopy-08` | an atomic's zerocopy traits: its cell's, never `Immutable`; off under loom |
+//! | Feature         | Adds                                                                       |
+//! | --------------- | -------------------------------------------------------------------------- |
+//! | `arbitrary`     | `Arbitrary`: an atomic as its value, and a ranged integer inside its range |
+//! | `arbitrary-int` | `Atom` and `AtomOrd` for arbitrary-int's integers, as their base integer   |
+//! | `bytemuck`      | an atomic's `Zeroable`, off under loom, and a ranged integer's byte traits |
+//! | `loom`          | loom's types under `--cfg loom`; nothing without the cfg                   |
+//! | `serde`         | serde: an atomic by a `Relaxed` load; a ranged integer, held to its range  |
+//! | `zerocopy-08`   | an atomic's zerocopy traits: its cell's, never `Immutable`; off under loom |
 
 #![no_std]
 #![feature(

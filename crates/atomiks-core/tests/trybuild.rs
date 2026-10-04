@@ -32,6 +32,9 @@ mod tests {
         // post-monomorphization errors show.
         cases.pass("tests/compile_pass/*.rs");
         cases.compile_fail("tests/compile_fail/*.rs");
+        if cfg!(feature = "arbitrary-int") {
+            cases.compile_fail("tests/compile_fail/arbitrary_int/*.rs");
+        }
         if cfg!(feature = "zerocopy-08") {
             cases.compile_fail("tests/compile_fail/zerocopy/*.rs");
         }
