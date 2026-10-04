@@ -12,6 +12,7 @@ repository   = "https://github.com/atomix-labs/atomiks"
 
 [workspace.dependencies]
 # external
+arbitrary          = { version = "1.4.2", default-features = false }
 bytemuck           = { version = "1.25.2", default-features = false }
 cfg_aliases        = { version = "0.2.2" }
 loom               = { version = "0.7" }

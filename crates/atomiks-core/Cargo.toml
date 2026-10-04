@@ -12,10 +12,11 @@ repository.workspace   = true
 ignored-paths = ["tests/compile_fail/**/*.rs", "tests/compile_pass/*.rs"]
 
 [package.metadata.docs.rs]
-features = ["bytemuck", "serde", "zerocopy-08"]
+features = ["arbitrary", "bytemuck", "serde", "zerocopy-08"]
 
 [features]
 default     = []
+arbitrary   = ["dep:arbitrary"]
 bytemuck    = ["dep:bytemuck"]
 loom        = ["dep:loom", "dep:tracing", "dep:tracing-subscriber"]
 serde       = ["dep:serde_core"]
@@ -26,6 +27,7 @@ workspace = true
 
 [dependencies]
 # external
+arbitrary  = { workspace = true, optional = true }
 bytemuck   = { workspace = true, optional = true }
 serde_core = { workspace = true, optional = true }
 

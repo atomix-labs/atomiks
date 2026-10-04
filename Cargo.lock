@@ -12,9 +12,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "arbitrary"
+version = "1.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c3d036a3c4ab069c7b410a2ce876bd74808d2d0888a82667669f8e783a898bf1"
+
+[[package]]
 name = "atomiks"
 version = "0.1.0"
 dependencies = [
+ "arbitrary",
  "atomiks-core",
  "atomiks-derive",
  "bytemuck",
@@ -29,6 +36,7 @@ dependencies = [
 name = "atomiks-core"
 version = "0.1.0"
 dependencies = [
+ "arbitrary",
  "bytemuck",
  "cfg_aliases",
  "loom",

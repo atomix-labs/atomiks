@@ -23,6 +23,7 @@
 //!
 //! | Feature       | Adds                                                                       |
 //! | ------------- | -------------------------------------------------------------------------- |
+//! | `arbitrary`   | `Arbitrary`: an atomic as its value, and a ranged integer inside its range |
 //! | `bytemuck`    | an atomic's `Zeroable`, off under loom, and a ranged integer's byte traits |
 //! | `loom`        | loom's types under `--cfg loom`; nothing without the cfg                   |
 //! | `serde`       | serde: an atomic by a `Relaxed` load; a ranged integer, held to its range  |

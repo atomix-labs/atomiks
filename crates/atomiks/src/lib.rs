@@ -152,6 +152,7 @@
 //!
 //! | Feature       | Adds                                                                        |
 //! | ------------- | --------------------------------------------------------------------------- |
+//! | `arbitrary`   | `Arbitrary`: an atomic as its value, and a ranged integer inside its range  |
 //! | `bytemuck`    | an atomic's `Zeroable`, off under loom, and a ranged integer's byte traits  |
 //! | `derive`      | `#[derive(Atom)]`, and `AtomAdd`, `AtomOrd` and `AtomBitwise` for a newtype |
 //! | `loom`        | loom's types under `--cfg loom`; nothing without the cfg                    |

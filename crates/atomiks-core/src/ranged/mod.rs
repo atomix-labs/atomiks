@@ -31,7 +31,7 @@ macro_rules! each_ranged_integer {
 }
 
 // For the integrations, which name it by its path.
-#[cfg(any(feature = "bytemuck", feature = "serde"))]
+#[cfg(any(feature = "arbitrary", feature = "bytemuck", feature = "serde"))]
 pub(crate) use each_ranged_integer;
 
 /// Defines a ranged integer, `$name`, over its integer, `$int`, one section at a time.

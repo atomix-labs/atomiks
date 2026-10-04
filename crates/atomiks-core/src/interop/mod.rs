@@ -2,6 +2,8 @@
 //!
 //! zerocopy's are derived on the types themselves, since zerocopy allows no other impl.
 
+#[cfg(feature = "arbitrary")]
+mod arbitrary;
 #[cfg(feature = "bytemuck")]
 mod bytemuck;
 #[cfg(feature = "serde")]
