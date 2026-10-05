@@ -1,5 +1,5 @@
 //! A packed struct's `Atom`: each field in its own bits, from bit 0 in declaration order, and the
-//! value's bits above them extending its top field.
+//! value's bits above them extending its top field; and its projection onto its fields.
 
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
@@ -7,10 +7,12 @@ use syn::Ident;
 
 use super::field::PackedFields;
 use super::layout::LayoutCode;
+use super::projection::ProjectionCode;
 use crate::model::{Field, Implementor};
 
 /// `Atom` for the packed struct of `fields`, in a block beside its layout: constants where it has
-/// no parameters, else a function each instance evaluates, the repr it states checked there.
+/// no parameters, else a function each instance evaluates, the repr it states checked there; and
+/// its projection, the struct `fields()` lends, beside it.
 ///
 /// A concrete struct's validity is what its fields promise of their bits; a generic one's, which
 /// no constant knows the layout of, promises only that zero decodes, and only where each field's
@@ -41,6 +43,7 @@ pub(crate) fn packed(implementor: &Implementor, fields: &[Field], def_site: Span
         })
     };
     let conversions = conversions(&packed, &layout, def_site);
+    let projection = ProjectionCode::new(implementor, fields, def_site);
     // The impl keeps each promise of `Atom`: each field packs into bits of its own, and the value
     // is the repr of those bits, extended above its width as its top field is, so it lies in the
     // range, and `from_repr` reads each field's repr back from them, so it decodes as the value;
@@ -52,7 +55,14 @@ pub(crate) fn packed(implementor: &Implementor, fields: &[Field], def_site: Span
     // a generic struct evaluate, refuses an instance wider than its repr, so no field's bits fall
     // past the repr's; and the value may cross threads, as the impl checks or bounds the type,
     // unless a field is written as a pointer, which `to_bits` refuses.
-    layout.implement(&TokenStream::new(), fields, &validity, &conversions)
+    let implemented = layout.implement(
+        &projection.implementations(&packed, &layout),
+        fields,
+        &validity,
+        &conversions,
+    );
+    let structure = projection.structure();
+    quote!(#implemented #structure)
 }
 
 /// `to_repr`, `from_repr` and `from_repr_unchecked` of the struct, through its `layout`.

@@ -49,6 +49,11 @@ impl<'a> PackedFields<'a> {
         self.fields
     }
 
+    /// Each field's placement, in declaration order.
+    pub(super) fn placements(&self) -> &[Ident] {
+        &self.placements
+    }
+
     /// Each field's value, as a match binds it, in declaration order.
     pub(super) fn values(&self) -> &[Ident] {
         &self.values

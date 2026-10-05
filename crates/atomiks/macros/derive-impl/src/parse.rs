@@ -24,19 +24,31 @@ const INTEGERS: [&str; 12] =
 
 /// Reads `input`, a type's definition, or gives syn's errors where it does not parse.
 pub(crate) fn input(input: TokenStream) -> Result<Input, Vec<DeriveError>> {
-    let DeriveInput { attrs, ident, generics, data, .. } =
+    let DeriveInput { attrs, vis, ident, generics, data } =
         parse2::<DeriveInput>(input).map_err(|error: SyntaxError| {
             error.into_iter().map(DeriveError::from).collect::<Vec<_>>()
         })?;
     let mut errors = Vec::new();
     let (atomiks, repr) = options(&attrs, &mut errors);
     let shape = shape(&ident, &generics, &attrs, repr.as_ref(), data, &mut errors);
-    let implementor = Implementor { ident, generics, atomiks, repr };
+    let projection_attributes =
+        attrs.iter().filter(|attr| is_projection_attribute(attr)).cloned().collect();
+    let implementor = Implementor { vis, projection_attributes, ident, generics, atomiks, repr };
     let shape = match shape {
         Some(shape) if errors.is_empty() => Ok(shape),
         _ => Err(errors),
     };
     Ok(Input { implementor, shape })
+}
+
+/// Whether a packed struct's projection takes `attr` as the struct does: `#[non_exhaustive]`,
+/// which keeps a pattern of the projection open as one of the struct, and `#[doc(hidden)]`.
+fn is_projection_attribute(attr: &Attribute) -> bool {
+    match &attr.meta {
+        Meta::Path(path) => path.is_ident("non_exhaustive"),
+        Meta::List(list) => list.path.is_ident("doc") && list.tokens.to_string() == "hidden",
+        Meta::NameValue(_) => false,
+    }
 }
 
 /// What `#[atom(…)]` states: the path to atomiks, `::atomiks` where none is, and the repr.
@@ -345,7 +357,9 @@ fn fields(fields: Fields, generics: &Generics, errors: &mut Vec<DeriveError>) ->
             refuse_atom_or_default(&field, errors);
             let is_generic = names_a_parameter(field.ty.to_token_stream(), generics);
             let is_pointer = is_pointer(&field.ty);
-            Field { member, ty: field.ty, is_generic, is_pointer }
+            let docs =
+                field.attrs.iter().filter(|attr| attr.path().is_ident("doc")).cloned().collect();
+            Field { member, vis: field.vis, docs, ty: field.ty, is_generic, is_pointer }
         })
         .collect()
 }

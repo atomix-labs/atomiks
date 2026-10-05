@@ -36,6 +36,23 @@ use proc_macro::{Diagnostic, Level, Span, TokenStream};
 ///
 /// `from_repr` refuses each repr no value encodes to, so each value has one repr.
 ///
+/// # Fields
+/// A packed struct's atomic projects onto its fields. Beside a struct `Quote`, the derive writes
+/// the projection `Atomic::fields` lends, and `AtomicField::fields` where a field's value is a
+/// `Quote`: `QuoteFields<'a, P>`, of `Quote`'s visibility, and `#[non_exhaustive]` and
+/// `#[doc(hidden)]` where `Quote` is. It holds one `&'a AtomicField` per field, each of the field's
+/// own visibility and docs, so each field is a place of its own, changed alone, and a private
+/// field's place stays in its module. Each place's type names its field's path, as `Field<Quote,
+/// 2, bool>`, which is a type alone. A tuple struct's projection is a tuple struct. A type named
+/// `QuoteFields` beside `Quote` clashes with the projection.
+///
+/// Generic code takes a place as `&AtomicField<P>`, and states what each operation asks of the
+/// container's repr: [`BitTest`], [`MaskBitwise`] or [`FetchAdd`].
+///
+/// [`BitTest`]: https://docs.rs/atomiks/latest/atomiks/trait.BitTest.html
+/// [`FetchAdd`]: https://docs.rs/atomiks/latest/atomiks/trait.FetchAdd.html
+/// [`MaskBitwise`]: https://docs.rs/atomiks/latest/atomiks/trait.MaskBitwise.html
+///
 /// # Repr
 /// A newtype's is its field's, and a fieldless enum's the integer its `#[repr]` names, or C's `int`
 /// under `#[repr(C)]`, which must hold each discriminant; any other is the narrowest unsigned
@@ -160,6 +177,87 @@ use proc_macro::{Diagnostic, Level, Span, TokenStream};
 /// let (last, wrapped) = (Head { slot: 1023, lap: 0 }, Head { slot: 0, lap: 1 });
 /// assert_eq!(HEAD.compare_exchange(last, wrapped, AcqRel, Acquire), Ok(last), "wrapped");
 /// assert_eq!(wrapped.to_repr(), 1 << 16, "the lap above the slot, in a `u32`");
+/// ```
+///
+/// ## Changing One Field
+/// ```
+/// # extern crate atomiks_core as atomiks;
+/// # use atomiks_derive::Atom;
+/// use atomiks::ordering::{AcqRel, Acquire};
+/// use atomiks::{Atom, Atomic, RangedU32};
+///
+/// /// A ring buffer's slot: whether it is written, its lap, then how many read it, in the top half.
+/// #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+/// struct Slot {
+///     written: bool,
+///     lap: RangedU32<0, 0x7FFF_FFFF>,
+///     readers: u32,
+/// }
+///
+/// static SLOT: Atomic<Slot> = Atomic::new(Slot { written: false, lap: RangedU32::MIN, readers: 0 });
+///
+/// // The one writer that finds the slot unwritten writes it: one `lock bts`, or `ldsetal`.
+/// assert!(!SLOT.fields().written.test_and_set(AcqRel), "this writer claimed the slot");
+/// assert!(SLOT.fields().written.test_and_set(AcqRel), "and no other can");
+/// // Each reader counts itself in at the word's top, so a carry would leave the word.
+/// let before = SLOT.fields().readers.fetch_add(1, AcqRel);
+/// let claimed = Slot { written: true, lap: RangedU32::MIN, readers: 0 };
+/// assert_eq!(before, claimed, "the first reader of a written slot");
+/// assert_eq!(SLOT.fields().readers.load(Acquire), 1, "and one reader now");
+/// ```
+///
+/// ## Changing a Field Through Generic Code
+/// ```
+/// # extern crate atomiks_core as atomiks;
+/// # use atomiks_derive::Atom;
+/// use atomiks::ordering::{AcqRel, Acquire};
+/// use atomiks::{Atom, Atomic, AtomicField, BitTest, FetchAdd, FieldPath, RangedU32, TopField};
+///
+/// /// What an order may do: whether it is halted, and whether it only rests on the book.
+/// #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+/// struct Flags {
+///     halted: bool,
+///     post_only: bool,
+/// }
+///
+/// /// An order: its flags, a price in ticks, then how many of it filled, in the top half.
+/// #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+/// struct Order {
+///     flags: Flags,
+///     price: RangedU32<0, 0x3FFF_FFFF>,
+///     filled: u32,
+/// }
+///
+/// /// The halt of whatever order holds `flags`: whether this call halted it.
+/// fn halt<P>(flags: &AtomicField<P>) -> bool
+/// where
+///     P: FieldPath<Value = Flags, Container: Atom<Repr: BitTest>>,
+/// {
+///     !flags.fields().halted.test_and_set(AcqRel)
+/// }
+///
+/// /// Counts `quantity` more filled, in a field at the top of its word.
+/// fn fill<P>(filled: &AtomicField<P>, quantity: u32)
+/// where
+///     P: TopField<Value = u32, Container: Atom<Repr: FetchAdd>>,
+/// {
+///     filled.fetch_add(quantity, AcqRel);
+/// }
+///
+/// const PRICE: RangedU32<0, 0x3FFF_FFFF> = RangedU32::new(10_050).expect("below 2^30 ticks");
+/// static ORDER: Atomic<Order> = Atomic::new(Order {
+///     flags: Flags { halted: false, post_only: true },
+///     price: PRICE,
+///     filled: 0,
+/// });
+///
+/// fill(ORDER.fields().filled, 300);
+/// // `ORDER.fields().flags.fields().halted`, a field of a field, in one `lock bts`, or `ldsetal`.
+/// assert!(halt(ORDER.fields().flags), "this call halted the order");
+/// assert!(!halt(ORDER.fields().flags), "and no other call does");
+/// let flags = Flags { halted: true, post_only: true };
+/// let halted = Order { flags, price: PRICE, filled: 300 };
+/// assert_eq!(ORDER.load(Acquire), halted, "filled, then halted");
 /// ```
 ///
 /// ## Storing an Enum with Fields

@@ -210,6 +210,23 @@ impl<'a> LayoutCode<'a> {
         }
     }
 
+    /// The local `name` of the instance `Self` is, as the function that lays it out computes it.
+    ///
+    /// # Panics
+    /// `name` is no local pushed before: a fault of the derive's own.
+    #[track_caller]
+    #[expect(clippy::expect_used, reason = "the derive names only the locals it pushed")]
+    pub(super) fn instance_local(&self, name: &Ident) -> TokenStream {
+        let laid_out = self.laid_out();
+        let index = self
+            .locals
+            .iter()
+            .position(|(local, ..)| local == name)
+            .expect("the derive names a local it pushed");
+        let index = Literal::usize_unsuffixed(index);
+        quote!(#laid_out.#index)
+    }
+
     /// The call that lays out the instance `Self` is.
     fn laid_out(&self) -> TokenStream {
         let lay_out = &self.lay_out;

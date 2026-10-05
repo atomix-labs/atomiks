@@ -1,0 +1,5 @@
+error[E0616]: field `side` of struct `QuoteFields` is private
+  --> tests/compile_fail/field_private_outside_its_module.rs:39:20
+   |
+39 |     quote.fields().side.update(Relaxed, Relaxed, |_| book::Side::Ask);
+   |                    ^^^^ private field
