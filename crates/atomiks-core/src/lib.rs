@@ -19,17 +19,18 @@
 //!
 //! # Crate Features
 //!
-//! None is on by default.
+//! None is on by default. Under `--cfg loom`, whose cells are not plain memory, an atomic has
+//! neither zerocopy's traits nor `Zeroable`.
 //!
 //! | Feature         | Adds                                                                       |
 //! | --------------- | -------------------------------------------------------------------------- |
-//! | `arbitrary`     | `Arbitrary`: an atomic as its value, and a ranged integer inside its range |
+//! | `serde`         | serde's traits for an atomic, and a ranged integer, held to its range      |
+//! | `zerocopy-08`   | zerocopy's traits for an atomic, as its validity allows, never `Immutable` |
+//! | `bytemuck`      | `Zeroable` for an atomic, and the bit-pattern traits for a ranged integer  |
+//! | `arbitrary`     | `Arbitrary` for an atomic, and a ranged integer, held to its range         |
 //! | `arbitrary-int` | `Atom` and `AtomOrd` for arbitrary-int's integers, as their base integer   |
-//! | `bytemuck`      | an atomic's `Zeroable`, off under loom, and a ranged integer's byte traits |
-//! | `deranged-05`   | `Atom` for deranged 0.5's ranged integers; `From` both ways with atomiks'  |
+//! | `deranged-05`   | `Atom`, `AtomOrd` and `From` with atomiks' own for deranged 0.5's integers |
 //! | `loom`          | loom's types under `--cfg loom`; nothing without the cfg                   |
-//! | `serde`         | serde: an atomic by a `Relaxed` load; a ranged integer, held to its range  |
-//! | `zerocopy-08`   | an atomic's zerocopy traits: its cell's, never `Immutable`; off under loom |
 
 #![no_std]
 #![feature(

@@ -99,6 +99,35 @@
 //! # }
 //! ```
 //!
+//! ## Placing Atomics in Shared Memory
+//! ```
+//! # #[cfg(feature = "zerocopy-08")] {
+//! use core::num::NonZero;
+//!
+//! use atomiks::ordering::{Acquire, Release};
+//! use atomiks::{Atomic, AtomicU64};
+//! use zerocopy::{FromBytes, IntoBytes, KnownLayout};
+//!
+//! /// The header of a page processes share; every repr of each field decodes, so any bytes do.
+//! #[derive(FromBytes, IntoBytes, KnownLayout)]
+//! #[repr(C)]
+//! struct Header {
+//!     seq: AtomicU64,
+//!     owner: Atomic<Option<NonZero<u64>>>,
+//! }
+//!
+//! // Words, so the page is aligned as `Header` is.
+//! let mut page = [7_u64, 0];
+//! // A shared atomic writes, so none is `Immutable`: a page this process lays out alone becomes a
+//! // header through `&mut`; one another process may already be writing is reached through a
+//! // pointer, as `Atomic::from_ptr` takes.
+//! let header: &Header = Header::mut_from_bytes(page.as_mut_bytes()).expect("16 aligned bytes");
+//! assert_eq!(header.owner.load(Acquire), None, "a zero owner is `None`");
+//! header.owner.store(NonZero::new(42), Release);
+//! assert_eq!(page, [7, 42], "and the store, in the page");
+//! # }
+//! ```
+//!
 //! # What Each Operation Costs
 //!
 //! An operation exists only where it is what its name says:
@@ -148,18 +177,19 @@
 //!
 //! # Crate Features
 //!
-//! None is on by default.
+//! None is on by default. Under `--cfg loom`, whose cells are not plain memory, an atomic has
+//! neither zerocopy's traits nor `Zeroable`.
 //!
 //! | Feature         | Adds                                                                       |
 //! | --------------- | -------------------------------------------------------------------------- |
-//! | `arbitrary`     | `Arbitrary`: an atomic as its value, and a ranged integer inside its range |
-//! | `arbitrary-int` | `Atom` and `AtomOrd` for arbitrary-int's integers, as their base integer   |
-//! | `bytemuck`      | an atomic's `Zeroable`, off under loom, and a ranged integer's byte traits |
-//! | `deranged-05`   | `Atom` for deranged 0.5's ranged integers; `From` both ways with atomiks'  |
 //! | `derive`        | `#[derive(Atom)]`, and `AtomAdd`, `AtomOrd` and `AtomBitwise` on a newtype |
+//! | `serde`         | serde's traits for an atomic, and a ranged integer, held to its range      |
+//! | `zerocopy-08`   | zerocopy's traits for an atomic, as its validity allows, never `Immutable` |
+//! | `bytemuck`      | `Zeroable` for an atomic, and the bit-pattern traits for a ranged integer  |
+//! | `arbitrary`     | `Arbitrary` for an atomic, and a ranged integer, held to its range         |
+//! | `arbitrary-int` | `Atom` and `AtomOrd` for arbitrary-int's integers, as their base integer   |
+//! | `deranged-05`   | `Atom`, `AtomOrd` and `From` with atomiks' own for deranged 0.5's integers |
 //! | `loom`          | loom's types under `--cfg loom`; nothing without the cfg                   |
-//! | `serde`         | serde: an atomic by a `Relaxed` load; a ranged integer, held to its range  |
-//! | `zerocopy-08`   | an atomic's zerocopy traits: its cell's, never `Immutable`; off under loom |
 //!
 //! atomiks holds `atomiks-derive`, which `derive` adds, at its own version whether the feature is
 //! on or not, so the code a derive writes always calls the hidden items it was written against.
