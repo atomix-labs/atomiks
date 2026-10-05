@@ -1,6 +1,13 @@
 # Every TOML file, in one layout. Left out: build output, and what devset owns whole: its records,
 # and the profiles' pins.
-exclude = ["**/node_modules/**", "**/target/**", ".devset/**", ".config/mise/conf.d/**"]
+exclude = [
+    "**/node_modules/**",
+    "**/target/**",
+    ".devset/**",
+    ".config/mise/conf.d/**",
+    ".notes/**",
+    ".secrets/**",
+]
 
 [formatting]
 column_width          = 100
