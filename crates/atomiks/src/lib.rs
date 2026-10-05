@@ -8,18 +8,24 @@
 //!
 //! # Types
 //!
-//! - **The atomic.** [`Atomic<T>`](Atomic), with an alias per primitive, such as [`AtomicU64`].
+//! - **The atomic.** [`Atomic<T>`](Atomic), with an alias per primitive, such as [`AtomicU64`]; and
+//!   [`AtomicField`], a field of an atomic packed struct, as a place of its own, which one
+//!   instruction on the whole word changes alone. [`Atomic::fields`] lends one per field through
+//!   the [`ProjectFields`] the derive implements, whose [`Fields`](ProjectFields::Fields) is the
+//!   struct of places it writes. A place's type names its [`FieldPath`]: a [`Field`], a [`Then`] of
+//!   a field's field, or [`Whole`], which [`Join`] extends; [`TopField`] marks the one that adds.
 //! - **Values.** [`Atom`] encodes a value as its repr and back, its [`ReprRange`] says which reprs
 //!   it takes and its [`validity`] which decode; [`AtomAdd`], [`AtomOrd`] and [`AtomBitwise`] add
-//!   the read-modify-writes that mean something for it. With the `derive` feature, each derives:
-//!   `Atom` for a struct or an enum, and each capability for a newtype whose field has it.
-//!   [`RangedU64<MIN, MAX>`](RangedU64) and its siblings, `RangedU8` to `RangedIsize`, hold an
-//!   integer from `MIN` to `MAX`, and [`RangeError`] and [`ParseRangeError`] say why one refused an
-//!   integer or a text.
+//!   the read-modify-writes that mean something for it, and [`FieldBitwise`] and [`FieldAdd`] those
+//!   of a field of it. With the `derive` feature, each derives: `Atom` for a struct or an enum, and
+//!   each capability for a newtype whose field has it. [`RangedU64<MIN, MAX>`](RangedU64) and its
+//!   siblings, `RangedU8` to `RangedIsize`, hold an integer from `MIN` to `MAX`, and [`RangeError`]
+//!   and [`ParseRangeError`] say why one refused an integer or a text.
 //! - **Orderings.** The [`ordering`] types, each accepted only where it means something, and the
 //!   [`fence`](fn@fence) and [`compiler_fence`] they order.
 //! - **Primitives.** [`Primitive`], [`ExactBits`] where the bits are the whole value, and what the
-//!   target runs without a loop: [`Load`], [`Store`], [`Swap`], [`FetchBitwise`], [`MinMax`].
+//!   target runs without a loop: [`Load`], [`Store`], [`Swap`], [`FetchBitwise`], [`MinMax`], and,
+//!   for a field's container, [`FetchAdd`], [`MaskBitwise`], [`BitTest`].
 //! - **Building blocks.** The loom-shaped [`cell`], the spin [`hint`], and `model` under loom.
 //!
 //! # Examples
@@ -53,6 +59,35 @@
 //! assert_eq!(BEST_BID.load(Acquire).map(|quote| quote.quantity), Some(300), "the quantity bid");
 //! assert_eq!(LAST_FILL.load(Acquire), Some(Side::Ask), "the side last filled");
 //! assert_eq!(size_of_val(&BEST_BID), 8, "and the quote in one `u64`, `None` too");
+//! # }
+//! ```
+//!
+//! ## Changing One Field
+//! ```
+//! # #[cfg(feature = "derive")] {
+//! use atomiks::ordering::{AcqRel, Acquire, Release};
+//! use atomiks::{Atom, Atomic};
+//!
+//! /// A resting quote: 32 bits of quantity, whether it may fill, then a byte of flags.
+//! #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+//! struct Quote {
+//!     quantity: u32,
+//!     live: bool,
+//!     flags: u8,
+//! }
+//!
+//! /// The flag of a quote that only rests on the book, never trading as it arrives.
+//! const POST_ONLY: u8 = 0b100;
+//!
+//! static QUOTE: Atomic<Quote> = Atomic::new(Quote { quantity: 300, live: false, flags: 0 });
+//!
+//! // Each changes its field alone, in one instruction on the quote's word: `lock or`, or `ldset`.
+//! QUOTE.fields().live.set(Release);
+//! QUOTE.fields().flags.or(POST_ONLY, Release);
+//! // `lock btr`, or `ldclral`: the one thread that finds it live takes it off the book.
+//! assert!(QUOTE.fields().live.test_and_clear(AcqRel), "this thread took it");
+//! let expected = Quote { quantity: 300, live: false, flags: POST_ONLY };
+//! assert_eq!(QUOTE.load(Acquire), expected, "the bit off, the flag on, the quantity as it was");
 //! # }
 //! ```
 //!
@@ -140,11 +175,17 @@
 //!   reads with one compare-exchange, which writes, by name; [`fetch_or`](Atomic::fetch_or),
 //!   [`fetch_max`](Atomic::fetch_max) and [`fetch_min`](Atomic::fetch_min) need [`FetchBitwise`]
 //!   and [`MinMax`], while [`or`](Atomic::or), which discards the value before, needs no loop
-//!   anywhere in an optimized build.
+//!   anywhere in an optimized build;
+//! - a field's operations keep the last two rules: each but its loops,
+//!   [`update`](AtomicField::update) and [`try_update`](AtomicField::try_update), and its
+//!   [`load_rmw`](AtomicField::load_rmw) is one instruction on the whole word, and needs what the
+//!   field's value promises, [`FieldBitwise`] for the bitwise operations and [`FieldAdd`] for the
+//!   add, and what the container's repr runs: [`MaskBitwise`], [`BitTest`] or [`FetchAdd`].
 //!
-//! The `fetch_` operations take core's names, and return the value before as core's do; only
-//! [`and`](Atomic::and), [`or`](Atomic::or), [`xor`](Atomic::xor) and [`not`](Atomic::not) have a
-//! form that discards it.
+//! The `fetch_` operations take core's names, and return the value before as core's do, a field's
+//! the container before. Only [`and`](Atomic::and), [`or`](Atomic::or), [`xor`](Atomic::xor) and
+//! [`not`](Atomic::not), on an atomic or a field, and a `bool` field's [`set`](AtomicField::set),
+//! [`clear`](AtomicField::clear) and [`toggle`](AtomicField::toggle) discard it.
 //!
 //! # Platforms
 //!
@@ -157,6 +198,9 @@
 //! | `aarch64` Linux | yes                    | `+lse2`               | yes                      |
 //! | `x86_64` macOS  | yes, with `cmpxchg16b` | `x86-64-v3`, for AVX  | no                       |
 //! | `x86_64` Linux  | `x86-64-v2`            | `x86-64-v3`, for AVX  | no                       |
+//!
+//! Every target has [`FetchAdd`] and [`MaskBitwise`] for each integer up to 64 bits, and
+//! [`BitTest`] from 16 bits on `x86_64`, whose `lock bts` takes no byte, and from 8 on `aarch64`.
 //!
 //! On `aarch64` Linux, a read-modify-write is LSE's one instruction with `+lse` (Armv8.1); without
 //! it, an outline call runs that instruction where the CPU has LSE, and an LL/SC loop where it does
@@ -186,12 +230,12 @@
 //!
 //! | Feature         | Adds                                                                       |
 //! | --------------- | -------------------------------------------------------------------------- |
-//! | `derive`        | `#[derive(Atom)]`, and `AtomAdd`, `AtomOrd` and `AtomBitwise` on a newtype |
+//! | `derive`        | `#[derive(Atom)]`, projecting a packed struct; a newtype's capabilities    |
 //! | `serde`         | serde's traits for an atomic, and a ranged integer, held to its range      |
 //! | `zerocopy-08`   | zerocopy's traits for an atomic, as its validity allows, never `Immutable` |
 //! | `bytemuck`      | `Zeroable` for an atomic, and the bit-pattern traits for a ranged integer  |
 //! | `arbitrary`     | `Arbitrary` for an atomic, and a ranged integer, held to its range         |
-//! | `arbitrary-int` | `Atom` and `AtomOrd` for arbitrary-int's integers, as their base integer   |
+//! | `arbitrary-int` | `Atom`, `AtomOrd`, `FieldBitwise` and `FieldAdd` for `UInt` and `Int`      |
 //! | `deranged-05`   | `Atom`, `AtomOrd` and `From` with atomiks' own for deranged 0.5's integers |
 //! | `loom`          | loom's types under `--cfg loom`; nothing without the cfg                   |
 //!

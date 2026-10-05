@@ -80,7 +80,22 @@ What a change here keeps, beyond what the checks hold it to.
   item `atomiks-core` makes public is re-exported in the same change.
 - An operation exists only where the target runs it without a compare-exchange
   loop, and a loop is `update`, by name; what each lowers to is pinned in
-  `tests/codegen.rs`.
+  `tests/codegen.rs`. Each takes core's name and meaning, `fetch_add` to
+  `try_update`, though a field's returns its container before, not the field's
+  value. A form that discards what it returns exists only where the `fetch_`
+  form is not one instruction on every target: `and`, `or`, `xor` and `not`, and
+  a `bool` field's `set`, `clear` and `toggle`; the forms that return it are
+  `#[must_use]`, naming the short one, and no other is, as core's are not. So
+  there is no `add`, `sub`, `max` or `min`: a dropped `fetch_add` is `lock add`
+  already.
+- Every packed struct the derive takes gets a projection, `QuoteFields<'a, P>`
+  beside `Quote`, of its visibility: one `&'a AtomicField` per field, of the
+  field's visibility and with its docs, and a tuple struct's a tuple struct.
+  Beside it go each field's hidden `HasPackedField` and the `ProjectFields`
+  impl, and nothing else names a field: no constant per field, no `impl Quote`.
+  The projection is the one way to a field's place, since a private field may
+  carry an invariant its module's unsafe code relies on: a path is a type alone,
+  and the hidden `project_field` that builds each place is `unsafe`.
 - A function that can be `const` is, and a trait whose impls can be is a `const
   trait`.
 - Each `unsafe` block sits under an `#[expect(unsafe_code, reason = "…")]` with
