@@ -4,12 +4,18 @@
 //! the test that `x86_64` refuses each; the `aarch64-refused` feature adds a probe of each
 //! capability `aarch64` Linux's floor lacks for 128 bits (load, store, exchange, maximum), for the
 //! tests that it refuses them and that macOS's floor, with LSE2, refuses the exchange and maximum.
-//! atomiks-core's `deranged-05` feature is always on, for the probes of its conversions.
+//! atomiks-core's `deranged-05` feature is always on, for the probes of its conversions. The field
+//! operations' probes are in `fields`, over packed structs `tests/testing/packed.rs` writes out.
 //!
 //! The empty `[workspace]` in its manifest makes it a workspace of its own: the repository's does
 //! not list it, and the test builds it alone.
 
 #![no_std]
+#![feature(const_trait_impl)]
+
+pub mod fields;
+#[path = "../../testing/packed.rs"]
+mod packed;
 
 use core::cell::Cell;
 use core::num::NonZero;

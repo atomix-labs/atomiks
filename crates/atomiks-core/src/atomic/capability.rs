@@ -8,7 +8,7 @@
 use super::Atomic;
 use crate::atom::{Atom, AtomAdd, AtomBitwise, AtomOrd};
 use crate::ordering::RmwOrdering;
-use crate::primitive::{AddSub, Bitwise, FetchBitwise, MinMax};
+use crate::primitive::{Bitwise, FetchAdd, FetchBitwise, MinMax};
 
 impl<T: Atom> Atomic<T> {
     /// Adds `delta` to the repr, wrapping, and returns the value before.

@@ -103,10 +103,11 @@ mod range;
 mod ranged;
 pub mod validity;
 
-pub use crate::atom::{Atom, AtomAdd, AtomBitwise, AtomOrd};
+pub use crate::atom::{Atom, AtomAdd, AtomBitwise, AtomOrd, FieldAdd, FieldBitwise};
 pub use crate::atomic::{
-    Atomic, AtomicBool, AtomicI8, AtomicI16, AtomicI32, AtomicI64, AtomicIsize, AtomicPtr,
-    AtomicU8, AtomicU16, AtomicU32, AtomicU64, AtomicUsize,
+    Atomic, AtomicBool, AtomicField, AtomicI8, AtomicI16, AtomicI32, AtomicI64, AtomicIsize,
+    AtomicPtr, AtomicU8, AtomicU16, AtomicU32, AtomicU64, AtomicUsize, Field, FieldPath, Join,
+    ProjectFields, Then, TopField, Whole,
 };
 #[cfg(wide)]
 #[doc(cfg(any(
@@ -116,7 +117,9 @@ pub use crate::atomic::{
 pub use crate::atomic::{AtomicI128, AtomicU128};
 pub use crate::errors::{ParseRangeError, RangeError};
 pub use crate::fence::{compiler_fence, fence};
-pub use crate::primitive::{ExactBits, FetchBitwise, Load, MinMax, Primitive, Store, Swap};
+pub use crate::primitive::{
+    BitTest, ExactBits, FetchAdd, FetchBitwise, Load, MaskBitwise, MinMax, Primitive, Store, Swap,
+};
 pub use crate::range::ReprRange;
 pub use crate::ranged::{
     RangedI8, RangedI16, RangedI32, RangedI64, RangedI128, RangedIsize, RangedU8, RangedU16,

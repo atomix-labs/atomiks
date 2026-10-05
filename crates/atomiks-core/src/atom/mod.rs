@@ -9,7 +9,7 @@ mod scalar;
 #[cfg(feature = "deranged-05")]
 pub(crate) use ranged::ranged_atom;
 
-use crate::primitive::{AddSub, Bitwise, CompareExchange, Primitive};
+use crate::primitive::{Bitwise, CompareExchange, ExactBits, FetchAdd, Primitive};
 use crate::range::ReprRange;
 use crate::validity::{Partial, Total, Validity};
 
@@ -133,7 +133,7 @@ pub const unsafe trait Atom: Copy {
     note = "for your own newtype over a value that has it, derive it: `#[derive(AtomAdd)]`",
     note = "to change the value in a compare-exchange loop, call `update`"
 )]
-pub trait AtomAdd: Atom<Validity = Total, Repr: AddSub> {}
+pub trait AtomAdd: Atom<Validity = Total, Repr: FetchAdd> {}
 
 /// The repr's own (signed or unsigned) order is the value's [`Ord`].
 ///
@@ -161,3 +161,69 @@ pub trait AtomOrd: Atom + Ord {}
     note = "to change the value in a compare-exchange loop, call `update`"
 )]
 pub trait AtomBitwise: Atom<Validity = Total, Repr: Bitwise> {}
+
+/// And, or, xor and not on the bits a packed value stores it in combine values, and every pattern
+/// of those bits decodes.
+///
+/// So a field of it has the bitwise operations. A packed value stores a field in as few bits as
+/// its [`REPRS`](Atom::REPRS) need, read back zero-extended, or sign-extended where two's
+/// complement takes fewer. Every value with [`AtomBitwise`] has it, since each of its reprs
+/// decodes.
+///
+/// # Safety
+/// Every pattern of those bits, read back so, is a repr that decodes.
+///
+/// # Examples
+/// [atomiks' example][facade] ors a flag into a quote's field of flags, a `u8`, whose
+/// [`AtomBitwise`] gives it this.
+///
+/// [facade]: https://docs.rs/atomiks/latest/atomiks/#changing-one-field
+#[diagnostic::on_unimplemented(
+    message = "`{Self}` has no bitwise operations in a field",
+    label = "`and`, `or`, `xor`, `not` and their `fetch_` forms on a field need `FieldBitwise`",
+    note = "and, or and xor on the field's bits could leave a pattern that is no `{Self}`",
+    note = "to change the field in a compare-exchange loop, call `update`"
+)]
+#[expect(unsafe_code, reason = "a field's bitwise operations write any pattern of its bits")]
+pub unsafe trait FieldBitwise: Atom<Repr: ExactBits> {}
+
+// `do_not_recommend`, so a value without `AtomBitwise` reports this trait's message, which speaks
+// of fields, not `AtomBitwise`'s.
+//
+// SAFETY: every repr of an `AtomBitwise` value decodes (`Total`), so every pattern of its bits,
+// read back however, does.
+#[diagnostic::do_not_recommend]
+#[expect(unsafe_code, reason = "`Total` keeps the promise")]
+unsafe impl<T: AtomBitwise<Repr: ExactBits>> FieldBitwise for T {}
+
+/// Wrapping add and subtract on the bits a packed value stores it in are add and subtract on the
+/// value, and every pattern of those bits decodes.
+///
+/// So a field of it that ends at its container's top bit adds in place. A packed value stores a
+/// field as [`FieldBitwise`] says. Every value with [`AtomAdd`] has it, since each of its reprs
+/// decodes.
+///
+/// # Safety
+/// Every pattern of those bits, read back so, is a repr that decodes.
+///
+/// # Examples
+/// [`#[derive(Atom)]`'s example][derive] counts a slot's readers in a field at the top of its
+/// word, a `u32`, whose [`AtomAdd`] gives it this.
+///
+/// [derive]: https://docs.rs/atomiks/latest/atomiks/derive.Atom.html#changing-one-field
+#[diagnostic::on_unimplemented(
+    message = "`{Self}` has no atomic add in a field",
+    label = "`fetch_add` and `fetch_sub` on a field need `FieldAdd`",
+    note = "an add on the field's bits could leave a pattern that is no `{Self}`",
+    note = "to change the field in a compare-exchange loop, call `update`"
+)]
+#[expect(unsafe_code, reason = "a field's add writes any pattern of its bits")]
+pub unsafe trait FieldAdd: Atom<Repr: ExactBits> {}
+
+// `do_not_recommend`, as `FieldBitwise`'s.
+//
+// SAFETY: every repr of an `AtomAdd` value decodes (`Total`), so every pattern of its bits, read
+// back however, does.
+#[diagnostic::do_not_recommend]
+#[expect(unsafe_code, reason = "`Total` keeps the promise")]
+unsafe impl<T: AtomAdd<Repr: ExactBits>> FieldAdd for T {}

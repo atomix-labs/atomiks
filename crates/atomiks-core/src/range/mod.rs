@@ -532,7 +532,7 @@ const fn sift_down(values: &mut [u128], mut root: usize, end: usize) {
 /// The low `width` bits set: none for 0, all 128 for 128 or more.
 #[inline]
 #[must_use]
-const fn mask(width: u32) -> u128 {
+pub(crate) const fn mask(width: u32) -> u128 {
     u128::MAX.unbounded_shr(u128::BITS.saturating_sub(width))
 }
 
@@ -555,7 +555,7 @@ const fn signed_bit_length(value: i128) -> u32 {
 /// The two's complement value of the low `width` bits of `bits`.
 #[inline]
 #[must_use]
-const fn sign_extend(bits: u128, width: u32) -> i128 {
+pub(crate) const fn sign_extend(bits: u128, width: u32) -> i128 {
     let above = u128::BITS.saturating_sub(width);
     bits.unbounded_shl(above).cast_signed().unbounded_shr(above)
 }

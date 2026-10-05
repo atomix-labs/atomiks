@@ -27,6 +27,13 @@ impl FieldLayout {
         self.width
     }
 
+    /// Whether the field is two's complement, sign-extended when read.
+    #[inline]
+    #[must_use]
+    pub(crate) const fn is_signed(self) -> bool {
+        self.signed
+    }
+
     /// How a packed value stores a field of the integers from `start` up to `end`, of any width to
     /// 128 bits: unsigned where none is negative and that is narrower, else two's complement.
     #[inline]
@@ -121,6 +128,13 @@ impl PackedField {
         self.layout
     }
 
+    /// Where its lowest bit lies in the value.
+    #[inline]
+    #[must_use]
+    pub(crate) const fn offset(self) -> u32 {
+        self.offset
+    }
+
     /// The bit after the field's last: where the field declared after it lies.
     #[inline]
     #[must_use]
@@ -193,6 +207,17 @@ impl PackedLayout {
     #[must_use]
     pub const fn width(self) -> u32 {
         self.layout.width
+    }
+
+    /// Whether the value's bits above its width, up to `repr_width`, copy `field`'s top bit: where
+    /// `field` is the last field of any bits, signed, and the repr is wider than the value.
+    #[inline]
+    #[must_use]
+    pub(crate) const fn is_extended_by(self, field: PackedField, repr_width: u32) -> bool {
+        field.layout.width != 0
+            && field.offset == self.top.offset
+            && field.layout.signed
+            && self.layout.width < repr_width
     }
 
     /// The value's range, in its repr `R`, which its top field decides.

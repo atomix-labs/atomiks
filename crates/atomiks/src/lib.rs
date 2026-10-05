@@ -210,11 +210,13 @@ pub use atomiks_core::__private;
 #[doc(inline)]
 pub use atomiks_core::model;
 pub use atomiks_core::{
-    Atom, AtomAdd, AtomBitwise, AtomOrd, Atomic, AtomicBool, AtomicI8, AtomicI16, AtomicI32,
-    AtomicI64, AtomicIsize, AtomicPtr, AtomicU8, AtomicU16, AtomicU32, AtomicU64, AtomicUsize,
-    ExactBits, FetchBitwise, Load, MinMax, ParseRangeError, Primitive, RangeError, RangedI8,
-    RangedI16, RangedI32, RangedI64, RangedI128, RangedIsize, RangedU8, RangedU16, RangedU32,
-    RangedU64, RangedU128, RangedUsize, ReprRange, Store, Swap, compiler_fence, fence,
+    Atom, AtomAdd, AtomBitwise, AtomOrd, Atomic, AtomicBool, AtomicField, AtomicI8, AtomicI16,
+    AtomicI32, AtomicI64, AtomicIsize, AtomicPtr, AtomicU8, AtomicU16, AtomicU32, AtomicU64,
+    AtomicUsize, BitTest, ExactBits, FetchAdd, FetchBitwise, Field, FieldAdd, FieldBitwise,
+    FieldPath, Join, Load, MaskBitwise, MinMax, ParseRangeError, Primitive, ProjectFields,
+    RangeError, RangedI8, RangedI16, RangedI32, RangedI64, RangedI128, RangedIsize, RangedU8,
+    RangedU16, RangedU32, RangedU64, RangedU128, RangedUsize, ReprRange, Store, Swap, Then,
+    TopField, Whole, compiler_fence, fence,
 };
 #[cfg(any(
     target_arch = "aarch64",
