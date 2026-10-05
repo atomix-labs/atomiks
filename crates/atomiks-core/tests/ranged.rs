@@ -2,7 +2,7 @@
 //! operation at the edges of the range and of the integer, the conversions and the text, with each
 //! refusal and its message, and comparing, hashing, stepping and formatting as the integer does;
 //! the niche an `Option` takes; and in an atomic, the integer itself as the repr, `None` beside the
-//! range, statics that need no feature gate, and `max` and `min` through zero, on aarch64.
+//! range, statics that need no feature gate, and the maximum and minimum through zero, on aarch64.
 
 // Loom's cells exist only inside a model; `model.rs` holds the loom tests.
 #![cfg(not(loom))]
@@ -344,12 +344,12 @@ mod tests {
         assert_eq!(LAST_MOVE.load(Acquire), Some(RangedI8::MAX), "then 5");
     }
 
-    // x86_64 has no atomic maximum or minimum, so `max` and `min` exist on aarch64 alone.
+    // x86_64 has no atomic maximum or minimum, so `fetch_max` and `fetch_min` are aarch64's alone.
     #[cfg(target_arch = "aarch64")]
     #[test]
     fn max_and_min_order_as_the_integers_through_zero() {
         let price_move = Atomic::new(PriceMove::new(-3).expect("-3 is a move"));
-        price_move.max(PriceMove::new(2).expect("2 is one"), Relaxed);
+        price_move.fetch_max(PriceMove::new(2).expect("2 is one"), Relaxed);
         assert_eq!(price_move.load(Relaxed).get(), 2, "2, above -3");
         assert_eq!(price_move.fetch_min(PriceMove::MIN, Relaxed).get(), 2, "the value before");
         assert_eq!(price_move.load(Relaxed), PriceMove::MIN, "then -5, below 2");

@@ -40,7 +40,7 @@
 //! #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
 //! struct Quote {
 //!     price: u32,
-//!     qty: u16,
+//!     quantity: u16,
 //!     side: Side,
 //! }
 //!
@@ -48,9 +48,9 @@
 //! static BEST_BID: Atomic<Option<Quote>> = Atomic::new(None);
 //! static LAST_FILL: Atomic<Option<Side>> = Atomic::new(None);
 //!
-//! BEST_BID.store(Some(Quote { price: 10_050, qty: 300, side: Side::Bid }), Release);
+//! BEST_BID.store(Some(Quote { price: 10_050, quantity: 300, side: Side::Bid }), Release);
 //! LAST_FILL.store(Some(Side::Ask), Release);
-//! assert_eq!(BEST_BID.load(Acquire).map(|quote| quote.qty), Some(300), "the quantity bid");
+//! assert_eq!(BEST_BID.load(Acquire).map(|quote| quote.quantity), Some(300), "the quantity bid");
 //! assert_eq!(LAST_FILL.load(Acquire), Some(Side::Ask), "the side last filled");
 //! assert_eq!(size_of_val(&BEST_BID), 8, "and the quote in one `u64`, `None` too");
 //! # }
@@ -138,16 +138,20 @@
 //! - an operation exists only where the target runs it without a compare-exchange loop, as
 //!   [Platforms](#platforms) tables: without a 16-byte [`Load`], [`load_rmw`](Atomic::load_rmw)
 //!   reads with one compare-exchange, which writes, by name; [`fetch_or`](Atomic::fetch_or),
-//!   [`max`](Atomic::max) and [`min`](Atomic::min) need [`FetchBitwise`] and [`MinMax`], while
-//!   [`or`](Atomic::or), which discards the value before, needs no loop anywhere in an optimized
-//!   build.
+//!   [`fetch_max`](Atomic::fetch_max) and [`fetch_min`](Atomic::fetch_min) need [`FetchBitwise`]
+//!   and [`MinMax`], while [`or`](Atomic::or), which discards the value before, needs no loop
+//!   anywhere in an optimized build.
+//!
+//! The `fetch_` operations take core's names, and return the value before as core's do; only
+//! [`and`](Atomic::and), [`or`](Atomic::or), [`xor`](Atomic::xor) and [`not`](Atomic::not) have a
+//! form that discards it.
 //!
 //! # Platforms
 //!
 //! atomiks builds for Linux and macOS, on `aarch64` and `x86_64`. What a target's default CPU
 //! lacks, a flag adds, `-C target-feature` on `aarch64` and `-C target-cpu` on `x86_64`:
 //!
-//! | Target          | 128-Bit Atomics        | Their `Load`, `Store` | `fetch_or`, `max`, `min` |
+//! | Target          | 128-Bit Atomics        | Their `Load`, `Store` | `FetchBitwise`, `MinMax` |
 //! | --------------- | ---------------------- | --------------------- | ------------------------ |
 //! | `aarch64` macOS | yes                    | yes, with LSE2        | yes                      |
 //! | `aarch64` Linux | yes                    | `+lse2`               | yes                      |

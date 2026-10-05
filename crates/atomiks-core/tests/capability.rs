@@ -17,9 +17,9 @@ mod tests {
         assert_eq!(count.load(Relaxed), 0, "wrapped");
         assert_eq!(count.fetch_sub(1, AcqRel), 0, "the value before");
         assert_eq!(count.load(Relaxed), 255, "wrapped back");
-        count.add(2, Relaxed);
+        count.fetch_add(2, Relaxed);
         assert_eq!(count.load(Relaxed), 1, "up two, wrapping");
-        count.sub(3, Relaxed);
+        count.fetch_sub(3, Relaxed);
         assert_eq!(count.load(Relaxed), 254, "down three, wrapping");
     }
 
@@ -28,7 +28,7 @@ mod tests {
         let level = AtomicI8::new(i8::MAX);
         assert_eq!(level.fetch_add(1, AcqRel), i8::MAX, "the value before");
         assert_eq!(level.load(Relaxed), i8::MIN, "past the greatest, the least");
-        level.sub(1, Relaxed);
+        level.fetch_sub(1, Relaxed);
         assert_eq!(level.load(Relaxed), i8::MAX, "below the least, the greatest");
         assert_eq!(level.fetch_sub(-2, AcqRel), i8::MAX, "the value before");
         assert_eq!(level.load(Relaxed), -127, "less -2 is 2 more, wrapping");
@@ -66,15 +66,15 @@ mod tests {
         let signed = AtomicI64::new(-5);
         assert_eq!(signed.fetch_max(3, AcqRel), -5, "the value before");
         assert_eq!(signed.load(Relaxed), 3, "3 is the larger signed value");
-        signed.min(-7, Relaxed);
+        signed.fetch_min(-7, Relaxed);
         assert_eq!(signed.load(Relaxed), -7, "-7 is the smaller signed value");
         let unsigned = AtomicU64::new(7);
         assert_eq!(unsigned.fetch_min(2, AcqRel), 7, "the value before");
         assert_eq!(unsigned.load(Relaxed), 2, "2 is the smaller");
-        unsigned.max(u64::MAX, Relaxed);
+        unsigned.fetch_max(u64::MAX, Relaxed);
         assert_eq!(unsigned.load(Relaxed), u64::MAX, "the top bit set is the larger, unsigned");
         let narrow = AtomicI8::new(-1);
-        narrow.max(1, Relaxed);
+        narrow.fetch_max(1, Relaxed);
         assert_eq!(narrow.load(Relaxed), 1, "1 is the larger signed value; unsigned, -1 is 0xFF");
         assert_eq!(narrow.fetch_min(-1, AcqRel), 1, "the value before");
         assert_eq!(narrow.load(Relaxed), -1, "-1 is the smaller signed value");

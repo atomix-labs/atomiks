@@ -2,7 +2,7 @@ error[E0277]: `OptionRangedU8<0, 10>` has no atomic maximum or minimum
   --> tests/compile_fail/deranged/order_of_an_optional_ranged_integer.rs:12:27
    |
 12 |     orders_as_its_reprs::<OptionRangedU8<0, 10>>();
-   |                           ^^^^^^^^^^^^^^^^^^^^^ `max`, `min`, `fetch_max` and `fetch_min` need `AtomOrd`
+   |                           ^^^^^^^^^^^^^^^^^^^^^ `fetch_max` and `fetch_min` need `AtomOrd`
    |
    = help: the trait `AtomOrd` is not implemented for `OptionRangedU8<0, 10>`
    = note: for your own newtype over a value that has it, derive it: `#[derive(AtomOrd)]`

@@ -153,7 +153,7 @@ mod tests {
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
     struct Quote {
         /// How many.
-        qty: u32,
+        quantity: u32,
         /// Which side.
         side: Side,
         /// Whether it may fill.
@@ -233,7 +233,7 @@ mod tests {
         /// Filled.
         Filled {
             /// How many.
-            qty: u8,
+            quantity: u8,
             /// Which way the price moved.
             sign: Sign,
         },
@@ -352,8 +352,8 @@ mod tests {
 
     /// Quotes of every quantity, side and liveness.
     fn quotes() -> impl Strategy<Value = Quote> {
-        (any::<u32>(), sides(), any::<bool>()).prop_map(|(qty, side, live)| Quote {
-            qty,
+        (any::<u32>(), sides(), any::<bool>()).prop_map(|(quantity, side, live)| Quote {
+            quantity,
             side,
             live,
         })
@@ -563,7 +563,7 @@ mod tests {
             reading in readings(),
             fill in prop_oneof![
                 Just(Fill::Pending),
-                (any::<u8>(), signs()).prop_map(|(qty, sign)| Fill::Filled { qty, sign }),
+                (any::<u8>(), signs()).prop_map(|(quantity, sign)| Fill::Filled { quantity, sign }),
             ],
             gate in prop_oneof![Just(Gate::Closed), any::<NonZero<u64>>().prop_map(Gate::Open)],
             shift in prop_oneof![

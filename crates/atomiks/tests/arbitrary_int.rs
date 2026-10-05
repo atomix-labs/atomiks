@@ -70,8 +70,8 @@ mod tests {
     #[test]
     fn a_newtype_keeps_the_order() {
         let seq = Atomic::new(Seq(u20::new(0)));
-        seq.max(Seq(u20::new(9)), Relaxed);
-        seq.max(Seq(u20::new(4)), Relaxed);
+        seq.fetch_max(Seq(u20::new(9)), Relaxed);
+        seq.fetch_max(Seq(u20::new(4)), Relaxed);
         assert_eq!(seq.load(Relaxed), Seq(u20::new(9)), "the larger kept");
     }
 }

@@ -251,18 +251,18 @@ mod tests {
     #[test]
     fn an_instance_takes_its_fields_capabilities() {
         has_every_capability::<Wrap<u32>>();
-        COUNT.add(2, Relaxed);
+        COUNT.fetch_add(2, Relaxed);
         assert_eq!(COUNT.load(Relaxed), Wrap(3), "add");
         COUNT.or(Wrap(0b100), Relaxed);
         assert_eq!(COUNT.load(Relaxed), Wrap(0b111), "then or");
     }
 
-    // x86_64 has no atomic maximum, so `max` exists on aarch64 alone.
+    // x86_64 has no atomic maximum, so `fetch_max` exists on aarch64 alone.
     #[cfg(target_arch = "aarch64")]
     #[test]
-    fn atom_ord_brings_max_where_the_target_has_one() {
+    fn atom_ord_brings_fetch_max_where_the_target_has_one() {
         let count = Atomic::new(Wrap(1_u32));
-        count.max(Wrap(9), Relaxed);
+        count.fetch_max(Wrap(9), Relaxed);
         assert_eq!(count.load(Relaxed), Wrap(9), "the larger");
     }
 

@@ -83,7 +83,7 @@ pub struct Marker;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
 pub struct Quote {
     /// How many.
-    qty: u32,
+    quantity: u32,
     /// Which side.
     side: Side,
     /// Which way the price last moved.
@@ -163,14 +163,14 @@ pub static READING: Atomic<Reading> = Atomic::new(Reading::Missing);
 pub static SHIFT: Atomic<Shift> = Atomic::new(Shift::Still);
 
 fn main() {
-    NEXT.add(1, Relaxed);
-    assert_eq!(NEXT.load(Acquire), Seq(1), "one taken");
+    assert_eq!(NEXT.fetch_add(1, Relaxed), Seq(0), "zero taken");
+    assert_eq!(NEXT.load(Acquire), Seq(1), "one next");
     assert_eq!(LAST.load(Acquire).value, 0, "and no id yet");
     assert_eq!(HEAD.load(Acquire), None, "nor a list's head");
     assert_eq!(FILL.load(Acquire), None, "no fill");
     assert_eq!(MOVE.swap(Sign::Minus, Relaxed), Sign::Flat, "a move down");
     assert_eq!(MARK.load(Acquire), Some(Marker), "the mark");
-    let quote = Quote { qty: 3, side: Side::Ask, sign: Sign::Minus };
+    let quote = Quote { quantity: 3, side: Side::Ask, sign: Sign::Minus };
     BEST.store(Some(quote), Relaxed);
     assert_eq!(BEST.load(Acquire), Some(quote), "and the quote");
     SLOT.store(Some(Slot::Writing { lap: 1 }), Relaxed);

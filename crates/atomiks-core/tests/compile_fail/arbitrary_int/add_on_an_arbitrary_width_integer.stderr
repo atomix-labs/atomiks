@@ -1,8 +1,8 @@
 error[E0277]: `UInt<u8, 3>` has no atomic add
  --> tests/compile_fail/arbitrary_int/add_on_an_arbitrary_width_integer.rs:9:29
   |
-9 |     Atomic::new(u3::new(7)).add(1, Relaxed);
-  |                             ^^^ `add`, `sub`, `fetch_add` and `fetch_sub` need `AtomAdd`
+9 |     Atomic::new(u3::new(7)).fetch_add(1, Relaxed);
+  |                             ^^^^^^^^^ `fetch_add` and `fetch_sub` need `AtomAdd`
   |
   = help: the trait `AtomAdd` is not implemented for `UInt<u8, 3>`
   = note: for your own newtype over a value that has it, derive it: `#[derive(AtomAdd)]`
@@ -17,12 +17,12 @@ error[E0277]: `UInt<u8, 3>` has no atomic add
             u16
             u32
           and $N others
-note: required by a bound in `atomiks_core::atomic::capability::<impl atomiks_core::Atomic<T>>::add`
+note: required by a bound in `atomiks_core::atomic::capability::<impl atomiks_core::Atomic<T>>::fetch_add`
  --> src/atomic/capability.rs
   |
   | impl<T: Atom> Atomic<T> {
 ...
-  |     pub fn add<O: RmwOrdering>(&self, delta: T::Repr, order: O)
+  |     pub fn fetch_add<O: RmwOrdering>(&self, delta: T::Repr, order: O) -> T
   |     where
   |         T: AtomAdd,
-  |            ^^^^^^^ required by this bound in `atomiks_core::atomic::capability::<impl Atomic<T>>::add`
+  |            ^^^^^^^ required by this bound in `atomiks_core::atomic::capability::<impl Atomic<T>>::fetch_add`

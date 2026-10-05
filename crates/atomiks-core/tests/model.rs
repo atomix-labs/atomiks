@@ -148,8 +148,8 @@ mod tests {
             let other = {
                 let cursor = Arc::clone(&cursor);
                 thread::spawn(move || {
-                    cursor.ptr_add(3, AcqRel);
-                    cursor.byte_sub(8, AcqRel);
+                    cursor.fetch_ptr_add(3, AcqRel);
+                    cursor.fetch_byte_sub(8, AcqRel);
                 })
             };
             let before_add = cursor.fetch_byte_add(16, AcqRel);
@@ -180,7 +180,7 @@ mod tests {
                 let shared = Arc::clone(&shared);
                 thread::spawn(move || {
                     shared.0.store(7, Relaxed);
-                    shared.1.byte_add(8, Release);
+                    shared.1.fetch_byte_add(8, Release);
                 })
             };
             // An offset of zero reads the pointer with an exchange, as `publish_through_a_loop`'s

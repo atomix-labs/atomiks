@@ -227,7 +227,7 @@ pub fn derive_atom(input: TokenStream) -> TokenStream {
     emit(expand_atom(input.into(), Span::def_site().into()))
 }
 
-/// Derives `AtomAdd` for a newtype whose field has it: `add`, `sub` and their `fetch_` forms.
+/// Derives `AtomAdd` for a newtype whose field has it: `fetch_add` and `fetch_sub`.
 ///
 /// # Examples
 /// ```
@@ -250,7 +250,7 @@ pub fn derive_atom_add(input: TokenStream) -> TokenStream {
     emit(expand_capability(input.into(), Capability::Add))
 }
 
-/// Derives `AtomOrd` for a newtype whose field has it: `max`, `min` and their `fetch_` forms.
+/// Derives `AtomOrd` for a newtype whose field has it: `fetch_max` and `fetch_min`.
 ///
 /// `AtomOrd` promises that the repr's order is the value's `Ord`, so the newtype's `Ord` must be
 /// its field's: derive `Ord` too.
@@ -268,11 +268,11 @@ pub fn derive_atom_add(input: TokenStream) -> TokenStream {
 ///
 /// static HIGH: Atomic<Price> = Atomic::new(Price(0));
 ///
-/// // `max` exists where it is one instruction: on `aarch64`, not `x86_64`.
+/// // `fetch_max` exists where it is one instruction: on `aarch64`, not `x86_64`.
 /// #[cfg(target_arch = "aarch64")]
 /// {
-///     HIGH.max(Price(10_100), Relaxed);
-///     HIGH.max(Price(10_050), Relaxed);
+///     HIGH.fetch_max(Price(10_100), Relaxed);
+///     HIGH.fetch_max(Price(10_050), Relaxed);
 ///     assert_eq!(HIGH.load(Acquire), Price(10_100), "the highest price seen");
 /// }
 /// ```

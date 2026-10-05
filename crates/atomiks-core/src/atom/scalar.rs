@@ -234,7 +234,7 @@ wrappers! {
 
 // The 128-bit integers and their `NonZero`s, where a 16-byte compare-exchange exists. atomiks
 // has no 128-bit add, bitwise operation, max or min, so they take no `AtomAdd` or `AtomBitwise`,
-// and `AtomOrd` brings them no `max` or `min`: `update` is each one's loop.
+// and `AtomOrd` brings them no `fetch_max` or `fetch_min`: `update` is each one's loop.
 #[cfg(wide)]
 integers! { [AtomOrd] u128, i128 }
 #[cfg(wide)]

@@ -506,7 +506,7 @@ mod tests {
                 ::atomiks::__private::assert_stated_width::<Quote, ::core::primitive::u32>(layout.width());
         };
         let quote =
-            derive_atom(quote! { #[atom(repr = u32)] struct Quote { qty: u8, live: bool } });
+            derive_atom(quote! { #[atom(repr = u32)] struct Quote { quantity: u8, live: bool } });
         let code = written(&quote);
         assert!(code.contains(&stated.to_string()), "checked: {code}");
     }

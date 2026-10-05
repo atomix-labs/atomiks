@@ -16,13 +16,13 @@ mod tests {
         /// The price, in ticks.
         price: RangedU32<1, 100_000>,
         /// The quantity, in lots.
-        qty: u16,
+        quantity: u16,
     }
 
     /// Each field in turn.
     impl<'a> Arbitrary<'a> for Quote {
         fn arbitrary(input: &mut Unstructured<'a>) -> Result<Self> {
-            Ok(Self { price: input.arbitrary()?, qty: input.arbitrary()? })
+            Ok(Self { price: input.arbitrary()?, quantity: input.arbitrary()? })
         }
     }
 
@@ -36,6 +36,10 @@ mod tests {
             assert_eq!(actual.ok(), expected.ok(), "{byte:#04x} gives the quote it gives alone");
         }
         let quote = Atomic::<Quote>::arbitrary(&mut Unstructured::new(&[])).map(Atomic::into_inner);
-        assert_eq!(quote.ok(), Some(Quote { price: RangedU32::MIN, qty: 0 }), "and the smallest");
+        assert_eq!(
+            quote.ok(),
+            Some(Quote { price: RangedU32::MIN, quantity: 0 }),
+            "and the smallest"
+        );
     }
 }

@@ -211,8 +211,8 @@ macro_rules! integers {
             }
         }
         // `ldsmax`, `ldumin` and the rest (an LL/SC pair without LSE); `x86_64` has neither.
-        // `atomic/capability.rs` repeats this cfg in the `doc(cfg(...))` of `max`, `min`,
-        // `fetch_max` and `fetch_min`: change them with it.
+        // `atomic/capability.rs` repeats this cfg in the `doc(cfg(...))` of `fetch_max` and
+        // `fetch_min`: change them with it.
         #[cfg(target_arch = "aarch64")]
         impl MinMax for $int {
             #[inline]

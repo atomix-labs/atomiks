@@ -26,7 +26,7 @@ mod tests {
         /// The price, in ticks.
         price: u32,
         /// The quantity, in lots.
-        qty: u16,
+        quantity: u16,
         /// The side it rests on.
         side: Side,
     }
@@ -37,9 +37,9 @@ mod tests {
 
     #[test]
     fn an_atomic_of_a_derived_type_is_the_value_its_derive_writes() {
-        let best_bid = Atomic::new(Some(Quote { price: 10_050, qty: 300, side: Side::Bid }));
+        let best_bid = Atomic::new(Some(Quote { price: 10_050, quantity: 300, side: Side::Bid }));
         let text = serde_json::to_string(&best_bid).expect("serde_json writes any quote");
-        assert_eq!(text, r#"{"price":10050,"qty":300,"side":"Bid"}"#, "the quote, loaded");
+        assert_eq!(text, r#"{"price":10050,"quantity":300,"side":"Bid"}"#, "the quote, loaded");
         let back: Atomic<Option<Quote>> = serde_json::from_str(&text).expect("the text is a quote");
         assert_eq!(back.load(Acquire), best_bid.load(Acquire), "and back");
         assert_eq!(

@@ -6,7 +6,7 @@ use atomiks::Atom;
 #[derive(Clone, Copy, Atom)]
 #[atom(repr = u32)]
 struct Quote {
-    qty: u32,
+    quantity: u32,
     live: bool,
 }
 

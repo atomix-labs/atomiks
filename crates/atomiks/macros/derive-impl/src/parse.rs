@@ -649,8 +649,8 @@ mod tests {
     #[test]
     fn a_struct_of_several_fields_reads_its_markers_too_in_order() {
         assert_eq!(
-            packed(quote! { struct Quote { qty: u32, kind: PhantomData<Venue>, live: bool } }),
-            ["qty", "kind", "live"],
+            packed(quote! { struct Quote { quantity: u32, kind: PhantomData<Venue>, live: bool } }),
+            ["quantity", "kind", "live"],
             "by name"
         );
         assert_eq!(packed(quote! { struct Pair(u32, ()); }), ["0", "1"], "or by position");

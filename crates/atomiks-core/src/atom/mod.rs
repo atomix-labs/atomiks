@@ -129,7 +129,7 @@ pub const unsafe trait Atom: Copy {
 /// A wrong impl gives wrong values, never undefined behaviour: every repr decodes ([`Total`]).
 #[diagnostic::on_unimplemented(
     message = "`{Self}` has no atomic add",
-    label = "`add`, `sub`, `fetch_add` and `fetch_sub` need `AtomAdd`",
+    label = "`fetch_add` and `fetch_sub` need `AtomAdd`",
     note = "for your own newtype over a value that has it, derive it: `#[derive(AtomAdd)]`",
     note = "to change the value in a compare-exchange loop, call `update`"
 )]
@@ -143,7 +143,7 @@ pub trait AtomAdd: Atom<Validity = Total, Repr: AddSub> {}
 /// is one of them, so it decodes.
 #[diagnostic::on_unimplemented(
     message = "`{Self}` has no atomic maximum or minimum",
-    label = "`max`, `min`, `fetch_max` and `fetch_min` need `AtomOrd`",
+    label = "`fetch_max` and `fetch_min` need `AtomOrd`",
     note = "for your own newtype over a value that has it, derive it: `#[derive(AtomOrd)]`",
     note = "to change the value in a compare-exchange loop, call `update`"
 )]

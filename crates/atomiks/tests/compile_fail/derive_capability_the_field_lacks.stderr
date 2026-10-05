@@ -2,7 +2,7 @@ error[E0277]: `Saturating<u32>` has no atomic add
  --> tests/compile_fail/derive_capability_the_field_lacks.rs:9:15
   |
 9 | struct Volume(Saturating<u32>);
-  |               ^^^^^^^^^^^^^^^ `add`, `sub`, `fetch_add` and `fetch_sub` need `AtomAdd`
+  |               ^^^^^^^^^^^^^^^ `fetch_add` and `fetch_sub` need `AtomAdd`
   |
   = help: the trait `AtomAdd` is not implemented for `Saturating<u32>`
   = note: for your own newtype over a value that has it, derive it: `#[derive(AtomAdd)]`

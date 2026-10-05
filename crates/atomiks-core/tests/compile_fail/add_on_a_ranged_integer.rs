@@ -5,5 +5,5 @@ use atomiks_core::ordering::Relaxed;
 use atomiks_core::{Atomic, RangedU8};
 
 fn main() {
-    Atomic::new(RangedU8::<1, 10>::MAX).add(1, Relaxed);
+    Atomic::new(RangedU8::<1, 10>::MAX).fetch_add(1, Relaxed);
 }

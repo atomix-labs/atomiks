@@ -56,13 +56,13 @@ pub fn u64_compare_exchange(atomic: &AtomicU64, current: u64, new: u64) -> Resul
 }
 
 #[unsafe(no_mangle)]
-pub fn u64_add(atomic: &AtomicU64, delta: u64) {
-    atomic.add(delta, Relaxed);
+pub fn u64_fetch_add_discarded(atomic: &AtomicU64, delta: u64) {
+    atomic.fetch_add(delta, Relaxed);
 }
 
 #[unsafe(no_mangle)]
-pub fn u64_sub(atomic: &AtomicU64, delta: u64) {
-    atomic.sub(delta, Relaxed);
+pub fn u64_fetch_sub_discarded(atomic: &AtomicU64, delta: u64) {
+    atomic.fetch_sub(delta, Relaxed);
 }
 
 #[unsafe(no_mangle)]
@@ -111,14 +111,14 @@ pub fn u64_fetch_not(atomic: &AtomicU64) -> u64 {
 
 #[cfg(any(target_arch = "aarch64", feature = "aarch64-only"))]
 #[unsafe(no_mangle)]
-pub fn u64_max(atomic: &AtomicU64, value: u64) {
-    atomic.max(value, Relaxed);
+pub fn u64_fetch_max_discarded(atomic: &AtomicU64, value: u64) {
+    atomic.fetch_max(value, Relaxed);
 }
 
 #[cfg(any(target_arch = "aarch64", feature = "aarch64-only"))]
 #[unsafe(no_mangle)]
-pub fn u64_min(atomic: &AtomicU64, value: u64) {
-    atomic.min(value, Relaxed);
+pub fn u64_fetch_min_discarded(atomic: &AtomicU64, value: u64) {
+    atomic.fetch_min(value, Relaxed);
 }
 
 #[cfg(any(target_arch = "aarch64", feature = "aarch64-only"))]
@@ -129,8 +129,8 @@ pub fn u64_fetch_max(atomic: &AtomicU64, value: u64) -> u64 {
 
 #[cfg(any(target_arch = "aarch64", feature = "aarch64-only"))]
 #[unsafe(no_mangle)]
-pub fn i64_max(atomic: &AtomicI64, value: i64) {
-    atomic.max(value, Relaxed);
+pub fn i64_fetch_max_discarded(atomic: &AtomicI64, value: i64) {
+    atomic.fetch_max(value, Relaxed);
 }
 
 #[cfg(any(target_arch = "aarch64", feature = "aarch64-only"))]
@@ -145,8 +145,8 @@ pub fn bool_or(atomic: &AtomicBool, value: bool) {
 }
 
 #[unsafe(no_mangle)]
-pub fn ptr_byte_add(atomic: &AtomicPtr<u64>, bytes: usize) {
-    atomic.byte_add(bytes, Relaxed);
+pub fn ptr_fetch_byte_add_discarded(atomic: &AtomicPtr<u64>, bytes: usize) {
+    atomic.fetch_byte_add(bytes, Relaxed);
 }
 
 #[unsafe(no_mangle)]
@@ -245,8 +245,8 @@ pub fn u128_swap(atomic: &AtomicU128, value: u128) -> u128 {
 
 #[cfg(feature = "aarch64-refused")]
 #[unsafe(no_mangle)]
-pub fn u128_max(atomic: &AtomicU128, value: u128) {
-    atomic.max(value, Relaxed);
+pub fn u128_fetch_max(atomic: &AtomicU128, value: u128) -> u128 {
+    atomic.fetch_max(value, AcqRel)
 }
 
 /// Two writes to a shared place around the fence: without `nomem`, the barrier keeps both.
