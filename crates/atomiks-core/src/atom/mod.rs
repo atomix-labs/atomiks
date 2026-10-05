@@ -5,6 +5,10 @@ mod ptr;
 mod ranged;
 mod scalar;
 
+// For deranged's ranged integers, which take the impls atomiks' own do.
+#[cfg(feature = "deranged-05")]
+pub(crate) use ranged::ranged_atom;
+
 use crate::primitive::{AddSub, Bitwise, CompareExchange, Primitive};
 use crate::range::ReprRange;
 use crate::validity::{Partial, Total, Validity};

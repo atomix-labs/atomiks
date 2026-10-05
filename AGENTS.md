@@ -40,13 +40,16 @@ with the profile, on `devset update`. Never edit `.devset/`.
 A Cargo workspace of crates under `crates/`: `atomiks-core` holds the typed
 atomic (`Atom`, `Atomic`, the orderings, validity, the primitives, the fences,
 the cell and the loom seam) and the ranged integers, each on a pattern-type
-field; the facade `atomiks` re-exports both. `crates/atomiks/macros/derive`,
-`atomiks-derive`, is the proc macro of `#[derive(Atom)]` and the capabilities'
-derives, and `crates/atomiks/macros/derive-impl`, `atomiks-derive-impl`, its
-logic; the derive is `atomiks`' `derive` feature. Each crate inherits its
-version, edition, licence and lints from the root `Cargo.toml`, and builds for
-Linux and macOS, on aarch64 and x86_64. `atomiks-lock` is yet to be written. The
-book is under `docs/`. The toolchain, with the four targets, is the nightly
+field; the facade `atomiks` re-exports both. `atomiks-core`'s `src/interop/`
+holds the integrations with other crates, a file per crate, each behind its
+feature; zerocopy's are derives on the types themselves.
+`crates/atomiks/macros/derive`, `atomiks-derive`, is the proc macro of
+`#[derive(Atom)]` and the capabilities' derives, and
+`crates/atomiks/macros/derive-impl`, `atomiks-derive-impl`, its logic; the
+derive is `atomiks`' `derive` feature. Each crate inherits its version, edition,
+licence and lints from the root `Cargo.toml`, and builds for Linux and macOS, on
+aarch64 and x86_64. `atomiks-lock` is yet to be written. The book is under
+`docs/`. The toolchain, with the four targets, is the nightly
 `rust-toolchain.toml` pins, which the crates need for their nightly features.
 The CPU floor is `.cargo/config.toml`'s: x86-64-v3, LSE on aarch64 Linux, and
 the M1 on macOS. The tools are the versions `.config/mise/` pins. The justfile's
@@ -83,6 +86,13 @@ What a change here keeps, beyond what the checks hold it to.
 - Each `unsafe` block sits under an `#[expect(unsafe_code, reason = "…")]` with
   a `// SAFETY:` comment that proves what it requires; a field a proof relies on
   states its `// INVARIANT:` and names every writer.
+- An integration is off under loom only where it reads an atomic's memory as
+  bytes, as zerocopy's derives and bytemuck's `Zeroable` for an atomic do.
+- An integration's feature names its dependency's version where that dependency
+  is a 0.x crate, `zerocopy-08` and `deranged-05` as t2t's `chrono-04`, so the
+  next 0.y can sit beside it; a 1.x or later dependency's feature is its name:
+  `serde`, `bytemuck`, `arbitrary`, `arbitrary-int`. `loom`, the model-checking
+  seam rather than an integration, keeps its name.
 - A nightly feature is taken where it makes the API right, never to reach core's
   internals beyond the 128-bit intrinsics and a ranged integer's pattern-type
   field, which `transmute_neo` alone converts and a plain integer replaces

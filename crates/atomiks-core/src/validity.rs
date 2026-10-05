@@ -88,10 +88,16 @@ pub enum Partial {}
 mod opaque {
     //! [`Opaque`], in a module of its own so that no path outside `validity` names it.
 
+    #[cfg(all(feature = "zerocopy-08", not(loom)))]
+    use zerocopy::{IntoBytes, KnownLayout, Unaligned};
+
     /// A primitive's cell behind a type that implements no trait building a value from bytes;
     /// `repr(transparent)`, so it has its cell's layout.
+    ///
+    /// With zerocopy, it has only the traits that read its layout or its bytes.
     #[repr(transparent)]
     #[derive(Debug)]
+    #[cfg_attr(all(feature = "zerocopy-08", not(loom)), derive(KnownLayout, IntoBytes, Unaligned))]
     pub struct Opaque<C>(pub(super) C);
 }
 

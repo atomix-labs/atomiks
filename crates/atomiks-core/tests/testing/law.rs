@@ -1,13 +1,14 @@
 //! The `Atom` laws every value obeys, built-in or derived, and the bits they run on: a value's repr
 //! lies in its range and decodes back to it; a repr that decodes re-encodes to itself, unchecked
-//! too; each validity's promise holds; and `None` takes a spare repr: zero where zero is the
-//! niche, else one outside its value's range.
+//! too; each validity's promise holds; an ordered value's reprs order as it does, and an integer
+//! held to a range decodes, as itself, exactly where its repr lies in it; and `None` takes a spare
+//! repr: zero where zero is the niche, else one outside its value's range.
 
 use core::any::type_name;
 use core::fmt::Debug;
 
 use atomiks_core::validity::{Partial, Total, TotalZeroNiche, ZeroNiche, ZeroValid};
-use atomiks_core::{Atom, ExactBits, Primitive};
+use atomiks_core::{Atom, AtomOrd, ExactBits, Primitive};
 use proptest::prelude::{Strategy, any, prop_oneof};
 use proptest::sample::select;
 use proptest::test_runner::TestCaseError;
@@ -104,6 +105,46 @@ where
         );
     }
     canonical::<T>(repr)
+}
+
+/// The order law for `a` and `b`: the reprs' own order is the values'.
+pub(crate) fn reprs_order_as_ord<T: AtomOrd + Debug>(a: T, b: T) -> Result<(), TestCaseError>
+where
+    T::Repr: Ord,
+{
+    let (values, reprs) = (a.cmp(&b), a.to_repr().cmp(&b.to_repr()));
+    prop_assert_eq!(reprs, values, "{:?} and {:?} order as their reprs do", a, b);
+    Ok(())
+}
+
+/// The ranged integer laws for the low bits of `bits` as the repr of `T`, an integer held to a
+/// range.
+///
+/// The repr decodes, as the integer it is, exactly where it lies in `T`'s range, alike unchecked,
+/// as `V`, `T`'s validity, promises; and where the low bits of `other` decode too, the two
+/// round-trip and order as their reprs do.
+pub(crate) fn ranged_integer_laws<V: Promise, T>(
+    bits: u128, other: u128,
+) -> Result<(), TestCaseError>
+where
+    T: AtomOrd<Validity = V> + Into<T::Repr> + Debug,
+    T::Repr: ExactBits + Ord + Debug,
+{
+    let [repr, other] = [bits, other].map(<T::Repr as Primitive>::from_bits);
+    let decoded = T::from_repr(repr);
+    prop_assert_eq!(
+        decoded.map(Into::into),
+        T::REPRS.contains(repr.to_bits()).then_some(repr),
+        "{:?} decodes as itself exactly where it lies in {:?}",
+        repr,
+        T::REPRS
+    );
+    decodes_as_promised::<V, T>(repr)?;
+    if let (Some(a), Some(b)) = (decoded, T::from_repr(other)) {
+        round_trips(a)?;
+        reprs_order_as_ord(a, b)?;
+    }
+    Ok(())
 }
 
 /// The `None` law for `T`, given `none`, the bits of `None`'s repr: they are spare, zero where

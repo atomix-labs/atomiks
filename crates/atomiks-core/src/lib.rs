@@ -19,11 +19,18 @@
 //!
 //! # Crate Features
 //!
-//! None is on by default.
+//! None is on by default. Under `--cfg loom`, whose cells are not plain memory, an atomic has
+//! neither zerocopy's traits nor `Zeroable`.
 //!
-//! | Feature | Adds                                                     |
-//! | ------- | -------------------------------------------------------- |
-//! | `loom`  | loom's types under `--cfg loom`; nothing without the cfg |
+//! | Feature         | Adds                                                                       |
+//! | --------------- | -------------------------------------------------------------------------- |
+//! | `serde`         | serde's traits for an atomic, and a ranged integer, held to its range      |
+//! | `zerocopy-08`   | zerocopy's traits for an atomic, as its validity allows, never `Immutable` |
+//! | `bytemuck`      | `Zeroable` for an atomic, and the bit-pattern traits for a ranged integer  |
+//! | `arbitrary`     | `Arbitrary` for an atomic, and a ranged integer, held to its range         |
+//! | `arbitrary-int` | `Atom` and `AtomOrd` for arbitrary-int's integers, as their base integer   |
+//! | `deranged-05`   | `Atom`, `AtomOrd` and `From` with atomiks' own for deranged 0.5's integers |
+//! | `loom`          | loom's types under `--cfg loom`; nothing without the cfg                   |
 
 #![no_std]
 #![feature(
@@ -86,6 +93,7 @@ pub mod cell;
 mod errors;
 mod fence;
 pub mod hint;
+mod interop;
 mod message;
 #[cfg(loom)]
 pub mod model;

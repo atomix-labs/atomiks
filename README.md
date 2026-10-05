@@ -19,10 +19,12 @@ atomiks is a workspace of Rust crates for sharing state between threads. The
 integers, plain or held to a range, `NonZero`s, `char`s, floats, pointers,
 `Option`s that spend a spare bit pattern on `None`, and the structs and enums
 `#[derive(Atom)]` packs into one word, with orderings checked at compile time
-and every operation the instruction its name promises. `atomiks-core` holds the
-typed atomic, `atomiks-derive` the derive, and `atomiks` re-exports both, the
-derive under its `derive` feature; all build for Linux and macOS, on aarch64 and
-x86_64. atomiks is in early development, and no crate is released yet.
+and every operation the instruction its name promises. It works with serde,
+zerocopy, bytemuck, arbitrary, arbitrary-int and deranged, each behind a
+feature. `atomiks-core` holds the typed atomic, `atomiks-derive` the derive, and
+`atomiks` re-exports both, the derive under its `derive` feature; all build for
+Linux and macOS, on aarch64 and x86_64. atomiks is in early development, and no
+crate is released yet.
 
 ## Documentation
 

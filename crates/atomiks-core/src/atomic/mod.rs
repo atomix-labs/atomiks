@@ -4,6 +4,10 @@ use core::fmt;
 use core::marker::PhantomData;
 use core::panic::{RefUnwindSafe, UnwindSafe};
 
+// Written out, not as an alias: an alias would hide the feature's badge on the derived impls.
+#[cfg(all(feature = "zerocopy-08", not(loom)))]
+use zerocopy::{FromBytes, IntoBytes, KnownLayout, Unaligned};
+
 use crate::atom::Atom;
 use crate::ordering::{LoadOrdering, Relaxed, RmwOrdering, StoreOrdering};
 use crate::primitive::{CellAccess, CompareExchange, ExactBits, Load, Primitive, Store, Swap};
@@ -31,6 +35,16 @@ pub use self::ptr::AtomicPtr;
 /// run-time code builds one with [`From`] and reads it back with [`get`](Self::get); a const
 /// caller of `get` or [`set`](Self::set) needs `const_trait_impl`.
 ///
+/// With the `zerocopy-08` feature, and not under loom, it derives zerocopy's traits through its
+/// cell, so it has each its cell has: [`KnownLayout`] always; [`IntoBytes`] but for a pointer, and
+/// [`Unaligned`] at 8 bits; [`FromBytes`] where every repr decodes and the cell holds an integer.
+/// An atomic `bool` or pointer reads only from zeros, or from bytes [`TryFromBytes`] checks, and a
+/// pointer's check passes only zeros; any other, as a `char`'s, reads from neither. It is never
+/// [`Immutable`], since its shared reference writes: bytes this process holds alone, as a page it
+/// lays out before another process maps it, become an atomic through `mut_from_bytes`, then a
+/// shared reborrow. Memory another process may already be writing is reached through a pointer, as
+/// [`from_ptr`](Self::from_ptr) takes, since a `&mut [u8]` over it would be aliased.
+///
 /// # Examples
 /// ```
 /// # extern crate atomiks_core as atomiks;
@@ -49,16 +63,29 @@ pub use self::ptr::AtomicPtr;
 /// });
 /// assert_eq!(LOW.load(Relaxed), 10_100, "the lowest of the three asks");
 /// ```
+///
+/// [`KnownLayout`]: https://docs.rs/zerocopy/0.8/zerocopy/trait.KnownLayout.html
+/// [`IntoBytes`]: https://docs.rs/zerocopy/0.8/zerocopy/trait.IntoBytes.html
+/// [`Unaligned`]: https://docs.rs/zerocopy/0.8/zerocopy/trait.Unaligned.html
+/// [`FromBytes`]: https://docs.rs/zerocopy/0.8/zerocopy/trait.FromBytes.html
+/// [`TryFromBytes`]: https://docs.rs/zerocopy/0.8/zerocopy/trait.TryFromBytes.html
+/// [`Immutable`]: https://docs.rs/zerocopy/0.8/zerocopy/trait.Immutable.html
 #[repr(transparent)]
+#[cfg_attr(
+    all(feature = "zerocopy-08", not(loom)),
+    derive(KnownLayout, IntoBytes, Unaligned, FromBytes)
+)]
 pub struct Atomic<T: Atom> {
     // INVARIANT: holds a repr that decodes: one `to_repr` returned; one a read-modify-write left,
     // which either needs `Total` (add, the bitwise operations, the pointer offsets), keeps one of
     // its operands (max, min), or leaves the repr as it was (`load_rmw`, and a 128-bit
     // `read_for_rmw` without `Load`, each a compare-exchange of zero for zero, on an integer repr,
     // whose exchange compares every bit); or any repr written through `get_mut`, whose `Total`
-    // bound makes every one decode. Its writers are this module and its submodules, whoever writes
-    // through `get_mut`'s place, and whoever writes through `as_ptr` or `from_ptr`, whose
-    // contracts keep it.
+    // bound makes every one decode; or any repr zerocopy's derives read from bytes or zeros, which
+    // they do only where the cell is the primitive's own, so `Total`'s; or the zero repr
+    // bytemuck's `Zeroable` writes, only where `ZeroValid` says it decodes. Its writers are this
+    // module and its submodules, the zerocopy and bytemuck impls, and whoever writes through
+    // `get_mut`'s place, `as_ptr` or `from_ptr`, whose bounds and contracts keep it.
     /// The cell holding `T`'s repr: the validity's wrapper around the primitive's cell.
     cell: <T::Validity as Validity>::Cell<T::Repr>,
     /// The type of the value the repr encodes.

@@ -7,16 +7,16 @@ loom := '''--config 'target."cfg(all())".rustflags=["--cfg","loom"]' --target-di
 # Miri with strict provenance, isolation on, and proptest's cases cut to what Miri runs in time.
 miri := "MIRIFLAGS='-Zmiri-strict-provenance -Zmiri-isolation-error=warn-nobacktrace -Zmiri-env-forward=PROPTEST_CASES' PROPTEST_CASES=16"
 
-# x86-64 goes through `RUSTFLAGS`, which replaces the floor. Only the models run: a doctest fails
-# under loom, whose atomics exist only inside a model, with no `const` `new` and no `from_ptr`.
+# The lints run on aarch64, and on x86_64 with the floor and with x86-64, which goes through
+# `RUSTFLAGS`, replacing the floor. Only the models run: a doctest fails under loom, whose atomics
+# exist only inside a model, with no `const` `new` and no `from_ptr`.
 
-# Lints every crate under loom, the derive's code too, on aarch64, and on x86_64 with the floor and
-# x86-64; runs the models.
+# Lints every crate under loom, with every feature on; runs the models.
 [metadata("rust")]
 check-loom:
-    cargo clippy --workspace --all-targets --features loom,derive {{ loom }} --target aarch64-unknown-linux-gnu -- -D warnings
-    cargo clippy --workspace --all-targets --features loom,derive {{ loom }} --target x86_64-unknown-linux-gnu -- -D warnings
-    RUSTFLAGS='--cfg loom -C target-cpu=x86-64' cargo clippy --workspace --all-targets --features loom,derive --target x86_64-unknown-linux-gnu --target-dir target/loom-x86-64 -- -D warnings
+    cargo clippy --workspace --all-targets --all-features {{ loom }} --target aarch64-unknown-linux-gnu -- -D warnings
+    cargo clippy --workspace --all-targets --all-features {{ loom }} --target x86_64-unknown-linux-gnu -- -D warnings
+    RUSTFLAGS='--cfg loom -C target-cpu=x86-64' cargo clippy --workspace --all-targets --all-features --target x86_64-unknown-linux-gnu --target-dir target/loom-x86-64 -- -D warnings
     cargo test -p atomiks-core --features loom {{ loom }} --test model
 
 # macOS's aarch64 floor has LSE2, which Linux's lacks. x86_64's floor has AVX; x86-64-v2 has

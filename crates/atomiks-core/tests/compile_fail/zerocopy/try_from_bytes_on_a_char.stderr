@@ -1,0 +1,26 @@
+error[E0599]: the associated function or constant `try_read_from_bytes` exists for struct `atomiks_core::Atomic<char>`, but its trait bounds were not satisfied
+ --> tests/compile_fail/zerocopy/try_from_bytes_on_a_char.rs:7:29
+  |
+7 |     let _ = Atomic::<char>::try_read_from_bytes(&[0; 4]);
+  |                             ^^^^^^^^^^^^^^^^^^^ associated function or constant cannot be called on `atomiks_core::Atomic<char>` due to unsatisfied trait bounds
+  |
+ ::: src/atomic/mod.rs
+  |
+  | pub struct Atomic<T: Atom> {
+  | -------------------------- doesn't satisfy `atomiks_core::Atomic<char>: TryFromBytes`
+  |
+ ::: src/validity.rs
+  |
+  |     pub struct Opaque<C>(pub(super) C);
+  |     -------------------- doesn't satisfy `_: TryFromBytes`
+  |
+note: if you're trying to build a new `atomiks_core::Atomic<char>`, consider using `atomiks_core::Atomic::<T>::new` which returns `atomiks_core::Atomic<_>`
+ --> src/atomic/mod.rs
+  |
+  | /     pub const fn new(value: T) -> Self
+  | |     where
+  | |         T: const Atom,
+  | |______________________^
+  = note: the following trait bounds were not satisfied:
+          `validity::opaque::Opaque<std::sync::atomic::Atomic<u32>>: TryFromBytes`
+          which is required by `atomiks_core::Atomic<char>: TryFromBytes`

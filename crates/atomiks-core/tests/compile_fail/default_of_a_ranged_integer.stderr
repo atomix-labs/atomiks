@@ -10,21 +10,15 @@ note: if you're trying to build a new `RangedU64<3, u64::MAX>` consider using on
       RangedU64::<MIN, MAX>::new_saturating
  --> src/ranged/mod.rs
   |
-  |               pub const fn new(integer: $int) -> Option<Self> {
-  |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |             pub const fn new(integer: $int) -> Option<Self> {
+  |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ...
-  |               pub const unsafe fn new_unchecked(integer: $int) -> Self {
-  |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |             pub const unsafe fn new_unchecked(integer: $int) -> Self {
+  |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ...
-  |               pub const fn new_saturating(integer: $int) -> Self {
-  |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |             pub const fn new_saturating(integer: $int) -> Self {
+  |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ...
-  | / ranged!(
-  | |     RangedU8(u8),
-  | |     RangedU16(u16),
-  | |     RangedU32(u32),
-... |
-  | |     RangedUsize(usize),
-  | | );
-  | |_- in this macro invocation
-  = note: this error originates in the macro `ranged` (in Nightly builds, run with -Z macro-backtrace for more info)
+  | each_ranged_integer!(ranged);
+  | ---------------------------- in this macro invocation
+  = note: this error originates in the macro `ranged` which comes from the expansion of the macro `each_ranged_integer` (in Nightly builds, run with -Z macro-backtrace for more info)

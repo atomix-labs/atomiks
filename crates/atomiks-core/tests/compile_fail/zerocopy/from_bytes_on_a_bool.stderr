@@ -1,0 +1,26 @@
+error[E0599]: the associated function or constant `read_from_bytes` exists for struct `atomiks_core::Atomic<bool>`, but its trait bounds were not satisfied
+ --> tests/compile_fail/zerocopy/from_bytes_on_a_bool.rs:8:25
+  |
+8 |     let _ = AtomicBool::read_from_bytes(&[2]);
+  |                         ^^^^^^^^^^^^^^^ associated function or constant cannot be called on `atomiks_core::Atomic<bool>` due to unsatisfied trait bounds
+  |
+ ::: src/atomic/mod.rs
+  |
+  | pub struct Atomic<T: Atom> {
+  | -------------------------- doesn't satisfy `atomiks_core::Atomic<bool>: FromBytes`
+  |
+ ::: $RUST/core/src/sync/atomic.rs
+  |
+  | pub struct Atomic<T: AtomicPrimitive> {
+  | ------------------------------------- doesn't satisfy `std::sync::atomic::Atomic<bool>: FromBytes`
+  |
+note: if you're trying to build a new `atomiks_core::Atomic<bool>`, consider using `atomiks_core::Atomic::<T>::new` which returns `atomiks_core::Atomic<_>`
+ --> src/atomic/mod.rs
+  |
+  | /     pub const fn new(value: T) -> Self
+  | |     where
+  | |         T: const Atom,
+  | |______________________^
+  = note: the following trait bounds were not satisfied:
+          `std::sync::atomic::Atomic<bool>: FromBytes`
+          which is required by `atomiks_core::Atomic<bool>: FromBytes`
