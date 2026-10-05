@@ -11,8 +11,9 @@ aarch64-refused = []
 
 [dependencies]
 # external
-deranged = { version = "0.5.8", default-features = false }
+arbitrary-int = { version = "2.2.0", default-features = false }
+deranged      = { version = "0.5.8", default-features = false }
 # internal
-atomiks-core = { path = "../..", features = ["deranged-05"] }
+atomiks-core = { path = "../..", features = ["arbitrary-int", "deranged-05"] }
 
 [workspace]

@@ -168,7 +168,8 @@ pub trait AtomBitwise: Atom<Validity = Total, Repr: Bitwise> {}
 /// So a field of it has the bitwise operations. A packed value stores a field in as few bits as
 /// its [`REPRS`](Atom::REPRS) need, read back zero-extended, or sign-extended where two's
 /// complement takes fewer. Every value with [`AtomBitwise`] has it, since each of its reprs
-/// decodes.
+/// decodes. So does each of arbitrary-int's integers, with the `arbitrary-int` feature, though none
+/// has `AtomBitwise`: a field stores a `u4` in four bits, and each pattern of them is a `u4`.
 ///
 /// # Safety
 /// Every pattern of those bits, read back so, is a repr that decodes.
@@ -201,7 +202,8 @@ unsafe impl<T: AtomBitwise<Repr: ExactBits>> FieldBitwise for T {}
 ///
 /// So a field of it that ends at its container's top bit adds in place. A packed value stores a
 /// field as [`FieldBitwise`] says. Every value with [`AtomAdd`] has it, since each of its reprs
-/// decodes.
+/// decodes, and so does each of arbitrary-int's integers, as for `FieldBitwise`: a `u61` above
+/// three `bool`s fills a `u64`, and counts in place.
 ///
 /// # Safety
 /// Every pattern of those bits, read back so, is a repr that decodes.

@@ -1,26 +1,36 @@
 //! arbitrary-int's integers in an atomic: each stored as its base integer, every repr of an 8-bit
 //! base decoding exactly when it is a value; the `Atom` laws at the edges of each width, and on
-//! random bits; `None` beside the range; statics; and `fetch_max` and `fetch_min`, through zero for
-//! the signed, on aarch64.
+//! random bits; `None` beside the range; statics; `fetch_max` and `fetch_min`, through zero for
+//! the signed, on aarch64; and, in a field of a packed struct, a `u4`'s bitwise operations, the
+//! add of a `u61`, an `i12` and an `Int<i8, 8>` that fill their word, and a signed field's not.
 //!
 //! The dev-dependency turns on arbitrary-int's `hint`, so these run against the `value` of each
 //! base it swaps in, whose promise that the value fits Miri checks; the library builds without it,
 //! as in `check-rust-doc` and a user's build.
 
 #![cfg(feature = "arbitrary-int")]
+#![feature(const_trait_impl)]
 
 // Under loom the impls stay on, since none reads an atomic's memory as bytes; `check-loom` builds
 // this.
 #[cfg(loom)]
 const _: () = {
     use arbitrary_int::{i20, u20};
-    use atomiks_core::AtomOrd;
+    use atomiks_core::{AtomOrd, FieldAdd, FieldBitwise};
 
     /// Compiles only where `T`'s reprs order as its values.
     const fn orders_as_its_reprs<T: AtomOrd>() {}
+    /// Compiles only where a field of `T` has the bitwise operations.
+    const fn combines_in_a_field<T: FieldBitwise>() {}
+    /// Compiles only where a field of `T` that ends at the top adds in place.
+    const fn adds_in_a_field<T: FieldAdd>() {}
 
     orders_as_its_reprs::<u20>();
     orders_as_its_reprs::<i20>();
+    combines_in_a_field::<u20>();
+    combines_in_a_field::<i20>();
+    adds_in_a_field::<u20>();
+    adds_in_a_field::<i20>();
 };
 
 // Loom's cells exist only inside a model; `model.rs` holds the loom tests.
@@ -33,25 +43,25 @@ mod testing;
 mod tests {
     use arbitrary_int::traits::Integer;
     use arbitrary_int::{
-        Int, UInt, i1, i3, i5, i7, i12, i15, i20, i31, i33, i63, u1, u3, u5, u7, u12, u15, u20,
-        u31, u33, u63,
+        Int, UInt, i1, i3, i5, i7, i12, i15, i20, i31, i33, i63, u1, u3, u4, u5, u7, u12, u15, u20,
+        u31, u33, u61, u63,
     };
     #[cfg(wide)]
     use arbitrary_int::{i65, i127, u65, u127};
-    #[cfg(wide)]
-    use atomiks_core::ordering::AcqRel;
     #[cfg(target_arch = "aarch64")]
     use atomiks_core::ordering::Relaxed;
-    use atomiks_core::ordering::{Acquire, Release};
+    use atomiks_core::ordering::{AcqRel, Acquire, Release};
     use atomiks_core::validity::ZeroValid;
-    use atomiks_core::{Atom, Atomic, ReprRange};
+    use atomiks_core::{Atom, Atomic, Field, ReprRange};
     use proptest::proptest;
     use proptest::test_runner::TestCaseError;
 
     use crate::testing::atom::{decodes_exactly_its_values, field_width, repr_and_validity_are};
+    use crate::testing::field::{bits, canonical};
     use crate::testing::law::{
         assert_holds, edge_or_random_bits, edges, none_laws, ranged_integer_laws,
     };
+    use crate::testing::packed::packed;
 
     /// The widths the laws run on beside each base's own: one bit, a few, one short of a base, and
     /// one past the base below.
@@ -61,6 +71,33 @@ mod tests {
     static SEQ: Atomic<u20> = Atomic::new(u20::new(5));
     /// A 20-bit signed offset, or `None` before the first.
     static OFFSET: Atomic<Option<i20>> = Atomic::new(None);
+
+    packed! {
+        /// A task: three bits of its state, then a count of its references, filling the word.
+        struct Task in u64, projected as TaskFields {
+            0 => queued: bool,
+            1 => running: bool,
+            2 => done: bool,
+            3 => references: u61,
+        }
+    }
+
+    packed! {
+        /// A step: four bits of flags, then a signed delta, filling the word.
+        struct Step in u16, projected as StepFields {
+            0 => flags: u4,
+            1 => delta: i12,
+        }
+    }
+
+    packed! {
+        /// A byte of flags, then a signed level as wide as its base, which a field stores as its
+        /// bits are, unextended.
+        struct Gauge in u16, projected as GaugeFields {
+            0 => flags: u8,
+            1 => level: Int<i8, 8>,
+        }
+    }
 
     #[test]
     fn each_is_stored_as_its_base_and_zero_decodes() {
@@ -214,6 +251,99 @@ mod tests {
         assert_eq!(signed.load(Relaxed), i20::MIN, "the smallest is below 1");
         signed.fetch_max(i20::new(-3), Relaxed);
         assert_eq!(signed.load(Relaxed), i20::new(-3), "-3 is above the smallest");
+    }
+
+    #[test]
+    fn a_u61_counter_at_the_top_wraps_at_its_largest_and_leaves_the_bits_below() {
+        assert_eq!(bits::<Field<Task, 3, u61>>(), (3, 61), "the count's 61 bits, at the top");
+        let first = Task { queued: true, running: false, done: true, references: u61::MAX };
+        let task = Atomic::new(first);
+        let TaskFields { queued, running, done, references } = task.fields();
+        assert_eq!(references.fetch_add(1, AcqRel), first, "the task before");
+        let wrapped = Task { references: u61::new(0), ..first };
+        assert_eq!(canonical(&task), wrapped, "wrapped to zero, the bits below as they were");
+        queued.clear(Release);
+        running.set(Release);
+        done.clear(Release);
+        let started = Task { queued: false, running: true, done: false, ..wrapped };
+        assert_eq!(references.fetch_sub(1, AcqRel), started, "zero before, the bits as changed");
+        let back = Task { references: u61::MAX, ..started };
+        assert_eq!(canonical(&task), back, "back to the largest, borrowing nothing from below");
+    }
+
+    #[test]
+    fn a_delta_wider_than_the_field_adds_modulo_its_width() {
+        let first = Task { queued: false, running: true, done: false, references: u61::MAX };
+        let task = Atomic::new(first);
+        task.fields().references.fetch_add(u64::MAX, Release);
+        let less_one = Task { references: u61::MAX.wrapping_sub(u61::new(1)), ..first };
+        assert_eq!(canonical(&task), less_one, "`u64::MAX` is 2^61 - 1 there, so one less");
+    }
+
+    #[test]
+    fn a_u4_field_of_flags_combines_its_bits_alone() {
+        assert_eq!(bits::<Field<Step, 0, u4>>(), (0, 4), "the flags' four bits");
+        let first = Step { flags: u4::new(0b1010), delta: i12::new(-5) };
+        let step = Atomic::new(first);
+        let flags = step.fields().flags;
+        flags.or(u4::new(0b0101), Release);
+        assert_eq!(flags.load(Acquire), u4::new(0b1111), "or");
+        flags.and(u4::new(0b0110), Release);
+        assert_eq!(flags.load(Acquire), u4::new(0b0110), "and");
+        flags.xor(u4::new(0b1100), Release);
+        assert_eq!(flags.load(Acquire), u4::new(0b1010), "xor");
+        flags.not(Release);
+        let inverted = Step { flags: u4::new(0b0101), ..first };
+        assert_eq!(canonical(&step), inverted, "not, the negative delta as it was");
+    }
+
+    #[test]
+    fn a_signed_field_at_the_top_subtracts_across_zero_and_wraps_past_its_smallest() {
+        let first = Step { flags: u4::new(0b1001), delta: i12::new(1) };
+        let step = Atomic::new(first);
+        let delta = step.fields().delta;
+        assert_eq!(delta.fetch_sub(3, AcqRel), first, "the container before");
+        let below = Step { delta: i12::new(-2), ..first };
+        assert_eq!(canonical(&step), below, "below zero, the flags as they were");
+        delta.fetch_add(2, AcqRel);
+        assert_eq!(canonical(&step), Step { delta: i12::new(0), ..first }, "and back to zero");
+        delta.update(AcqRel, Acquire, |_| i12::MIN);
+        delta.fetch_sub(1, AcqRel);
+        assert_eq!(canonical(&step), Step { delta: i12::MAX, ..first }, "wrapped to the largest");
+    }
+
+    #[test]
+    fn a_signed_field_as_wide_as_its_base_adds_across_zero_and_wraps_past_its_largest() {
+        assert_eq!(
+            bits::<Field<Gauge, 1, Int<i8, 8>>>(),
+            (8, 8),
+            "the level's eight bits, at the top"
+        );
+        let first = Gauge { flags: 0xA5, level: Int::<i8, 8>::new(-1) };
+        let gauge = Atomic::new(first);
+        let GaugeFields { flags, level } = gauge.fields();
+        level.fetch_add(2, AcqRel);
+        let above = Gauge { level: Int::<i8, 8>::new(1), ..first };
+        assert_eq!(canonical(&gauge), above, "above zero, the flags as they were");
+        flags.and(0x0F, Release);
+        level.update(AcqRel, Acquire, |_| Int::<i8, 8>::MAX);
+        level.fetch_add(1, AcqRel);
+        let wrapped = Gauge { flags: 0x05, level: Int::<i8, 8>::MIN };
+        assert_eq!(canonical(&gauge), wrapped, "wrapped to the smallest, the flags as changed");
+    }
+
+    #[test]
+    fn a_signed_field_inverts_as_its_own_not() {
+        let first = Step { flags: u4::new(0b1001), delta: i12::MAX };
+        let step = Atomic::new(first);
+        step.fields().delta.not(Release);
+        let inverted = Step { delta: i12::MIN, ..first };
+        assert_eq!(canonical(&step), inverted, "sign-extended: `!i12::MAX` is `i12::MIN`");
+        let first = Gauge { flags: 0xA5, level: Int::<i8, 8>::new(5) };
+        let gauge = Atomic::new(first);
+        gauge.fields().level.not(Release);
+        let inverted = Gauge { level: Int::<i8, 8>::new(-6), ..first };
+        assert_eq!(canonical(&gauge), inverted, "as wide as its base: `!5` is -6");
     }
 
     #[cfg(wide)]

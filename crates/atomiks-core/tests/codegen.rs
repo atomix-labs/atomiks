@@ -9,7 +9,8 @@
 //!
 //! A field's operation is its whole word's, its operand confined to the field: one LSE
 //! instruction on `aarch64`, one `lock` instruction on `x86_64`, where a bit's test is `lock bts`
-//! and its kin at every position, the lowest and the top bit's position in a register.
+//! and its kin at every position, the lowest and the top bit's position in a register. A field of
+//! an arbitrary-int integer lowers as a built-in integer's does.
 
 // Miri cannot run the compiler, and loom's atomics are not what ships.
 #![cfg(on_hardware)]
@@ -75,6 +76,8 @@ mod tests {
         ("top_fetch_sub", InOrder(&["neg", "ldaddal"])),
         ("top_fetch_add_discarded", Only(&["lsl", "ldadd", "ret"])),
         ("top_fetch_add_count", Only(&["mov", "ldaddal", "lsr", "ret"])),
+        ("u61_top_fetch_add_references", Only(&["mov", "ldaddal", "lsr", "ret"])),
+        ("u4_flags_or", Only(&["and", "ldsetlh", "ret"])),
         ("field_fetch_or", InOrder(&["mov", "ldsetal"])),
         ("flags_fetch_and", InOrder(&["bic", "ldclral"])),
         ("flags_fetch_or", InOrder(&["lsl", "ldsetal"])),
@@ -195,6 +198,8 @@ mod tests {
         ("top_fetch_sub", InOrder(&["shlq", "negq", "lock xaddq"])),
         ("top_fetch_add_discarded", Only(&["shlq", "lock addq", "retq"])),
         ("top_fetch_add_count", Only(&["movabsq", "lock xaddq", "shrq", "retq"])),
+        ("u61_top_fetch_add_references", Only(&["movl", "lock xaddq", "shrq", "retq"])),
+        ("u4_flags_or", Only(&["andl", "lock orw", "retq"])),
         ("ends16_low_test_and_set", Only(&["xorl", "andl", "lock btsw", "setb", "retq"])),
         (
             "ends16_middle_test_and_set",

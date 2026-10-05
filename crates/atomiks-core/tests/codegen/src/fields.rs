@@ -1,9 +1,11 @@
 //! One field operation per function, over packed structs written out as the derive writes them:
 //! each of a `bool`, a bitwise field, a field of a field and the field at the top bit, and a bit's
-//! test at each end and at the middle of 8, 16, 32 and 64 bits.
+//! test at each end and at the middle of 8, 16, 32 and 64 bits; and the add of an arbitrary-int
+//! `u61` at the top, and the or of a `u4`.
 
 use core::num::NonZero;
 
+use arbitrary_int::{u4, u12, u61};
 use atomiks_core::ordering::{AcqRel, Acquire, Relaxed, Release};
 use atomiks_core::{Atomic, RangedU8, RangedU16, RangedU32};
 
@@ -85,6 +87,24 @@ packed! {
         2 => middle: bool,
         3 => above: RangedU32<0, 0x3FFF_FFFF>,
         4 => top: bool,
+    }
+}
+
+packed! {
+    /// Three bits of a task's state, then a count of its references, filling the word.
+    pub struct Task in u64, projected as TaskFields {
+        0 => queued: bool,
+        1 => running: bool,
+        2 => done: bool,
+        3 => references: u61,
+    }
+}
+
+packed! {
+    /// Four bits of flags, then a count, filling the word.
+    pub struct Flagged in u16, projected as FlaggedFields {
+        0 => flags: u4,
+        1 => count: u12,
     }
 }
 
@@ -186,6 +206,16 @@ pub fn top_fetch_add_discarded(atomic: &Atomic<Counted>, delta: u32) {
 #[unsafe(no_mangle)]
 pub fn top_fetch_add_count(atomic: &Atomic<Counted>) -> u32 {
     atomic.fields().count.fetch_add(1, AcqRel).count
+}
+
+#[unsafe(no_mangle)]
+pub fn u61_top_fetch_add_references(atomic: &Atomic<Task>) -> u61 {
+    atomic.fields().references.fetch_add(1, AcqRel).references
+}
+
+#[unsafe(no_mangle)]
+pub fn u4_flags_or(atomic: &Atomic<Flagged>, flags: u4) {
+    atomic.fields().flags.or(flags, Release);
 }
 
 #[cfg(any(target_arch = "aarch64", feature = "aarch64-only"))]
