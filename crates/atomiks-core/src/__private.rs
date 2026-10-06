@@ -7,6 +7,7 @@
 use core::any::type_name;
 
 use crate::atom::{Atom, AtomAdd, AtomBitwise, AtomOrd};
+pub use crate::atomic::{HasPackedField, Reach, project_field};
 use crate::message::{Message, refuse};
 use crate::primitive::{CompareExchange, ExactBits, Primitive};
 pub use crate::range::{EnumLayout, PackedField, PackedLayout};
@@ -103,6 +104,14 @@ pub const fn assert_atom_ord<T: AtomOrd>() {}
 /// must.
 #[inline]
 pub const fn assert_atom_bitwise<T: AtomBitwise>() {}
+
+/// Whether `field`, of a packed value in the repr `R`, ends at the repr's top bit: the constant
+/// that selects a field's [`Reach`].
+#[inline]
+#[must_use]
+pub const fn reaches_top<R: Primitive>(field: PackedField) -> bool {
+    field.layout().width() != 0 && field.next_offset() == R::BITS
+}
 
 /// The widest integer an atomic cell holds on this target, in bits.
 const WIDEST: u32 = if cfg!(wide) { u128::BITS } else { u64::BITS };

@@ -2,7 +2,7 @@
 
 use core::iter;
 
-use syn::{Expr, Generics, Ident, Member, Path, Type};
+use syn::{Attribute, Expr, Generics, Ident, Member, Path, Type, Visibility};
 
 use crate::errors::DeriveError;
 
@@ -17,6 +17,11 @@ pub(crate) struct Input {
 
 /// What an impl for the type names: the type, and what `#[atom(…)]` states of it.
 pub(crate) struct Implementor {
+    /// The type's visibility, which a packed struct's projection takes.
+    pub(crate) vis: Visibility,
+    /// Its attributes that a packed struct's projection takes too: `#[non_exhaustive]` and
+    /// `#[doc(hidden)]`.
+    pub(crate) projection_attributes: Vec<Attribute>,
     /// The type's name.
     pub(crate) ident: Ident,
     /// Its parameters and where clause.
@@ -135,6 +140,10 @@ pub(crate) enum EnumRepr {
 pub(crate) struct Field {
     /// Its name, or its index in a tuple struct.
     pub(crate) member: Member,
+    /// Its visibility, which its place in a packed struct's projection takes.
+    pub(crate) vis: Visibility,
+    /// Its doc comments, which its place in a packed struct's projection carries.
+    pub(crate) docs: Vec<Attribute>,
     /// Its type, with the user's spans.
     pub(crate) ty: Type,
     /// Whether its type names a parameter of the type, so that an impl bounds it in its where

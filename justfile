@@ -11,13 +11,14 @@ miri := "MIRIFLAGS='-Zmiri-strict-provenance -Zmiri-isolation-error=warn-nobackt
 # `RUSTFLAGS`, replacing the floor. Only the models run: a doctest fails under loom, whose atomics
 # exist only inside a model, with no `const` `new` and no `from_ptr`.
 
-# Lints every crate under loom, with every feature on; runs the models.
+# Lints every crate under loom, with every feature on; runs the models, core's and the facade's.
 [metadata("rust")]
 check-loom:
     cargo clippy --workspace --all-targets --all-features {{ loom }} --target aarch64-unknown-linux-gnu -- -D warnings
     cargo clippy --workspace --all-targets --all-features {{ loom }} --target x86_64-unknown-linux-gnu -- -D warnings
     RUSTFLAGS='--cfg loom -C target-cpu=x86-64' cargo clippy --workspace --all-targets --all-features --target x86_64-unknown-linux-gnu --target-dir target/loom-x86-64 -- -D warnings
     cargo test -p atomiks-core --features loom {{ loom }} --test model
+    cargo test -p atomiks --features derive,loom {{ loom }} --test model
 
 # macOS's aarch64 floor has LSE2, which Linux's lacks. x86_64's floor has AVX; x86-64-v2 has
 # `cmpxchg16b` but no AVX; x86-64 has neither, so no 128-bit atomics. The last two go through

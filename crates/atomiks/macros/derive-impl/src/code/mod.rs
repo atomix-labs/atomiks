@@ -11,6 +11,7 @@ mod fieldless;
 mod layout;
 mod newtype;
 mod packed;
+mod projection;
 mod repr;
 mod stub;
 mod zero_width;

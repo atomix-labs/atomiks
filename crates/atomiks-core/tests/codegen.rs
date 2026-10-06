@@ -6,6 +6,11 @@
 //! those only `aarch64` has, and `aarch64` each 128-bit one it has no instruction for. A ranged
 //! integer's range reaches LLVM, so a comparison outside it folds to a constant, and a conversion
 //! to or from deranged's of the same bounds, which saturates, is a move at most.
+//!
+//! A field's operation is its whole word's, its operand confined to the field: one LSE
+//! instruction on `aarch64`, one `lock` instruction on `x86_64`, where a bit's test is `lock bts`
+//! and its kin at every position, the lowest and the top bit's position in a register. A field of
+//! an arbitrary-int integer lowers as a built-in integer's does.
 
 // Miri cannot run the compiler, and loom's atomics are not what ships.
 #![cfg(on_hardware)]
@@ -55,6 +60,44 @@ mod tests {
         ("ranged_below_min", Only(&["mov", "ret"])),
         ("ranged_to_deranged", Only(&["ret"])),
         ("ranged_from_deranged", Only(&["ret"])),
+        ("field_set", Only(&["mov", "ldsetl", "ret"])),
+        ("field_clear", Only(&["mov", "ldclrl", "ret"])),
+        ("field_toggle", Only(&["mov", "ldeorl", "ret"])),
+        ("field_store", InOrder(&["tbz", "ldsetl", "ldclrl"])),
+        ("field_test_and_set", Only(&["mov", "ldsetal", "ubfx", "ret"])),
+        ("flags_or", Only(&["and", "lsl", "ldsetl", "ret"])),
+        ("flags_and", Only(&["mov", "bic", "ldclrl", "ret"])),
+        ("flags_xor", Only(&["and", "lsl", "ldeorl", "ret"])),
+        ("flags_not", Only(&["mov", "ldeorl", "ret"])),
+        ("flags_or_constant", Only(&["mov", "ldsetl", "ret"])),
+        ("nested_clear", Only(&["mov", "ldclrl", "ret"])),
+        ("nested_flags_or", Only(&["ubfiz", "ldsetl", "ret"])),
+        ("top_fetch_add", InOrder(&["lsl", "ldaddal"])),
+        ("top_fetch_sub", InOrder(&["neg", "ldaddal"])),
+        ("top_fetch_add_discarded", Only(&["lsl", "ldadd", "ret"])),
+        ("top_fetch_add_count", Only(&["mov", "ldaddal", "lsr", "ret"])),
+        ("u61_top_fetch_add_references", Only(&["mov", "ldaddal", "lsr", "ret"])),
+        ("u4_flags_or", Only(&["and", "ldsetlh", "ret"])),
+        ("field_fetch_or", InOrder(&["mov", "ldsetal"])),
+        ("flags_fetch_and", InOrder(&["bic", "ldclral"])),
+        ("flags_fetch_or", InOrder(&["lsl", "ldsetal"])),
+        ("flags_fetch_xor", InOrder(&["lsl", "ldeoral"])),
+        ("flags_fetch_not", InOrder(&["mov", "ldeoral"])),
+        ("ends8_low_test_and_set", Only(&["mov", "ldsetalb", "and", "ret"])),
+        ("ends8_top_test_and_set", Only(&["mov", "ldsetalb", "lsr", "ret"])),
+        ("ends16_low_test_and_set", Only(&["mov", "ldsetalh", "and", "ret"])),
+        ("ends16_middle_test_and_set", Only(&["mov", "ldsetalh", "ubfx", "ret"])),
+        ("ends16_top_test_and_set", Only(&["mov", "ldsetalh", "lsr", "ret"])),
+        ("ends32_low_test_and_set", Only(&["mov", "ldsetal", "and", "ret"])),
+        ("ends32_middle_test_and_set", Only(&["mov", "ldsetal", "ubfx", "ret"])),
+        ("ends32_top_test_and_set", Only(&["mov", "ldsetal", "lsr", "ret"])),
+        ("ends64_low_test_and_set", Only(&["mov", "ldsetal", "and", "ret"])),
+        ("ends64_middle_test_and_set", Only(&["mov", "ldsetal", "ubfx", "ret"])),
+        ("ends64_middle_test_and_clear", Only(&["mov", "ldclral", "ubfx", "ret"])),
+        ("ends64_middle_test_and_toggle", Only(&["mov", "ldeoral", "ubfx", "ret"])),
+        ("ends64_top_test_and_set", Only(&["mov", "ldsetal", "lsr", "ret"])),
+        ("ends64_top_test_and_clear", Only(&["mov", "ldclral", "lsr", "ret"])),
+        ("ends64_top_test_and_toggle", Only(&["mov", "ldeoral", "lsr", "ret"])),
     ];
 
     /// The rest on `aarch64` with the `+lse` floor, which has no LSE2.
@@ -67,6 +110,10 @@ mod tests {
         ("option_load", Only(&["ldar", "ret"])),
         ("ranged_load", Only(&["ldar", "ret"])),
         ("u128_update", Retry(&["caspa", "caspal"])),
+        ("field_load", Only(&["ldar", "ubfx", "ret"])),
+        ("flags_load", Only(&["ldar", "lsr", "ret"])),
+        ("quantity_load", Only(&["ldar", "ret"])),
+        ("quantity_update", Retry(&["ldar", "casal"])),
     ];
 
     /// The rest on `aarch64` with LSE2: `neoverse-v1` on Linux, and macOS's floor, `apple-m1`.
@@ -84,9 +131,18 @@ mod tests {
         ("u128_store", InOrder(&["dmb ish", "stp"])),
         ("u128_store_seq_cst", InOrder(&["dmb ish", "stp", "dmb ish"])),
         ("u128_update", Retry(&["ldp", "dmb ishld", "caspal"])),
+        ("field_load", Only(&["ldapr", "ubfx", "ret"])),
+        ("flags_load", Only(&["ldapr", "lsr", "ret"])),
+        ("quantity_load", Only(&["ldapr", "ret"])),
+        ("quantity_update", Retry(&["ldapr", "casal"])),
     ];
 
     /// Each function of the fixture on `x86_64`, Linux or macOS, at the `x86-64-v3` floor (AVX).
+    ///
+    /// A bit's test is one `lock bts`, `btr` or `btc` at every position: with the position an
+    /// immediate, but the lowest bit's and the top bit's, which go through a register, and with
+    /// LLVM's `setb`, shift and test where the bit is the upper half's lowest, at 8 of 16 bits or
+    /// 32 of 64.
     const X86_64: &[(&str, Lowering)] = &[
         ("u64_load", Only(&["movq", "retq"])),
         ("u64_store", Only(&["movq", "retq"])),
@@ -122,6 +178,53 @@ mod tests {
         ("ranged_below_min", Only(&["xorl", "retq"])),
         ("ranged_to_deranged", Only(&["movl", "retq"])),
         ("ranged_from_deranged", Only(&["movl", "retq"])),
+        ("field_set", Only(&["movabsq", "lock orq", "retq"])),
+        ("field_clear", Only(&["movabsq", "lock andq", "retq"])),
+        ("field_toggle", Only(&["movabsq", "lock xorq", "retq"])),
+        ("field_store", InOrder(&["testl", "lock orq", "lock andq"])),
+        ("field_test_and_set", Only(&["lock btsq", "setb", "retq"])),
+        ("field_load", Only(&["movq", "shrq", "andl", "retq"])),
+        ("flags_load", Only(&["movq", "shrq", "retq"])),
+        ("quantity_load", Only(&["movq", "retq"])),
+        ("quantity_update", Retry(&["lock cmpxchgq"])),
+        ("flags_or", Only(&["movzbl", "shlq", "lock orq", "retq"])),
+        ("flags_and", Only(&["shlq", "movabsq", "orq", "lock andq", "retq"])),
+        ("flags_xor", Only(&["movzbl", "shlq", "lock xorq", "retq"])),
+        ("flags_not", Only(&["movabsq", "lock xorq", "retq"])),
+        ("flags_or_constant", Only(&["movabsq", "lock orq", "retq"])),
+        ("nested_clear", Only(&["lock andl", "retq"])),
+        ("nested_flags_or", Only(&["movzbl", "shll", "lock orl", "retq"])),
+        ("top_fetch_add", InOrder(&["shlq", "lock xaddq"])),
+        ("top_fetch_sub", InOrder(&["shlq", "negq", "lock xaddq"])),
+        ("top_fetch_add_discarded", Only(&["shlq", "lock addq", "retq"])),
+        ("top_fetch_add_count", Only(&["movabsq", "lock xaddq", "shrq", "retq"])),
+        ("u61_top_fetch_add_references", Only(&["movl", "lock xaddq", "shrq", "retq"])),
+        ("u4_flags_or", Only(&["andl", "lock orw", "retq"])),
+        ("ends16_low_test_and_set", Only(&["xorl", "andl", "lock btsw", "setb", "retq"])),
+        (
+            "ends16_middle_test_and_set",
+            Only(&["xorl", "lock btsw", "setb", "shll", "testw", "setne", "retq"]),
+        ),
+        ("ends16_top_test_and_set", Only(&["movl", "andl", "lock btsw", "setb", "retq"])),
+        ("ends32_low_test_and_set", Only(&["xorl", "andl", "lock btsl", "setb", "retq"])),
+        ("ends32_middle_test_and_set", Only(&["lock btsl", "setb", "retq"])),
+        ("ends32_top_test_and_set", Only(&["movl", "andl", "lock btsl", "setb", "retq"])),
+        ("ends64_low_test_and_set", Only(&["xorl", "andl", "lock btsq", "setb", "retq"])),
+        (
+            "ends64_middle_test_and_set",
+            Only(&["xorl", "lock btsq", "setb", "shlq", "setne", "retq"]),
+        ),
+        (
+            "ends64_middle_test_and_clear",
+            Only(&["xorl", "lock btrq", "setb", "shlq", "setne", "retq"]),
+        ),
+        (
+            "ends64_middle_test_and_toggle",
+            Only(&["xorl", "lock btcq", "setb", "shlq", "setne", "retq"]),
+        ),
+        ("ends64_top_test_and_set", Only(&["movl", "andl", "lock btsq", "setb", "retq"])),
+        ("ends64_top_test_and_clear", Only(&["movl", "andl", "lock btrq", "setb", "retq"])),
+        ("ends64_top_test_and_toggle", Only(&["movl", "andl", "lock btcq", "setb", "retq"])),
     ];
 
     #[test]
@@ -158,10 +261,13 @@ mod tests {
                              compare-exchange loop on this target";
         let min_max =
             "has no atomic maximum or minimum without a compare-exchange loop on this target";
+        let bit_test = "has no bit test-and-set without a compare-exchange loop on this target";
         assert!(
             errors.iter().all(|error| error.starts_with("error[E0277]: `")
-                && (error.ends_with(fetch_bitwise) || error.ends_with(min_max))),
-            "every error is `FetchBitwise`'s or `MinMax`'s:\n{stderr}"
+                && [fetch_bitwise, min_max, bit_test]
+                    .iter()
+                    .any(|message| error.ends_with(message))),
+            "every error is `FetchBitwise`'s, `MinMax`'s or `BitTest`'s:\n{stderr}"
         );
         let aarch64_only = AARCH64
             .iter()
@@ -174,6 +280,9 @@ mod tests {
             "= note: x86_64's `lock and`, `lock or` and `lock xor` cannot return the value before",
             "= help: the trait `MinMax` is not implemented for `i64`",
             "= note: x86_64 has no atomic maximum or minimum",
+            "= help: the trait `BitTest` is not implemented for `u8`",
+            "= note: x86_64's `lock bts`, `btr` and `btc` take 16, 32 or 64 bits",
+            "= note: for an 8-bit word, state `#[atom(repr = u16)]`",
             "= note: to accept a compare-exchange loop, call `update`",
         ] {
             assert!(stderr.contains(line), "the diagnostics say `{line}`:\n{stderr}");

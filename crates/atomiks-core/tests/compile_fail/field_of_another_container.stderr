@@ -1,0 +1,13 @@
+error[E0271]: type mismatch resolving `<Field<Head, 1, bool> as FieldPath>::Container == Quote`
+  --> tests/compile_fail/field_of_another_container.rs:31:21
+   |
+31 |     let _ = is_live(head.fields().written);
+   |             ------- ^^^^^^^^^^^^^^^^^^^^^ expected `Quote`, found `Head`
+   |             |
+   |             required by a bound introduced by this call
+   |
+note: required by a bound in `is_live`
+  --> tests/compile_fail/field_of_another_container.rs:23:25
+   |
+23 | fn is_live<P: FieldPath<Container = Quote, Value = bool>>(live: &AtomicField<P>) -> bool {
+   |                         ^^^^^^^^^^^^^^^^^ required by this bound in `is_live`

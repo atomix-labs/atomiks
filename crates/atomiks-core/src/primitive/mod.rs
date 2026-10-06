@@ -38,9 +38,9 @@ macro_rules! primitive {
     ($($cell:tt)+) => {
         /// A primitive an atomic cell holds: `bool`, an integer, or a `*mut T`.
         ///
-        /// Every primitive has a compare-exchange; [`Load`], [`Store`], [`Swap`], [`FetchBitwise`]
-        /// and [`MinMax`] say which other operations the target runs without a compare-exchange
-        /// loop. Only atomiks implements it.
+        /// Every primitive has a compare-exchange; [`Load`], [`Store`], [`Swap`], [`FetchAdd`],
+        /// [`MaskBitwise`], [`BitTest`], [`FetchBitwise`] and [`MinMax`] say which other operations
+        /// the target runs without a compare-exchange loop.
         #[diagnostic::on_unimplemented(
             message = "`{Self}` is not a primitive an atomic cell holds on this target",
             label = "expected `bool`, an integer or a `*mut T`"
@@ -77,8 +77,6 @@ primitive!(CellAccess);
 
 /// A primitive whose bits are its whole value: `bool` or an integer, never a pointer, whose
 /// provenance its bits do not hold.
-///
-/// Only atomiks implements it.
 // `Primitive::IS_BITS_EXACT` is true exactly for the primitives that implement this.
 #[diagnostic::on_unimplemented(
     message = "`{Self}` is not a primitive whose bits are its whole value",
@@ -122,8 +120,6 @@ pub impl(crate) trait CompareExchange: Primitive {
 }
 
 /// A primitive whose atomic load never writes.
-///
-/// Only atomiks implements it.
 #[diagnostic::on_unimplemented(
     message = "`{Self}` has no pure-read atomic load on this target",
     label = "this load would be a read-modify-write: it writes the line and faults on read-only pages",
@@ -137,8 +133,6 @@ pub impl(crate) trait Load: CompareExchange {
 }
 
 /// A primitive whose atomic store needs no compare-exchange loop.
-///
-/// Only atomiks implements it.
 #[diagnostic::on_unimplemented(
     message = "`{Self}` has no atomic store without a compare-exchange loop on this target",
     label = "this store would be a compare-exchange loop",
@@ -152,8 +146,6 @@ pub impl(crate) trait Store: CompareExchange {
 }
 
 /// A primitive whose atomic exchange needs no compare-exchange loop.
-///
-/// Only atomiks implements it.
 #[diagnostic::on_unimplemented(
     message = "`{Self}` has no atomic exchange without a compare-exchange loop on this target",
     label = "this exchange would be a compare-exchange loop",
@@ -167,11 +159,28 @@ pub impl(crate) trait Swap: CompareExchange {
 
 /// A primitive whose wrapping add and subtract need no compare-exchange loop: `lock xadd` on
 /// `x86_64`, `ldadd` on `aarch64` (without LSE, an outline call or an LL/SC pair).
-#[doc(hidden)]
-pub impl(crate) trait AddSub: CompareExchange {
+///
+/// A field's `fetch_add` and `fetch_sub` ask it of the container's repr, so generic code over a
+/// field states it; a value's [`AtomAdd`](crate::AtomAdd) implies it.
+///
+/// # Examples
+/// [`#[derive(Atom)]`'s example][generic] states it in generic code over a field.
+///
+/// [generic]: https://docs.rs/atomiks/latest/atomiks/derive.Atom.html#changing-a-field-through-generic-code
+// A value's `AtomAdd` names this bound first, so only a field's add, whose value may be a 128-bit
+// container's field, reaches this message.
+#[diagnostic::on_unimplemented(
+    message = "`{Self}` has no atomic add without a compare-exchange loop on this target",
+    label = "this would be a compare-exchange loop",
+    note = "atomiks has no 128-bit add",
+    note = "to accept a compare-exchange loop, call `update`"
+)]
+pub impl(crate) trait FetchAdd: CompareExchange {
     /// Adds `delta`, wrapping, and returns the value before.
+    #[doc(hidden)]
     fn fetch_add(cell: &Self::Cell, delta: Self, order: CoreOrdering) -> Self;
     /// Subtracts `delta`, wrapping, and returns the value before.
+    #[doc(hidden)]
     fn fetch_sub(cell: &Self::Cell, delta: Self, order: CoreOrdering) -> Self;
 }
 
@@ -206,10 +215,76 @@ pub impl(crate) trait Bitwise: CompareExchange {
     fn fetch_not(cell: &Self::Cell, order: CoreOrdering) -> Self;
 }
 
+/// A primitive whose bits a mask sets, clears or flips without a compare-exchange loop, once an
+/// optimized build discards the value before.
+///
+/// Each is `lock or`, `lock and` and `lock xor` on `x86_64`, `ldset`, `ldclr` and `ldeor` on
+/// `aarch64` (without LSE, an outline call or an LL/SC pair). A field's bitwise operations go
+/// through it, each with a mask its path confines to the field, and ask it of the container's repr,
+/// so generic code over a field states it, or [`BitTest`], which implies it.
+///
+/// # Examples
+/// [`#[derive(Atom)]`'s example][generic] states [`BitTest`], which implies it, in generic code
+/// over a field.
+///
+/// [generic]: https://docs.rs/atomiks/latest/atomiks/derive.Atom.html#changing-a-field-through-generic-code
+// An integer is its own mask.
+#[diagnostic::on_unimplemented(
+    message = "`{Self}` has no bitwise operation without a compare-exchange loop on this target",
+    label = "this would be a compare-exchange loop",
+    note = "atomiks has no 128-bit bitwise operation",
+    note = "to accept a compare-exchange loop, call `update`"
+)]
+pub impl(crate) trait MaskBitwise: CompareExchange {
+    /// The mask: the integer itself.
+    #[doc(hidden)]
+    type Mask: ExactBits;
+    /// The mask of the one bit at `position`, below `BITS`.
+    #[doc(hidden)]
+    fn bit(position: u32) -> Self::Mask;
+    /// The value's bits, as a mask.
+    #[doc(hidden)]
+    fn to_mask(self) -> Self::Mask;
+    /// Turns on the bits of `mask`, and returns the value before.
+    #[doc(hidden)]
+    fn fetch_or_mask(cell: &Self::Cell, mask: Self::Mask, order: CoreOrdering) -> Self;
+    /// Clears every bit outside `mask`, and returns the value before.
+    #[doc(hidden)]
+    fn fetch_and_mask(cell: &Self::Cell, mask: Self::Mask, order: CoreOrdering) -> Self;
+    /// Flips the bits of `mask`, and returns the value before.
+    #[doc(hidden)]
+    fn fetch_xor_mask(cell: &Self::Cell, mask: Self::Mask, order: CoreOrdering) -> Self;
+}
+
+/// A primitive whose one bit a test-and-set, -clear or -toggle reads back without a
+/// compare-exchange loop.
+///
+/// Each is `lock bts`, `btr` and `btc` on `x86_64`, of 16 bits or more, and `ldset`, `ldclr` and
+/// `ldeor` on `aarch64` (without LSE, an outline call or an LL/SC pair). A `bool` field's
+/// `test_and_set`, `test_and_clear` and `test_and_toggle` ask it of the container's repr, so
+/// generic code over a field states it.
+///
+/// # Examples
+/// [`#[derive(Atom)]`'s example][generic] states it in generic code over a field.
+///
+/// [generic]: https://docs.rs/atomiks/latest/atomiks/derive.Atom.html#changing-a-field-through-generic-code
+// Above the target-neutral attribute, so the target's notes come before its fallback.
+#[cfg_attr(
+    target_arch = "x86_64",
+    diagnostic::on_unimplemented(
+        note = "x86_64's `lock bts`, `btr` and `btc` take 16, 32 or 64 bits: an 8-bit or a 128-bit word's bit would be a compare-exchange loop",
+        note = "for an 8-bit word, state `#[atom(repr = u16)]`, or call `set`, `clear` or `toggle`, which discard the bit before"
+    )
+)]
+#[diagnostic::on_unimplemented(
+    message = "`{Self}` has no bit test-and-set without a compare-exchange loop on this target",
+    label = "this would be a compare-exchange loop",
+    note = "to accept a compare-exchange loop, call `update`"
+)]
+pub impl(crate) trait BitTest: MaskBitwise {}
+
 /// A primitive whose and, or, xor and not return the value before without a compare-exchange
 /// loop: `ldclr`, `ldset` and `ldeor` on `aarch64` (without LSE, an outline call or an LL/SC pair).
-///
-/// Only atomiks implements it.
 // Above the target-neutral attribute, so the target's notes come before its fallback.
 #[cfg_attr(
     target_arch = "x86_64",
@@ -228,8 +303,6 @@ pub impl(crate) trait FetchBitwise: Bitwise {}
 /// A primitive whose maximum and minimum, in its own signed or unsigned order, need no
 /// compare-exchange loop: `ldsmax`, `ldumin` and the rest on `aarch64`
 /// (without LSE, an LL/SC pair).
-///
-/// Only atomiks implements it.
 // Above the target-neutral attribute, so the target's notes come before its fallback.
 #[cfg_attr(
     target_arch = "x86_64",

@@ -3,6 +3,11 @@
 //! [`Atomic<T>`](Atomic) holds a `T` as its [`Repr`](Atom::Repr), one primitive an atomic
 //! instruction reads and writes, and decodes it on the way out.
 //!
+//! An atomic packed struct lends each of its fields as an [`AtomicField`], which one instruction
+//! on the whole word changes alone: `QUOTE.fields().live.set(Release)` sets the bit `live` of a
+//! derived `Quote` with `lock or`, or `ldset`. [`Atomic::fields`] lends them, through the
+//! [`ProjectFields`] atomiks' derive implements for the struct.
+//!
 //! # Examples
 //! ```
 //! use core::num::NonZero;
@@ -28,7 +33,7 @@
 //! | `zerocopy-08`   | zerocopy's traits for an atomic, as its validity allows, never `Immutable` |
 //! | `bytemuck`      | `Zeroable` for an atomic, and the bit-pattern traits for a ranged integer  |
 //! | `arbitrary`     | `Arbitrary` for an atomic, and a ranged integer, held to its range         |
-//! | `arbitrary-int` | `Atom` and `AtomOrd` for arbitrary-int's integers, as their base integer   |
+//! | `arbitrary-int` | `Atom`, `AtomOrd`, `FieldBitwise` and `FieldAdd` for `UInt` and `Int`      |
 //! | `deranged-05`   | `Atom`, `AtomOrd` and `From` with atomiks' own for deranged 0.5's integers |
 //! | `loom`          | loom's types under `--cfg loom`; nothing without the cfg                   |
 
@@ -103,10 +108,11 @@ mod range;
 mod ranged;
 pub mod validity;
 
-pub use crate::atom::{Atom, AtomAdd, AtomBitwise, AtomOrd};
+pub use crate::atom::{Atom, AtomAdd, AtomBitwise, AtomOrd, FieldAdd, FieldBitwise};
 pub use crate::atomic::{
-    Atomic, AtomicBool, AtomicI8, AtomicI16, AtomicI32, AtomicI64, AtomicIsize, AtomicPtr,
-    AtomicU8, AtomicU16, AtomicU32, AtomicU64, AtomicUsize,
+    Atomic, AtomicBool, AtomicField, AtomicI8, AtomicI16, AtomicI32, AtomicI64, AtomicIsize,
+    AtomicPtr, AtomicU8, AtomicU16, AtomicU32, AtomicU64, AtomicUsize, Field, FieldPath, Join,
+    ProjectFields, Then, TopField, Whole,
 };
 #[cfg(wide)]
 #[doc(cfg(any(
@@ -116,7 +122,9 @@ pub use crate::atomic::{
 pub use crate::atomic::{AtomicI128, AtomicU128};
 pub use crate::errors::{ParseRangeError, RangeError};
 pub use crate::fence::{compiler_fence, fence};
-pub use crate::primitive::{ExactBits, FetchBitwise, Load, MinMax, Primitive, Store, Swap};
+pub use crate::primitive::{
+    BitTest, ExactBits, FetchAdd, FetchBitwise, Load, MaskBitwise, MinMax, Primitive, Store, Swap,
+};
 pub use crate::range::ReprRange;
 pub use crate::ranged::{
     RangedI8, RangedI16, RangedI32, RangedI64, RangedI128, RangedIsize, RangedU8, RangedU16,

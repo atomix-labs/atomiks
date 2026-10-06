@@ -427,10 +427,59 @@ mod tests {
     }
 
     #[test]
+    #[expect(
+        clippy::too_many_lines,
+        reason = "the whole expansion it pins, written out, is that long"
+    )]
     fn a_packed_struct_places_each_field_where_the_one_before_it_ends() {
         let expected = quote! {
             const _: () = ::atomiks::__private::assert_send_and_sync::<Step>();
             const _: () = {
+                #[automatically_derived]
+                unsafe impl ::atomiks::__private::HasPackedField<0, u8> for Step {
+                    const PLACEMENT: ::atomiks::__private::PackedField = placement_0;
+                    const LAYOUT: ::atomiks::__private::PackedLayout = layout;
+                    type Reach = ::atomiks::__private::Reach<{
+                        ::atomiks::__private::reaches_top::<Repr>(placement_0)
+                    }>;
+                }
+                #[automatically_derived]
+                unsafe impl ::atomiks::__private::HasPackedField<1, Sign> for Step {
+                    const PLACEMENT: ::atomiks::__private::PackedField = placement_1;
+                    const LAYOUT: ::atomiks::__private::PackedLayout = layout;
+                    type Reach = ::atomiks::__private::Reach<{
+                        ::atomiks::__private::reaches_top::<Repr>(placement_1)
+                    }>;
+                }
+                #[automatically_derived]
+                const unsafe impl ::atomiks::ProjectFields for Step {
+                    type Fields<'a, P: ::atomiks::FieldPath<Value = Self> + 'a> = StepFields<'a, P>
+                    where
+                        Self: 'a;
+                    #[inline]
+                    fn project<P: ::atomiks::FieldPath<Value = Self>>(
+                        place: &::atomiks::AtomicField<P>,
+                    ) -> StepFields<'_, P> {
+                        StepFields {
+                            length: unsafe { ::atomiks::__private::project_field(place) },
+                            sign: unsafe { ::atomiks::__private::project_field(place) }
+                        }
+                    }
+                }
+                #[automatically_derived]
+                impl<'a, P: ::atomiks::FieldPath<Value = Step> + 'a> ::core::fmt::Debug for StepFields<'a, P>
+                where
+                    &'a ::atomiks::AtomicField<::atomiks::Join<P, ::atomiks::Field<Step, 0, u8>>>: ::core::fmt::Debug,
+                    &'a ::atomiks::AtomicField<::atomiks::Join<P, ::atomiks::Field<Step, 1, Sign>>>: ::core::fmt::Debug
+                {
+                    fn fmt(&self, formatter: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+                        formatter
+                            .debug_struct("StepFields")
+                            .field("length", &self.length)
+                            .field("sign", &self.sign)
+                            .finish()
+                    }
+                }
                 const placement_0: ::atomiks::__private::PackedField =
                     ::atomiks::__private::PackedField::new(<u8 as ::atomiks::Atom>::REPRS, 0);
                 const placement_1: ::atomiks::__private::PackedField =
@@ -492,9 +541,155 @@ mod tests {
                     }
                 }
             };
+            #[doc = " The fields of an atomic [`Step`], or of a field whose value is one, each a place of its own: what [`fields()`](atomiks::Atomic::fields) lends."]
+            #[derive(::core::clone::Clone, ::core::marker::Copy)]
+            struct StepFields<'a, P: ::atomiks::FieldPath<Value = Step> + 'a> {
+                #[doc = " The field `length`, of type `u8`, in an atomic `Step`."]
+                length: &'a ::atomiks::AtomicField<::atomiks::Join<P, ::atomiks::Field<Step, 0, u8>>>,
+                #[doc = " The field `sign`, of type `Sign`, in an atomic `Step`."]
+                sign: &'a ::atomiks::AtomicField<::atomiks::Join<P, ::atomiks::Field<Step, 1, Sign>>>
+            }
         };
         let step = derive_atom(quote! { struct Step { length: u8, sign: Sign } });
-        assert_eq!(written(&step), expected.to_string(), "the impl");
+        assert_eq!(written(&step), expected.to_string(), "the impl and the projection");
+    }
+
+    #[test]
+    fn each_place_of_the_projection_takes_its_fields_visibility_and_docs() {
+        let quote = written(&derive_atom(quote! {
+            pub struct Quote {
+                /// How many.
+                pub quantity: u32,
+                side: Side,
+                pub(crate) live: bool,
+            }
+        }));
+        let fields = quote! {
+            pub struct QuoteFields<'a, P: ::atomiks::FieldPath<Value = Quote> + 'a> {
+                #[doc = r" How many."]
+                #[doc = ""]
+                #[doc = " The field `quantity`, of type `u32`, in an atomic `Quote`."]
+                pub quantity: &'a ::atomiks::AtomicField<::atomiks::Join<P, ::atomiks::Field<Quote, 0, u32>>>,
+                #[doc = " The field `side`, of type `Side`, in an atomic `Quote`."]
+                side: &'a ::atomiks::AtomicField<::atomiks::Join<P, ::atomiks::Field<Quote, 1, Side>>>,
+                #[doc = " The field `live`, of type `bool`, in an atomic `Quote`."]
+                pub(crate) live: &'a ::atomiks::AtomicField<::atomiks::Join<P, ::atomiks::Field<Quote, 2, bool>>>
+            }
+        };
+        assert!(quote.contains(&fields.to_string()), "each place as its field is: {quote}");
+    }
+
+    #[test]
+    fn the_projection_is_hidden_and_open_as_its_struct_is() {
+        let quote = written(&derive_atom(quote! {
+            #[doc(hidden)]
+            #[non_exhaustive]
+            #[derive(Debug)]
+            pub struct Quote { pub quantity: u32, pub live: bool }
+        }));
+        let attributes = quote! {
+            #[doc(hidden)]
+            #[non_exhaustive]
+            #[derive(::core::clone::Clone, ::core::marker::Copy)]
+            pub struct QuoteFields
+        };
+        assert!(quote.contains(&attributes.to_string()), "those two carried, alone: {quote}");
+    }
+
+    #[test]
+    fn a_tuple_structs_projection_is_a_tuple_struct() {
+        let code = written(&derive_atom(quote! { struct Pair(u16, bool); }));
+        let fields = quote! {
+            struct PairFields<'a, P: ::atomiks::FieldPath<Value = Pair> + 'a>(
+                #[doc = " The field `0`, of type `u16`, in an atomic `Pair`."]
+                &'a ::atomiks::AtomicField<::atomiks::Join<P, ::atomiks::Field<Pair, 0, u16>>>,
+                #[doc = " The field `1`, of type `bool`, in an atomic `Pair`."]
+                &'a ::atomiks::AtomicField<::atomiks::Join<P, ::atomiks::Field<Pair, 1, bool>>>
+            );
+        };
+        assert!(code.contains(&fields.to_string()), "a tuple struct: {code}");
+        let built =
+            quote!(PairFields(unsafe { ::atomiks::__private::project_field(place) }, unsafe {
+                ::atomiks::__private::project_field(place)
+            }));
+        assert!(code.contains(&built.to_string()), "built by position: {code}");
+        let shown =
+            quote!(formatter.debug_tuple("PairFields").field(&self.0).field(&self.1).finish());
+        assert!(code.contains(&shown.to_string()), "and printed so: {code}");
+    }
+
+    #[test]
+    fn a_generic_structs_fields_lie_where_each_instance_puts_them() {
+        let code = written(&derive_atom(quote! {
+            #[atom(repr = u64)]
+            struct Tagged<T> { marked: bool, value: T }
+        }));
+        let placed = quote! {
+            const PLACEMENT: ::atomiks::__private::PackedField =
+                lay_out(::core::marker::PhantomData::<Self>).1;
+            const LAYOUT: ::atomiks::__private::PackedLayout =
+                lay_out(::core::marker::PhantomData::<Self>).2;
+            type Reach = ::atomiks::__private::Reach<false>;
+        };
+        assert!(code.contains(&placed.to_string()), "each instance's placement: {code}");
+        let bounded = quote! {
+            struct TaggedFields<'a, T, P: ::atomiks::FieldPath<Value = Tagged<T> > + 'a>
+            where
+                Tagged<T>: ::atomiks::__private::HasPackedField<0, bool> + ::atomiks::__private::HasPackedField<1, T>,
+                T: ::atomiks::Atom
+        };
+        assert!(code.contains(&bounded.to_string()), "and each field's path bounded: {code}");
+        let outlives = quote!(where Self: 'a, T: 'a;);
+        assert!(code.contains(&outlives.to_string()), "with its parameter outliving `'a`: {code}");
+    }
+
+    #[test]
+    fn the_projection_takes_the_structs_parameters_without_their_defaults() {
+        let code = written(&derive_atom(quote! {
+            #[atom(repr = u64)]
+            struct Tagged<T: Copy = u32, const N: usize = 4> { marked: bool, value: T }
+        }));
+        let header = quote! {
+            struct TaggedFields<'a, T: Copy, const N: usize, P: ::atomiks::FieldPath<Value = Tagged<T, N> > + 'a>
+        };
+        assert!(code.contains(&header.to_string()), "its parameters, not their defaults: {code}");
+    }
+
+    #[test]
+    fn the_projections_parameters_take_names_the_structs_own_do_not() {
+        let code = written(&derive_atom(quote! {
+            #[atom(repr = u64)]
+            struct Named<'a, P, Q> { marked: bool, value: P, other: Q, origin: PhantomData<&'a ()> }
+        }));
+        let header = quote! {
+            struct NamedFields<'b, 'a, P, Q, R: ::atomiks::FieldPath<Value = Named<'a, P, Q> > + 'b>
+        };
+        assert!(code.contains(&header.to_string()), "`'b` and `R`: {code}");
+    }
+
+    #[test]
+    fn a_type_reads_in_a_doc_as_its_source_does() {
+        let code = written(&derive_atom(quote! {
+            #[atom(repr = u128)]
+            struct Spread<F> {
+                low: RangedI8<-5, 5>,
+                owner: OwnerId,
+                raw: core::num::NonZero<u8>,
+                price: f32,
+                flags: F,
+                r#type: Side,
+            }
+        }));
+        for line in [
+            "The field `low`, of type `RangedI8<-5, 5>`,",
+            "The field `owner`, of type `OwnerId`,",
+            "The field `raw`, of type `core::num::NonZero<u8>`,",
+            "The field `price`, of type `f32`,",
+            "The field `flags`, of type `F`,",
+            "The field `type`, of type `Side`,",
+        ] {
+            assert!(code.contains(line), "{line}: {code}");
+        }
     }
 
     #[test]

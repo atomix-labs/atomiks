@@ -18,8 +18,6 @@ use self::opaque::Opaque;
 use crate::primitive::CellAccess;
 
 /// Which reprs of a value's primitive decode.
-///
-/// Only atomiks implements it.
 pub impl(crate) const trait Validity {
     /// The cell an `Atomic` of such a value holds: the primitive's own for [`Total`], an opaque
     /// wrapper otherwise, so a trait that builds a value from bytes reaches only total values.

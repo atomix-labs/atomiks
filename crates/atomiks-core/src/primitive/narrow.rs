@@ -9,8 +9,8 @@ use core::sync::atomic::Ordering as CoreOrdering;
 use loom::sync::atomic;
 
 use super::{
-    AddSub, Bitwise, CellAccess, CompareExchange, ExactBits, Load, Primitive, PtrOffset, Store,
-    Swap,
+    BitTest, Bitwise, CellAccess, CompareExchange, ExactBits, FetchAdd, Load, MaskBitwise,
+    Primitive, PtrOffset, Store, Swap,
 };
 #[cfg(target_arch = "aarch64")]
 use super::{FetchBitwise, MinMax};
@@ -138,11 +138,35 @@ macro_rules! cells {
     };
 }
 
-/// Implements `Bitwise` for a primitive whose every bit set is `$ones`.
+/// Implements `Bitwise` and `MaskBitwise` for a primitive whose every bit set is `$ones`, and whose
+/// bit at a position is `$bit` of it.
 ///
 /// Also `FetchBitwise` on `aarch64`, whose `ldclr`, `ldset` and `ldeor` return the value before.
 macro_rules! bitwise {
-    ($($kind:ty: $ones:expr);+ $(;)?) => {$(
+    ($($kind:ty: $ones:expr, $bit:expr);+ $(;)?) => {$(
+        impl MaskBitwise for $kind {
+            type Mask = Self;
+            #[inline]
+            fn bit(position: u32) -> Self {
+                $bit(position)
+            }
+            #[inline]
+            fn to_mask(self) -> Self {
+                self
+            }
+            #[inline]
+            fn fetch_or_mask(cell: &Self::Cell, mask: Self, order: CoreOrdering) -> Self {
+                cell.fetch_or(mask, order)
+            }
+            #[inline]
+            fn fetch_and_mask(cell: &Self::Cell, mask: Self, order: CoreOrdering) -> Self {
+                cell.fetch_and(mask, order)
+            }
+            #[inline]
+            fn fetch_xor_mask(cell: &Self::Cell, mask: Self, order: CoreOrdering) -> Self {
+                cell.fetch_xor(mask, order)
+            }
+        }
         impl Bitwise for $kind {
             #[inline]
             fn fetch_and(cell: &Self::Cell, value: Self, order: CoreOrdering) -> Self {
@@ -161,12 +185,24 @@ macro_rules! bitwise {
                 cell.fetch_xor($ones, order)
             }
         }
-        // `atomic/capability.rs` repeats this cfg in the `doc(cfg(...))` of `fetch_and`,
-        // `fetch_or`, `fetch_xor` and `fetch_not`: change them with it.
+        // `atomic/capability.rs` and `atomic/field/mod.rs` repeat this cfg in the `doc(cfg(...))`
+        // of `fetch_and`, `fetch_or`, `fetch_xor` and `fetch_not`: change them with it.
         #[cfg(target_arch = "aarch64")]
         impl FetchBitwise for $kind {}
     )+};
 }
+
+/// Implements `BitTest` for each primitive whose bit test-and-set is one instruction.
+macro_rules! bit_test {
+    ($($kind:ty),+ $(,)?) => {$(
+        impl BitTest for $kind {}
+    )+};
+}
+
+// `x86_64`'s `lock bts`, `btr` and `btc` take 16 bits or more.
+bit_test!(u16, u32, u64, usize, i16, i32, i64, isize);
+#[cfg(target_arch = "aarch64")]
+bit_test!(u8, i8, bool);
 
 /// The unsigned bits of an integer: itself, or its two's complement.
 macro_rules! unsigned_bits {
@@ -182,7 +218,8 @@ macro_rules! unsigned_bits {
 macro_rules! integers {
     ($($int:ident => $cell:ident $(, $signed:ident)?);+ $(;)?) => {$(
         cells!($int => atomic::$cell);
-        bitwise!($int: !0);
+        // Wrapping, as `x86_64`'s `bts` with its position in a register needs.
+        bitwise!($int: !0, |position: u32| <$int>::wrapping_shl(1, position));
         const impl Primitive for $int {
             const BITS: u32 = <$int>::BITS;
             #[inline]
@@ -200,7 +237,7 @@ macro_rules! integers {
                 unsigned_bits!(self $(, $signed)?).wrapping_cast()
             }
         }
-        impl AddSub for $int {
+        impl FetchAdd for $int {
             #[inline]
             fn fetch_add(cell: &Self::Cell, delta: Self, order: CoreOrdering) -> Self {
                 cell.fetch_add(delta, order)
@@ -244,7 +281,7 @@ integers! {
 cells!(bool => atomic::AtomicBool, relaxed);
 cells!(<T> *mut T => atomic::AtomicPtr<T>);
 
-bitwise!(bool: true);
+bitwise!(bool: true, |_: u32| true);
 
 const impl Primitive for bool {
     const BITS: u32 = 1;

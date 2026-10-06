@@ -18,5 +18,8 @@ fn main() {
         on_hardware: { not(any(loom, miri)) },
         // `fence(StoreStore)` is `dmb ishst`, an `asm!` that neither loom nor Miri runs.
         dmb_ishst: { all(target_arch = "aarch64", on_hardware) },
+        // A bit's position at either end of a word goes through an empty `asm!`, so x86_64 tests
+        // it with `lock bts`; Miri runs no `asm!`.
+        opaque_bit_position: { all(target_arch = "x86_64", not(miri)) },
     }
 }

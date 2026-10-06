@@ -15,8 +15,12 @@ use crate::validity::Validity;
 
 mod capability;
 mod exclusive;
+mod field;
 mod ptr;
 
+pub use self::field::{AtomicField, Field, FieldPath, Join, ProjectFields, Then, TopField, Whole};
+#[doc(hidden)]
+pub use self::field::{HasPackedField, Reach, project_field};
 pub use self::ptr::AtomicPtr;
 
 /// A value of `T` shared between threads through one atomic word.
@@ -80,12 +84,17 @@ pub struct Atomic<T: Atom> {
     // which either needs `Total` (add, the bitwise operations, the pointer offsets), keeps one of
     // its operands (max, min), or leaves the repr as it was (`load_rmw`, and a 128-bit
     // `read_for_rmw` without `Load`, each a compare-exchange of zero for zero, on an integer repr,
-    // whose exchange compares every bit); or any repr written through `get_mut`, whose `Total`
-    // bound makes every one decode; or any repr zerocopy's derives read from bytes or zeros, which
-    // they do only where the cell is the primitive's own, so `Total`'s; or the zero repr
-    // bytemuck's `Zeroable` writes, only where `ZeroValid` says it decodes. Its writers are this
-    // module and its submodules, the zerocopy and bytemuck impls, and whoever writes through
-    // `get_mut`'s place, `as_ptr` or `from_ptr`, whose bounds and contracts keep it.
+    // whose exchange compares every bit); one a field operation left, which changes only the bits
+    // its `FieldPath` governs: to a repr of the field's value placed as the path says (`update`,
+    // `try_update`), to any pattern of a field whose every pattern decodes (the bitwise
+    // operations, on `FieldBitwise`, `bool` among them), or by an add whose carry leaves the word
+    // (the field's add, on `FieldAdd`, at a `TopField`), each through the place of a field, never
+    // of `Whole`, as `ProjectFields` promises; or any repr written through `get_mut`,
+    // whose `Total` bound makes every one decode; or any repr zerocopy's derives read from bytes
+    // or zeros, which they do only where the cell is the primitive's own, so `Total`'s; or the
+    // zero repr bytemuck's `Zeroable` writes, only where `ZeroValid` says it decodes. Its writers
+    // are this module and its submodules, the zerocopy and bytemuck impls, and whoever writes
+    // through `get_mut`'s place, `as_ptr` or `from_ptr`, whose bounds and contracts keep it.
     /// The cell holding `T`'s repr: the validity's wrapper around the primitive's cell.
     cell: <T::Validity as Validity>::Cell<T::Repr>,
     /// The type of the value the repr encodes.
@@ -318,22 +327,20 @@ impl<T: Atom> Atomic<T> {
     /// assert_eq!(delay.update(AcqRel, Acquire, double), 800, "doubled");
     /// assert_eq!(delay.load(Acquire), 1_000, "and capped at a millisecond");
     /// ```
-    #[expect(unsafe_code, reason = "decodes a repr read from the cell")]
+    #[expect(unsafe_code, reason = "decodes reprs read from the cell")]
     #[inline]
     pub fn update<S: RmwOrdering, F: LoadOrdering, U: FnMut(T) -> T>(
         &self, set_order: S, fetch_order: F, mut f: U,
     ) -> T {
-        let _ = (set_order, fetch_order);
-        let cell = self.primitive_cell();
-        let mut seen = T::Repr::read_for_rmw(cell, F::CORE);
-        loop {
+        let replace = |seen| {
             // SAFETY: by the field INVARIANT, the repr read from the cell decodes.
-            let next = f(unsafe { T::from_repr_unchecked(seen) }).to_repr();
-            match T::Repr::compare_exchange_weak(cell, seen, next, S::CORE, F::CORE) {
-                // SAFETY: as above.
-                Ok(before) => return unsafe { T::from_repr_unchecked(before) },
-                Err(found) => seen = found,
-            }
+            Some(f(unsafe { T::from_repr_unchecked(seen) }).to_repr())
+        };
+        // SAFETY: each repr `replace` returns is a value's own, which decodes.
+        let replaced = unsafe { self.try_update_repr(set_order, fetch_order, replace) };
+        match replaced {
+            // SAFETY: by the field INVARIANT, the repr read from the cell decodes.
+            Ok(before) | Err(before) => unsafe { T::from_repr_unchecked(before) },
         }
     }
 
@@ -354,21 +361,49 @@ impl<T: Atom> Atomic<T> {
     /// assert_eq!(seats.try_update(AcqRel, Acquire, book), Ok(1), "the last seat booked");
     /// assert_eq!(seats.try_update(AcqRel, Acquire, book), Err(0), "none left: nothing written");
     /// ```
-    #[expect(unsafe_code, reason = "decodes a repr read from the cell")]
+    #[expect(unsafe_code, reason = "decodes reprs read from the cell")]
     #[inline]
     pub fn try_update<S: RmwOrdering, F: LoadOrdering, U: FnMut(T) -> Option<T>>(
         &self, set_order: S, fetch_order: F, mut f: U,
     ) -> Result<T, T> {
+        let replace = |seen| {
+            // SAFETY: by the field INVARIANT, the repr read from the cell decodes.
+            f(unsafe { T::from_repr_unchecked(seen) }).map(Atom::to_repr)
+        };
+        // SAFETY: each repr `replace` returns is a value's own, which decodes.
+        let replaced = unsafe { self.try_update_repr(set_order, fetch_order, replace) };
+        match replaced {
+            // SAFETY: by the field INVARIANT, the repr read from the cell decodes.
+            Ok(before) => Ok(unsafe { T::from_repr_unchecked(before) }),
+            // SAFETY: as above.
+            Err(seen) => Err(unsafe { T::from_repr_unchecked(seen) }),
+        }
+    }
+
+    /// Replaces the repr with `f` of it, until no other write intervenes, and returns the repr
+    /// before; `Err` with the repr seen, without a write, when `f` returns `None`.
+    ///
+    /// The loop of [`update`](Self::update) and [`try_update`](Self::try_update), and of each
+    /// field's.
+    ///
+    /// # Safety
+    /// Each repr `f` returns decodes, as the field INVARIANT asks of each repr the cell holds.
+    #[expect(unsafe_code, reason = "writes each repr its closure returns to the cell")]
+    #[inline]
+    unsafe fn try_update_repr<
+        S: RmwOrdering,
+        F: LoadOrdering,
+        U: FnMut(T::Repr) -> Option<T::Repr>,
+    >(
+        &self, set_order: S, fetch_order: F, mut f: U,
+    ) -> Result<T::Repr, T::Repr> {
         let _ = (set_order, fetch_order);
         let cell = self.primitive_cell();
         let mut seen = T::Repr::read_for_rmw(cell, F::CORE);
         loop {
-            // SAFETY: by the field INVARIANT, the repr read from the cell decodes.
-            let current = unsafe { T::from_repr_unchecked(seen) };
-            let Some(next) = f(current) else { return Err(current) };
-            match T::Repr::compare_exchange_weak(cell, seen, next.to_repr(), S::CORE, F::CORE) {
-                // SAFETY: as above.
-                Ok(before) => return Ok(unsafe { T::from_repr_unchecked(before) }),
+            let next = f(seen).ok_or(seen)?;
+            match T::Repr::compare_exchange_weak(cell, seen, next, S::CORE, F::CORE) {
+                Ok(before) => return Ok(before),
                 Err(found) => seen = found,
             }
         }
@@ -383,6 +418,18 @@ impl<T: Atom> Atomic<T> {
     where
         T::Repr: ExactBits,
     {
+        let repr = self.load_rmw_repr(order);
+        // SAFETY: by the field INVARIANT, the repr read from the cell decodes.
+        unsafe { T::from_repr_unchecked(repr) }
+    }
+
+    /// Reads the repr with a compare-exchange, which leaves it as it was: the read of
+    /// [`load_rmw`](Self::load_rmw), and of each field's.
+    #[inline]
+    fn load_rmw_repr<O: LoadOrdering>(&self, order: O) -> T::Repr
+    where
+        T::Repr: ExactBits,
+    {
         let _ = order;
         let zero = T::Repr::from_bits(0);
         // It writes zero only over zero, and an integer's exchange compares every bit, so the repr
@@ -390,8 +437,7 @@ impl<T: Atom> Atomic<T> {
         // over address zero it would write a null without the pointer's provenance: hence
         // `ExactBits`, which costs nothing, as every pointer has a `Load`.
         match T::Repr::compare_exchange(self.primitive_cell(), zero, zero, O::CORE, O::CORE) {
-            // SAFETY: by the field INVARIANT, the repr read from the cell decodes.
-            Ok(current) | Err(current) => unsafe { T::from_repr_unchecked(current) },
+            Ok(current) | Err(current) => current,
         }
     }
 

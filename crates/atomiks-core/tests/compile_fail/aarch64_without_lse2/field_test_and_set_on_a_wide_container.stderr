@@ -1,0 +1,27 @@
+error[E0277]: `u128` has no bit test-and-set without a compare-exchange loop on this target
+  --> tests/compile_fail/aarch64_without_lse2/field_test_and_set_on_a_wide_container.rs:20:35
+   |
+20 |     let _ = slot.fields().written.test_and_set(AcqRel);
+   |                                   ^^^^^^^^^^^^ this would be a compare-exchange loop
+   |
+   = help: the trait `BitTest` is not implemented for `u128`
+   = note: to accept a compare-exchange loop, call `update`
+   = help: the following other types implement trait `BitTest`:
+             i16
+             i32
+             i64
+             i8
+             isize
+             u16
+             u32
+             u64
+           and $N others
+note: required by a bound in `AtomicField::<P>::test_and_set`
+  --> src/atomic/field/mod.rs
+   |
+   | impl<P: FieldPath> AtomicField<P> {
+...
+   |     pub fn test_and_set<O: RmwOrdering>(&self, order: O) -> bool
+...
+   |         ContainerRepr<P>: BitTest,
+   |                           ^^^^^^^ required by this bound in `AtomicField::<P>::test_and_set`

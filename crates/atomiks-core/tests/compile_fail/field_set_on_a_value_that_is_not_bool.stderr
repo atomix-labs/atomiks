@@ -1,0 +1,15 @@
+error[E0271]: type mismatch resolving `<Field<Quote, 0, u32> as FieldPath>::Value == bool`
+  --> tests/compile_fail/field_set_on_a_value_that_is_not_bool.rs:20:29
+   |
+20 |     quote.fields().quantity.set(Relaxed);
+   |                             ^^^ expected `bool`, found `u32`
+   |
+note: required by a bound in `AtomicField::<P>::set`
+  --> src/atomic/field/mod.rs
+   |
+   | impl<P: FieldPath> AtomicField<P> {
+...
+   |     pub fn set<O: RmwOrdering>(&self, order: O)
+   |     where
+   |         P: FieldPath<Value = bool>,
+   |                      ^^^^^^^^^^^^ required by this bound in `AtomicField::<P>::set`

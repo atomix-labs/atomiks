@@ -16,7 +16,7 @@ use crate::model::{Implementor, ZeroWidth};
 pub(crate) fn zero_width(
     implementor: &Implementor, zero_width: &ZeroWidth, def_site: Span,
 ) -> TokenStream {
-    let Implementor { ident, generics, atomiks, repr: stated } = implementor;
+    let Implementor { ident, generics, atomiks, repr: stated, .. } = implementor;
     let (repr_type, repr_check) = stated.as_ref().map_or_else(
         || (quote!(::core::primitive::u8), TokenStream::new()),
         |stated| (repr::selected_from(atomiks, stated), repr::integer_check(implementor, stated)),

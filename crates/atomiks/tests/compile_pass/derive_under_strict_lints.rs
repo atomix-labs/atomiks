@@ -1,7 +1,8 @@
-//! A crate under the workspace's lints, `unsafe_code` forbidden, derives `Atom` and the
-//! capabilities for documented newtypes, a pointer's among them, and `Atom` for fieldless enums, a
-//! marker, a struct of several fields and enums with fields, and stores each in a static, with no
-//! feature gate.
+//! A crate under the workspace's lints, `unsafe_code` and `dead_code` forbidden, derives `Atom` and
+//! the capabilities for documented newtypes, a pointer's among them, and `Atom` for fieldless
+//! enums, a marker, a struct of several fields, whose projection it changes a field through, a
+//! private one, whose projection it never uses, and enums with fields, and stores each in a static,
+//! with no feature gate.
 //!
 //! trybuild runs rustc alone, so the clippy lints here hold only where clippy builds the same code,
 //! as it does in `tests/derive_newtype.rs`.
@@ -32,6 +33,9 @@
     clippy::undocumented_unsafe_blocks,
     clippy::wildcard_enum_match_arm
 )]
+// After `unused`, which it raises for dead code alone: the derive writes nothing that is dead, or
+// that allows it.
+#![forbid(dead_code)]
 
 use core::marker::PhantomData;
 use core::ptr::NonNull;
@@ -88,6 +92,15 @@ pub struct Quote {
     side: Side,
     /// Which way the price last moved.
     sign: Sign,
+}
+
+/// The best bid and ask, which no code projects onto its fields.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+struct Spread {
+    /// The best bid's price.
+    bid: u16,
+    /// The best ask's price.
+    ask: u16,
 }
 
 /// A ring buffer's slot: a tag above a lap.
@@ -162,6 +175,13 @@ pub static READING: Atomic<Reading> = Atomic::new(Reading::Missing);
 /// The last shift.
 pub static SHIFT: Atomic<Shift> = Atomic::new(Shift::Still);
 
+/// The quote on the book.
+pub static QUOTE: Atomic<Quote> =
+    Atomic::new(Quote { quantity: 3, side: Side::Bid, sign: Sign::Flat });
+
+/// The spread on the book.
+static SPREAD: Atomic<Spread> = Atomic::new(Spread { bid: 99, ask: 101 });
+
 fn main() {
     assert_eq!(NEXT.fetch_add(1, Relaxed), Seq(0), "zero taken");
     assert_eq!(NEXT.load(Acquire), Seq(1), "one next");
@@ -181,4 +201,10 @@ fn main() {
     SHIFT.store(Shift::Back(3), Relaxed);
     assert_eq!(SHIFT.load(Acquire), Shift::Back(3), "and a shift");
     assert_eq!(Shift::Ahead(0).to_repr(), 5 << 8, "tagged by its discriminant");
+    let fields = QUOTE.fields();
+    let before = fields.quantity.update(Relaxed, Relaxed, |quantity| quantity + 1);
+    assert_eq!(before.quantity, 3, "a field changed");
+    assert_eq!(fields.side.load(Acquire), Side::Bid, "and another as it was");
+    let spread = SPREAD.load(Acquire);
+    assert_eq!((spread.bid, spread.ask), (99, 101), "and a spread, read whole");
 }
