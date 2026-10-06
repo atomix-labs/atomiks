@@ -48,14 +48,26 @@ fix-codegen-fmt:
 # macOS builds as x86_64 Linux does.
 
 # Runs every feature's tests under Miri on aarch64 Linux and macOS, and on x86_64 with the floor and
-# x86-64-v2.
+# x86-64-v2: each target is a `nightly-*` recipe of its own, so the nightly runs them side by side.
+miri: nightly-miri-aarch64-linux nightly-miri-aarch64-macos nightly-miri-x86-64 nightly-miri-x86-64-v2
+
 [metadata("rust")]
-nightly-miri:
+nightly-miri-aarch64-linux: (_miri "aarch64-unknown-linux-gnu")
+
+[metadata("rust")]
+nightly-miri-aarch64-macos: (_miri "aarch64-apple-darwin")
+
+[metadata("rust")]
+nightly-miri-x86-64: (_miri "x86_64-unknown-linux-gnu")
+
+[metadata("rust")]
+nightly-miri-x86-64-v2: (_miri "x86_64-unknown-linux-gnu" "x86-64-v2")
+
+# Runs every feature's tests under Miri on `target`, built for `cpu` where one is named, in a target
+# directory of its own.
+_miri target cpu="":
     rustup component add miri
-    {{ miri }} cargo miri test --workspace --all-features --target aarch64-unknown-linux-gnu
-    {{ miri }} cargo miri test --workspace --all-features --target aarch64-apple-darwin
-    {{ miri }} cargo miri test --workspace --all-features --target x86_64-unknown-linux-gnu
-    {{ miri }} RUSTFLAGS='-C target-cpu=x86-64-v2' cargo miri test --workspace --all-features --target x86_64-unknown-linux-gnu --target-dir target/miri-x86-64-v2
+    {{ miri }}{{ if cpu == "" { "" } else { " RUSTFLAGS='-C target-cpu=" + cpu + "'" } }} cargo miri test --workspace --all-features --target {{ target }}{{ if cpu == "" { "" } else { " --target-dir target/miri-" + cpu } }}
 
 # >>> devset: just >>>
 # Each active profile's recipes.
