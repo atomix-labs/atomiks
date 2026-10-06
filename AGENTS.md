@@ -129,9 +129,8 @@ What a change here keeps, beyond what the checks hold it to.
 
 ### Checks Beyond `just check`
 
-- A change to unsafe code, a primitive or a cell runs `just nightly-miri`, Miri
-  on aarch64 Linux and macOS, x86_64 and x86-64-v2, which CI runs only each
-  night.
+- A change to unsafe code, a primitive or a cell runs `just miri`, Miri on
+  aarch64 Linux and macOS, x86_64 and x86-64-v2, which CI runs only each night.
 - A change to an ordering, a fence or a cell adds or updates its model in
   `crates/atomiks-core/tests/model.rs`, which `just check-loom` runs.
 - What the types refuse has a fixture in
