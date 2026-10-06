@@ -89,7 +89,7 @@ pub const unsafe fn from_pointer_unchecked<F: const PtrAtom>(pointer: *mut ()) -
 #[diagnostic::on_unimplemented(
     message = "a field stored as `{Self}` cannot be packed beside others",
     label = "a pointer, whose bits do not hold its provenance",
-    note = "a pointer is stored alone: in a newtype, a struct of one field beside any `PhantomData` markers, or in an `Option`"
+    note = "a pointer is stored alone, in a newtype or an `Option`, or as the one pointer field of a pointer word or of a pointer enum's variant, marked `#[atom(ptr)]` where its type shows no pointer"
 )]
 pub impl(crate) const trait FieldRepr: [const] ExactBits {}
 
@@ -130,6 +130,11 @@ pub const unsafe fn from_bits_unchecked<F: const Atom>(bits: u128) -> F {
 /// a newtype's pointer: an `Atomic` of it is both, whatever the value's own auto traits say.
 #[inline]
 pub const fn assert_send_and_sync<T: Send + Sync>() {}
+
+/// Compiles only where `F` is stored as a pointer, which a newtype claims of its field where it is
+/// written as one or marked `#[atom(ptr)]`.
+#[inline]
+pub const fn assert_pointer<F: PtrAtom>() {}
 
 /// Compiles only where `T`'s repr is `R`: the repr a derived value states, checked against the
 /// field whose repr it takes.

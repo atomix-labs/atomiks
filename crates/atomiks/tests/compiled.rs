@@ -1,5 +1,5 @@
-//! The tests that run the compiler: what a crate that derives sees, and what a derived value's
-//! load and its fields' operations lower to.
+//! The tests that run the compiler: what a crate that derives sees, and what each operation on a
+//! derived value lowers to.
 
 // Neither loom's model nor Miri's interpreter can run the compiler, and loom's atomics are not
 // what ships.
@@ -29,23 +29,34 @@ mod trybuild {
 
 #[cfg(test)]
 mod codegen {
-    //! What a derived value's load and its fields' operations lower to, per target, read from the
-    //! assembly of `tests/codegen`.
+    //! What each operation on a derived value lowers to, per target, read from the assembly of
+    //! `tests/codegen`.
     //!
     //! The fixture builds for Linux and macOS with the repository's CPU floor and, on `aarch64`
     //! Linux, with LSE2 too. Each load is the instruction an `Acquire` load is, then the decode
     //! `from_repr_unchecked` gives, with no check: shifts and masks with no branch for a packed
     //! struct, nothing for a fieldless enum, and no loop for a niche-filling enum. Each field
     //! operation through the projection is the one instruction its whole word's is, its operand
-    //! confined to the field.
+    //! confined to the field, a pointer word's tag's too, beside a pointer, a pointer enum or an
+    //! inner word's tags. A match of a pointer enum is one mask and the compare chain the
+    //! match needs, then a load through an arm's pointer that takes the arm's tag into its own
+    //! offset, or, where LLVM merges arms that load through pointers of several tags, one mask to
+    //! take them off; a word read through its pointer's place is one mask. A store tests its
+    //! pointer once against every tag bit, a word's over a word or over a pointer enum too, an
+    //! exchange both its pointers in one test, and a store of a pointer enum's unit or data, or of
+    //! a pointer that fills a niche, tests nothing; each test's cold refusal saves the frame record
+    //! off the fast path. An update that keeps a pointer enum's pointer writes back the word it
+    //! read, and tests, calls and saves nothing; but a word's over an enum of several pointer
+    //! variants saves a frame record on `aarch64`, and on `x86_64` keeps a branch to the cold
+    //! refusal that it never takes.
 
-    use crate::testing::codegen::Lowering::{self, InOrder, Only};
+    use crate::testing::codegen::Lowering::{self, InOrder, Only, Refuses, RetryOnly};
     use crate::testing::codegen::{
         AARCH64_LINUX, AARCH64_MACOS, X86_64_LINUX, X86_64_MACOS, lowers_as_expected,
     };
 
-    /// Each field operation on `aarch64`, the same at the floor, with LSE2 and on macOS: one LSE
-    /// instruction, then a shift for a bit or a count.
+    /// Each store, exchange and field operation on `aarch64`, the same at the floor, with LSE2 and
+    /// on macOS: a field operation is one LSE instruction, then a shift for a bit or a count.
     const AARCH64: &[(&str, Lowering)] = &[
         ("field_set", Only(&["mov", "ldsetl", "ret"])),
         ("field_clear", Only(&["mov", "ldclrl", "ret"])),
@@ -53,28 +64,142 @@ mod codegen {
         ("flags_or", Only(&["and", "lsl", "ldsetl", "ret"])),
         ("nested_clear", Only(&["mov", "ldclrl", "ret"])),
         ("top_fetch_add", Only(&["lsl", "ldaddal", "lsr", "ret"])),
+        ("head_test_and_set_marked", Only(&["mov", "ldsetal", "ubfx", "ret"])),
+        ("slot_store_inline", Only(&["mov", "mov", "orr", "stlr", "ret"])),
+        ("slot_store_node", Refuses(&["tst", "b.ne", "add", "stlr", "ret"])),
+        ("next_store_node", Only(&["stlr", "ret"])),
+        ("marked_store", Refuses(&["tbnz", "add", "stlr", "ret"])),
+        ("guarded_store", Refuses(&["tst", "b.ne", "add", "stlr", "ret"])),
+        ("locked_slot_store_node", Refuses(&["tst", "b.ne", "add", "stlr", "ret"])),
+        ("head_compare_exchange", Refuses(&["orr", "tst", "b.ne", "casal", "ret"])),
+        ("locked_slot_set_locked", Only(&["mov", "ldsetl", "ret"])),
+        ("locked_slot_test_and_set_locked", Only(&["mov", "ldsetal", "ubfx", "ret"])),
+        ("guarded_set_locked", Only(&["mov", "ldsetl", "ret"])),
+        ("guarded_test_and_set_marked", Only(&["mov", "ldsetal", "and", "ret"])),
     ];
 
-    /// Each load on `aarch64` with the `+lse` floor, which reads with `ldar`.
+    /// Each load and update on `aarch64` with the `+lse` floor, which reads with `ldar`.
     const AARCH64_FLOOR: &[(&str, Lowering)] = &[
         ("packed_struct_load", Only(&["ldar", "lsr", "and", "bfi", "ret"])),
         ("fieldless_enum_load", Only(&["ldarb", "ret"])),
         ("niche_filling_enum_load", InOrder(&["ldarb"])),
         ("field_load", Only(&["ldar", "ubfx", "ret"])),
+        ("head_load_top", Only(&["ldar", "and", "ret"])),
+        ("next_load_match", Only(&["ldar", "cbz", "ldr", "ret", "mov", "ret"])),
+        ("child_load_match", Only(&["ldar", "ubfiz", "and", "ldr", "ret"])),
+        ("child_load_leaf", Only(&["ldar", "tbz", "mov", "ret", "ldr", "ret"])),
+        ("child_load_branch", Only(&["ldar", "tbz", "ldur", "ret", "mov", "ret"])),
+        (
+            "slot_load_match",
+            Only(&[
+                "ldar", "ands", "b.eq", "cmp", "b.ne", "ubfx", "ret", "mov", "ret", "ldur", "ret",
+            ]),
+        ),
+        ("entry_load_match", Only(&["ldar", "tbz", "ldur", "ret", "ubfx", "ret"])),
+        ("guarded_load_inner", Only(&["ldar", "and", "ldr", "ret"])),
+        (
+            "slot_update",
+            RetryOnly(&[
+                "ldar", "b", "mov", "mov", "casal", "cmp", "mov", "b.eq", "ands", "b.eq", "cmp",
+                "b.ne", "add", "and", "orr", "b", "mov", "b", "ands", "b.eq", "cmp", "b.ne", "lsr",
+                "mov", "stp", "ret", "sub", "str", "mov", "str", "ret",
+            ]),
+        ),
+        (
+            "entry_update",
+            RetryOnly(&[
+                "ldar", "mov", "add", "tst", "and", "csel", "casal", "cmp", "mov", "b.ne", "tbz",
+                "sub", "mov", "str", "str", "ret", "lsr", "stp", "ret",
+            ]),
+        ),
+        (
+            "child_update",
+            RetryOnly(&["ldar", "mov", "casal", "cmp", "mov", "b.ne", "and", "and", "ret"]),
+        ),
+        (
+            "locked_child_update",
+            RetryOnly(&[
+                "stp", "mov", "ldar", "mvn", "and", "and", "add", "mov", "casal", "cmp", "mov",
+                "b.ne", "and", "and", "ubfx", "stp", "strb", "ldp", "ret",
+            ]),
+        ),
     ];
 
-    /// Each load on `aarch64` with LSE2, `neoverse-v1` on Linux and macOS's floor, `apple-m1`,
-    /// which reads with `ldapr`.
+    /// Each load and update on `aarch64` with LSE2, `neoverse-v1` on Linux and macOS's floor,
+    /// `apple-m1`, which reads with `ldapr`.
     const AARCH64_LSE2: &[(&str, Lowering)] = &[
         ("packed_struct_load", Only(&["ldapr", "lsr", "and", "bfi", "ret"])),
         ("fieldless_enum_load", Only(&["ldaprb", "ret"])),
         ("niche_filling_enum_load", InOrder(&["ldaprb"])),
         ("field_load", Only(&["ldapr", "ubfx", "ret"])),
+        ("head_load_top", Only(&["ldapr", "and", "ret"])),
+        ("next_load_match", Only(&["ldapr", "cbz", "ldr", "ret", "mov", "ret"])),
+        ("child_load_match", Only(&["ldapr", "and", "ubfiz", "ldr", "ret"])),
+        ("child_load_leaf", Only(&["ldapr", "tbz", "mov", "ret", "ldr", "ret"])),
+        ("child_load_branch", Only(&["ldapr", "tbz", "ldur", "ret", "mov", "ret"])),
+        (
+            "slot_load_match",
+            Only(&[
+                "ldapr", "ands", "b.eq", "cmp", "b.ne", "ubfx", "ret", "mov", "ret", "ldur", "ret",
+            ]),
+        ),
+        ("entry_load_match", Only(&["ldapr", "tbz", "ldur", "ret", "ubfx", "ret"])),
+        ("guarded_load_inner", Only(&["ldapr", "and", "ldr", "ret"])),
+        (
+            "slot_update",
+            RetryOnly(&[
+                "ldapr", "b", "mov", "mov", "casal", "cmp", "mov", "b.eq", "ands", "b.eq", "cmp",
+                "b.ne", "add", "and", "orr", "b", "mov", "b", "ands", "b.eq", "cmp", "b.ne", "lsr",
+                "mov", "stp", "ret", "sub", "str", "mov", "str", "ret",
+            ]),
+        ),
+        (
+            "child_update",
+            RetryOnly(&["ldapr", "mov", "casal", "cmp", "mov", "b.ne", "and", "and", "ret"]),
+        ),
     ];
 
-    /// Each load on `x86_64`, Linux or macOS, at the `x86-64-v3` floor, whose BMI2 masks with
-    /// `bzhi`, and each field read-modify-write: one `lock` instruction, `lock bts` for a bit's
-    /// test.
+    /// The rest on `aarch64` Linux with LSE2, `neoverse-v1`, which puts an update's
+    /// instructions in its own order.
+    const AARCH64_LINUX_LSE2: &[(&str, Lowering)] = &[
+        (
+            "entry_update",
+            RetryOnly(&[
+                "ldapr", "mov", "add", "tst", "and", "csel", "casal", "cmp", "mov", "b.ne", "tbz",
+                "sub", "mov", "str", "str", "ret", "lsr", "stp", "ret",
+            ]),
+        ),
+        (
+            "locked_child_update",
+            RetryOnly(&[
+                "stp", "mov", "ldapr", "mvn", "and", "and", "add", "mov", "casal", "cmp", "mov",
+                "b.ne", "and", "and", "stp", "ubfx", "strb", "ldp", "ret",
+            ]),
+        ),
+    ];
+
+    /// The rest on `aarch64` macOS, whose `apple-m1` puts an update's instructions
+    /// in its own order too.
+    const AARCH64_MACOS_LSE2: &[(&str, Lowering)] = &[
+        (
+            "entry_update",
+            RetryOnly(&[
+                "ldapr", "mov", "add", "and", "tst", "csel", "casal", "cmp", "mov", "b.ne", "tbz",
+                "sub", "str", "mov", "str", "ret", "lsr", "stp", "ret",
+            ]),
+        ),
+        (
+            "locked_child_update",
+            RetryOnly(&[
+                "stp", "mov", "ldapr", "and", "mvn", "and", "add", "mov", "casal", "cmp", "mov",
+                "b.ne", "and", "and", "stp", "ubfx", "strb", "ldp", "ret",
+            ]),
+        ),
+    ];
+
+    /// Each load and update on `x86_64`, Linux or macOS, at the `x86-64-v3` floor, whose BMI2
+    /// masks with `bzhi`, and each field read-modify-write: one `lock` instruction, `lock bts` for
+    /// a bit's test.
     const X86_64: &[(&str, Lowering)] = &[
         (
             "packed_struct_load",
@@ -89,30 +214,215 @@ mod codegen {
         ("flags_or", Only(&["movzbl", "shlq", "lock orq", "retq"])),
         ("nested_clear", Only(&["lock andl", "retq"])),
         ("top_fetch_add", Only(&["movl", "shlq", "lock xaddq", "shrq", "retq"])),
+        ("head_test_and_set_marked", Only(&["lock btsq", "setb", "retq"])),
+        ("head_load_top", Only(&["movq", "andq", "retq"])),
+        ("next_load_match", Only(&["movq", "testq", "je", "movq", "retq", "movl", "retq"])),
+        ("child_load_match", Only(&["movq", "movq", "andq", "andl", "movq", "retq"])),
+        ("child_load_leaf", Only(&["movq", "testb", "je", "xorl", "retq", "movq", "retq"])),
+        ("child_load_branch", Only(&["movq", "testb", "je", "movq", "retq", "xorl", "retq"])),
+        (
+            "slot_load_match",
+            Only(&[
+                "movq", "movq", "andq", "je", "cmpl", "jne", "shrq", "movl", "retq", "movl",
+                "retq", "movq", "retq",
+            ]),
+        ),
+        (
+            "entry_load_match",
+            Only(&["movq", "testb", "je", "movq", "retq", "shrq", "movl", "retq"]),
+        ),
+        ("guarded_load_inner", Only(&["movq", "andq", "movq", "retq"])),
+        ("slot_store_inline", Only(&["movl", "leaq", "movq", "retq"])),
+        ("slot_store_node", Refuses(&["testb", "jne", "addq", "movq", "retq"])),
+        ("next_store_node", Only(&["movq", "retq"])),
+        ("marked_store", Refuses(&["testb", "jne", "incq", "movq", "retq"])),
+        ("guarded_store", Refuses(&["testb", "jne", "addq", "movq", "retq"])),
+        ("locked_slot_store_node", Refuses(&["testb", "jne", "addq", "movq", "retq"])),
+        ("head_compare_exchange", Refuses(&["orl", "testb", "jne", "lock cmpxchgq", "retq"])),
+        (
+            "slot_update",
+            RetryOnly(&[
+                "movq",
+                "movabsq",
+                "jmp",
+                "movl",
+                "lock cmpxchgq",
+                "je",
+                "movq",
+                "andq",
+                "je",
+                "cmpl",
+                "jne",
+                "leaq",
+                "andq",
+                "incq",
+                "jmp",
+                "movq",
+                "jmp",
+                "movq",
+                "andq",
+                "je",
+                "cmpl",
+                "jne",
+                "shrq",
+                "movl",
+                "movl",
+                "movl",
+                "movq",
+                "retq",
+                "xorl",
+                "movl",
+                "movq",
+                "retq",
+                "addq",
+                "movq",
+                "movl",
+                "movl",
+                "movq",
+                "retq",
+            ]),
+        ),
+        (
+            "entry_update",
+            RetryOnly(&[
+                "movq",
+                "movabsq",
+                "jmp",
+                "lock cmpxchgq",
+                "je",
+                "movq",
+                "testb",
+                "jne",
+                "leaq",
+                "andq",
+                "jmp",
+                "testb",
+                "je",
+                "decq",
+                "movq",
+                "movl",
+                "movl",
+                "movq",
+                "retq",
+                "shrq",
+                "movl",
+                "xorl",
+                "movl",
+                "movq",
+                "retq",
+            ]),
+        ),
+        (
+            "child_update",
+            RetryOnly(&[
+                "movq",
+                "movq",
+                "lock cmpxchgq",
+                "movq",
+                "jne",
+                "movl",
+                "andl",
+                "andq",
+                "retq",
+            ]),
+        ),
+        ("locked_slot_set_locked", Only(&["lock orq", "retq"])),
+        ("locked_slot_test_and_set_locked", Only(&["lock btsq", "setb", "retq"])),
+        ("guarded_set_locked", Only(&["lock orq", "retq"])),
+        ("guarded_test_and_set_marked", Only(&["xorl", "andl", "lock btsq", "setb", "retq"])),
     ];
 
+    /// The rest on `x86_64` Linux, where a function that calls aligns the stack with a push.
+    const X86_64_LINUX_PUSH: &[(&str, Lowering)] = &[(
+        "locked_child_update",
+        RetryOnly(&[
+            "movq",
+            "movb",
+            "testb",
+            "je",
+            "movl",
+            "movq",
+            "andq",
+            "notl",
+            "andl",
+            "addq",
+            "lock cmpxchgq",
+            "jne",
+            "movl",
+            "andl",
+            "movq",
+            "andq",
+            "shrb",
+            "andb",
+            "movq",
+            "movq",
+            "movb",
+            "movq",
+            "retq",
+            "pushq",
+            "leaq",
+            "callq",
+        ]),
+    )];
+
+    /// The rest on `x86_64` macOS, where every function's frame record aligns the stack.
+    const X86_64_MACOS_FRAME: &[(&str, Lowering)] = &[(
+        "locked_child_update",
+        RetryOnly(&[
+            "movq",
+            "movb",
+            "testb",
+            "je",
+            "movl",
+            "movq",
+            "andq",
+            "notl",
+            "andl",
+            "addq",
+            "lock cmpxchgq",
+            "jne",
+            "movl",
+            "andl",
+            "movq",
+            "andq",
+            "shrb",
+            "andb",
+            "movq",
+            "movq",
+            "movb",
+            "movq",
+            "retq",
+            "leaq",
+            "callq",
+        ]),
+    )];
+
     #[test]
-    fn aarch64_linux_lowers_each_derived_load_and_field_operation_to_its_instructions() {
+    fn aarch64_linux_lowers_each_derived_operation_to_its_instructions() {
         lowers_as_expected(AARCH64_LINUX, None, &[AARCH64, AARCH64_FLOOR]);
     }
 
     #[test]
-    fn aarch64_linux_with_lse2_lowers_each_derived_load_and_field_operation_to_its_instructions() {
-        lowers_as_expected(AARCH64_LINUX, Some("neoverse-v1"), &[AARCH64, AARCH64_LSE2]);
+    fn aarch64_linux_with_lse2_lowers_each_derived_operation_to_its_instructions() {
+        lowers_as_expected(
+            AARCH64_LINUX,
+            Some("neoverse-v1"),
+            &[AARCH64, AARCH64_LSE2, AARCH64_LINUX_LSE2],
+        );
     }
 
     #[test]
-    fn aarch64_macos_lowers_each_derived_load_and_field_operation_to_its_instructions() {
-        lowers_as_expected(AARCH64_MACOS, None, &[AARCH64, AARCH64_LSE2]);
+    fn aarch64_macos_lowers_each_derived_operation_to_its_instructions() {
+        lowers_as_expected(AARCH64_MACOS, None, &[AARCH64, AARCH64_LSE2, AARCH64_MACOS_LSE2]);
     }
 
     #[test]
-    fn x86_64_linux_lowers_each_derived_load_and_field_operation_to_its_instructions() {
-        lowers_as_expected(X86_64_LINUX, None, &[X86_64]);
+    fn x86_64_linux_lowers_each_derived_operation_to_its_instructions() {
+        lowers_as_expected(X86_64_LINUX, None, &[X86_64, X86_64_LINUX_PUSH]);
     }
 
     #[test]
-    fn x86_64_macos_lowers_each_derived_load_and_field_operation_to_its_instructions() {
-        lowers_as_expected(X86_64_MACOS, None, &[X86_64]);
+    fn x86_64_macos_lowers_each_derived_operation_to_its_instructions() {
+        lowers_as_expected(X86_64_MACOS, None, &[X86_64, X86_64_MACOS_FRAME]);
     }
 }

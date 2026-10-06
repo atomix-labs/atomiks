@@ -33,10 +33,6 @@ pub(crate) struct Implementor {
 }
 
 /// How the type holds its value, which decides how its impl lays it out.
-#[expect(
-    clippy::large_enum_variant,
-    reason = "a derive reads one shape, so its size costs nothing"
-)]
 pub(crate) enum Shape {
     /// A newtype: one field holds the value, beside any `PhantomData` markers.
     Newtype(Newtype),
@@ -44,11 +40,18 @@ pub(crate) enum Shape {
     ZeroWidth(ZeroWidth),
     /// Several fields that hold a value, each in declaration order, as a struct packs them.
     Packed(Vec<Field>),
+    /// Several fields, one a pointer, the others its tags, packed into the low bits the
+    /// pointer's alignment leaves clear.
+    PointerWord(PointerWord),
     /// Unit variants alone, each stored as its discriminant.
     Fieldless(Fieldless),
     /// Variants, one at least written with parentheses or braces, each stored as its discriminant
     /// beside its fields.
     EnumWithFields(EnumWithFields),
+    /// Variants, one at least holding a pointer, each stored in one pointer word: its discriminant
+    /// in the low bits, above its pointers' own tags, and its pointer's address or its fields
+    /// above the bits its pointers' alignment leaves clear.
+    PointerEnum(EnumWithFields),
 }
 
 /// A newtype's fields: the one that holds the value, and the `PhantomData` markers split around it
@@ -108,6 +111,13 @@ pub(crate) struct EnumWithFields {
     pub(crate) variants: Vec<Variant>,
 }
 
+impl EnumWithFields {
+    /// Whether a variant states its discriminant; where none does, each is its variant's index.
+    pub(crate) fn has_stated_discriminant(&self) -> bool {
+        self.variants.iter().any(|variant| variant.discriminant.is_some())
+    }
+}
+
 /// A variant of an enum with fields.
 pub(crate) struct Variant {
     /// Its name.
@@ -136,6 +146,24 @@ pub(crate) enum EnumRepr {
     Selected,
 }
 
+/// A pointer word's fields: its pointer, and its tags, every other field.
+pub(crate) struct PointerWord {
+    /// The pointer field.
+    pub(crate) pointer: Field,
+    /// The pointer's index among the fields, in declaration order.
+    pub(crate) pointer_index: usize,
+    /// The tag fields, in declaration order.
+    pub(crate) tag_fields: Vec<Field>,
+}
+
+impl PointerWord {
+    /// Every field, in declaration order.
+    pub(crate) fn fields(&self) -> impl Iterator<Item = &Field> + Clone {
+        let (before, after) = self.tag_fields.split_at(self.pointer_index);
+        before.iter().chain(iter::once(&self.pointer)).chain(after)
+    }
+}
+
 /// A field, as an impl reads and builds it.
 pub(crate) struct Field {
     /// Its name, or its index in a tuple struct.
@@ -149,7 +177,8 @@ pub(crate) struct Field {
     /// Whether its type names a parameter of the type, so that an impl bounds it in its where
     /// clause rather than checking it once beside the impl.
     pub(crate) is_generic: bool,
-    /// Whether it is written as a raw pointer, a `NonNull` or an `Option` of one, which need not
-    /// be `Send` or `Sync`: `Atom` promises such a value may cross threads.
+    /// Whether it is written as a raw pointer, a `NonNull` or an `Option` of one, or
+    /// marked `#[atom(ptr)]`, which need not be `Send` or `Sync`: `Atom` promises such a
+    /// value may cross threads.
     pub(crate) is_pointer: bool,
 }

@@ -74,7 +74,12 @@ const unsafe impl<T> Atom for NonNull<T> {
 }
 
 /// A value stored as a pointer to its [`Pointee`](Self::Pointee): a `NonNull`, an `Option` of one,
-/// a raw pointer, or any value whose [`Atom::Repr`] is a `*mut`, such as a newtype of one.
+/// a raw pointer, or any value whose [`Atom::Repr`] is a `*mut`, such as a newtype of one, a
+/// pointer word or a pointer enum.
+///
+/// A pointer word, `#[derive(Atom)]`'s struct of one such field beside tag fields, packs the tags
+/// into the low bits the pointer's alignment leaves clear, and its derive bounds a generic pointer
+/// field by this trait.
 ///
 /// One impl gives it to every such [`Atom`], so it promises nothing of its own: it names the
 /// pointee, so generic code knows the repr is `*mut Self::Pointee`.

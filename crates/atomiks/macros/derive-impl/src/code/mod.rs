@@ -11,6 +11,8 @@ mod fieldless;
 mod layout;
 mod newtype;
 mod packed;
+mod pointer_enum;
+mod pointer_word;
 mod projection;
 mod repr;
 mod stub;
@@ -23,6 +25,8 @@ pub(crate) use self::enum_with_fields::enum_with_fields;
 pub(crate) use self::fieldless::fieldless;
 pub(crate) use self::newtype::{capability, newtype};
 pub(crate) use self::packed::packed;
+pub(crate) use self::pointer_enum::pointer_enum;
+pub(crate) use self::pointer_word::pointer_word;
 pub(crate) use self::stub::stub;
 pub(crate) use self::zero_width::zero_width;
 

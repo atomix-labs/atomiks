@@ -80,11 +80,17 @@ pub fn expand_atom(input: TokenStream, def_site: Span) -> Expansion {
         Ok(Shape::Packed(fields)) => {
             Expansion::written(code::packed(&implementor, &fields, def_site))
         },
+        Ok(Shape::PointerWord(word)) => {
+            Expansion::written(code::pointer_word(&implementor, &word, def_site))
+        },
         Ok(Shape::Fieldless(fieldless)) => {
             Expansion::written(code::fieldless(&implementor, &fieldless, def_site))
         },
         Ok(Shape::EnumWithFields(enum_with_fields)) => {
             Expansion::written(code::enum_with_fields(&implementor, &enum_with_fields, def_site))
+        },
+        Ok(Shape::PointerEnum(enumeration)) => {
+            Expansion::written(code::pointer_enum(&implementor, &enumeration, def_site))
         },
         Err(errors) => Expansion::refused(errors, code::stub(&implementor)),
     }
@@ -153,9 +159,18 @@ mod tests {
                 type Validity = <u64 as ::atomiks::Atom>::Validity;
                 const REPRS: ::atomiks::ReprRange< <u64 as ::atomiks::Atom>::Repr > =
                     <u64 as ::atomiks::Atom>::REPRS;
+                const TAG_WIDTH: ::core::primitive::u32 = <u64 as ::atomiks::Atom>::TAG_WIDTH;
+                const POINTEE_ALIGNMENT: ::atomiks::__private::PointeeAlignment =
+                    <u64 as ::atomiks::Atom>::POINTEE_ALIGNMENT;
                 #[inline]
                 fn to_repr(self) -> <u64 as ::atomiks::Atom>::Repr {
                     ::atomiks::__private::to_repr::<u64>(self.0)
+                }
+                #[inline]
+                fn to_tagged_repr(
+                    self, tags: ::atomiks::__private::Tags,
+                ) -> (<u64 as ::atomiks::Atom>::Repr, ::core::primitive::usize) {
+                    ::atomiks::__private::to_tagged_repr::<u64>(self.0, tags)
                 }
                 #[inline]
                 fn from_repr(repr: <u64 as ::atomiks::Atom>::Repr) -> ::core::option::Option<Self> {
@@ -189,9 +204,18 @@ mod tests {
                 type Validity = <T as ::atomiks::Atom>::Validity;
                 const REPRS: ::atomiks::ReprRange< <T as ::atomiks::Atom>::Repr > =
                     <T as ::atomiks::Atom>::REPRS;
+                const TAG_WIDTH: ::core::primitive::u32 = <T as ::atomiks::Atom>::TAG_WIDTH;
+                const POINTEE_ALIGNMENT: ::atomiks::__private::PointeeAlignment =
+                    <T as ::atomiks::Atom>::POINTEE_ALIGNMENT;
                 #[inline]
                 fn to_repr(self) -> <T as ::atomiks::Atom>::Repr {
                     <T as ::atomiks::Atom>::to_repr(self.0)
+                }
+                #[inline]
+                fn to_tagged_repr(
+                    self, tags: ::atomiks::__private::Tags,
+                ) -> (<T as ::atomiks::Atom>::Repr, ::core::primitive::usize) {
+                    <T as ::atomiks::Atom>::to_tagged_repr(self.0, tags)
                 }
                 #[inline]
                 fn from_repr(repr: <T as ::atomiks::Atom>::Repr) -> ::core::option::Option<Self> {
@@ -996,6 +1020,265 @@ mod tests {
     }
 
     #[test]
+    #[expect(
+        clippy::too_many_lines,
+        reason = "the whole expansion it pins, written out, is that long"
+    )]
+    fn a_pointer_word_packs_its_tags_above_its_pointers_own_and_projects_each_field() {
+        let expected = quote! {
+            const _: () = ::atomiks::__private::assert_send_and_sync::<bool>();
+            const _: () = {
+                #[automatically_derived]
+                unsafe impl ::atomiks::__private::HasPackedField<0, NonNull<Node> > for Link {
+                    const PLACEMENT: ::atomiks::__private::PackedField = layout.pointer_placement();
+                    const LAYOUT: ::atomiks::__private::PackedLayout = layout.packed_layout();
+                    type Reach = ::atomiks::__private::Reach<false>;
+                    #[inline]
+                    fn field(self) -> NonNull<Node> {
+                        self.next
+                    }
+                }
+                #[automatically_derived]
+                unsafe impl ::atomiks::__private::HasPackedField<1, bool> for Link {
+                    const PLACEMENT: ::atomiks::__private::PackedField = placement_0;
+                    const LAYOUT: ::atomiks::__private::PackedLayout = layout.packed_layout();
+                    type Reach = ::atomiks::__private::Reach<false>;
+                    #[inline]
+                    fn field(self) -> bool {
+                        self.deleted
+                    }
+                }
+                #[automatically_derived]
+                const unsafe impl ::atomiks::ProjectFields for Link {
+                    type Fields<'a, P: ::atomiks::FieldPath<Value = Self> + 'a>
+                        = LinkFields<'a, P>
+                    where
+                        Self: 'a;
+                    #[inline]
+                    fn project<P: ::atomiks::FieldPath<Value = Self>>(
+                        place: &::atomiks::AtomicField<P>,
+                    ) -> LinkFields<'_, P> {
+                        LinkFields {
+                            next: unsafe { ::atomiks::__private::project_field(place) },
+                            deleted: unsafe { ::atomiks::__private::project_field(place) }
+                        }
+                    }
+                }
+                #[automatically_derived]
+                impl<'a, P: ::atomiks::FieldPath<Value = Link> + 'a> ::core::fmt::Debug for LinkFields<'a, P>
+                where
+                    &'a ::atomiks::AtomicField<::atomiks::Join<P, ::atomiks::Field<Link, 0, NonNull<Node> >> >:
+                        ::core::fmt::Debug,
+                    &'a ::atomiks::AtomicField<::atomiks::Join<P, ::atomiks::Field<Link, 1, bool>>>:
+                        ::core::fmt::Debug
+                {
+                    fn fmt(&self, formatter: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+                        formatter
+                            .debug_struct("LinkFields")
+                            .field("next", &self.next)
+                            .field("deleted", &self.deleted)
+                            .finish()
+                    }
+                }
+                const placement_0: ::atomiks::__private::PackedField = ::atomiks::__private::PackedField::new(
+                    <bool as ::atomiks::Atom>::REPRS,
+                    <NonNull<Node> as ::atomiks::Atom>::TAG_WIDTH
+                );
+                const layout: ::atomiks::__private::PointerWordLayout =
+                    ::atomiks::__private::PointerWordLayout::new(
+                        <NonNull<Node> as ::atomiks::Atom>::TAG_WIDTH,
+                        ::atomiks::__private::PackedLayout::new(&[placement_0]),
+                    );
+                const alignment: ::atomiks::__private::PointeeAlignment =
+                    ::atomiks::__private::PointeeAlignment::least(&[
+                        <NonNull<Node> as ::atomiks::Atom>::POINTEE_ALIGNMENT
+                    ]);
+                type Repr = <NonNull<Node> as ::atomiks::Atom>::Repr;
+                const _: () = ::atomiks::__private::assert_pointer::<NonNull<Node> >();
+                const _: () = layout.assert_tags_fit::<Link, NonNull<Node> >("tag field `deleted` needs");
+                #[automatically_derived]
+                const unsafe impl ::atomiks::Atom for Link {
+                    type Repr = Repr;
+                    type Validity = <::atomiks::__private::ValidityCode<
+                        {
+                            ::atomiks::__private::PackedValidity::EMPTY
+                                .with_field::<<bool as ::atomiks::Atom>::Validity>(placement_0.layout())
+                                .with_field::<<NonNull<Node> as ::atomiks::Atom>::Validity>(
+                                    layout.pointer_layout()
+                                )
+                                .code(
+                                    <Repr as ::atomiks::Primitive>::BITS,
+                                    <Repr as ::atomiks::Primitive>::BITS
+                                )
+                        }
+                    > as ::atomiks::__private::SelectValidity>::Validity;
+                    const REPRS: ::atomiks::ReprRange<Repr> =
+                        layout.range(<NonNull<Node> as ::atomiks::Atom>::REPRS);
+                    const TAG_WIDTH: ::core::primitive::u32 = layout.tag_width();
+                    const POINTEE_ALIGNMENT: ::atomiks::__private::PointeeAlignment = alignment;
+                    #[inline]
+                    fn to_repr(self) -> Repr {
+                        let (repr, misaligned) = ::atomiks::__private::to_tagged_repr::<Self>(
+                            self,
+                            ::atomiks::__private::Tags::EMPTY
+                        );
+                        ::atomiks::__private::assert_aligned::<Self>(misaligned);
+                        repr
+                    }
+                    #[inline]
+                    fn to_tagged_repr(
+                        self, tags: ::atomiks::__private::Tags
+                    ) -> (Repr, ::core::primitive::usize) {
+                        ::atomiks::__private::to_tagged_repr::<NonNull<Node> >(
+                            self.next,
+                            layout.pointer_tags(
+                                placement_0.pack(::atomiks::__private::to_bits::<bool>(self.deleted)),
+                                tags
+                            )
+                        )
+                    }
+                    #[inline]
+                    fn from_repr(repr: Repr) -> ::core::option::Option<Self> {
+                        let (pointer, bits) = layout.split(repr);
+                        match (
+                            ::atomiks::__private::from_repr::<NonNull<Node> >(pointer),
+                            ::atomiks::__private::from_bits::<bool>(placement_0.unpack(bits)),
+                        ) {
+                            (
+                                ::core::option::Option::Some(value_0),
+                                ::core::option::Option::Some(value_1),
+                            ) => ::core::option::Option::Some(Self { next: value_0, deleted: value_1 }),
+                            _ => ::core::option::Option::None,
+                        }
+                    }
+                    #[inline]
+                    unsafe fn from_repr_unchecked(repr: Repr) -> Self {
+                        let (pointer, bits) = layout.split(repr);
+                        Self {
+                            next: unsafe {
+                                ::atomiks::__private::from_repr_unchecked::<NonNull<Node> >(pointer)
+                            },
+                            deleted: unsafe {
+                                ::atomiks::__private::from_bits_unchecked::<bool>(placement_0.unpack(bits))
+                            }
+                        }
+                    }
+                }
+            };
+            #[doc = " The fields of an atomic [`Link`], or of a field whose value is one, each a place of its own: what [`fields()`](atomiks::Atomic::fields) lends."]
+            #[derive(:: core :: clone :: Clone, :: core :: marker :: Copy)]
+            struct LinkFields<'a, P: ::atomiks::FieldPath<Value = Link> + 'a> {
+                #[doc = " The field `next`, of type `NonNull<Node>`, in an atomic `Link`."]
+                next: &'a ::atomiks::AtomicField<::atomiks::Join<P, ::atomiks::Field<Link, 0, NonNull<Node> >> >,
+                #[doc = " The field `deleted`, of type `bool`, in an atomic `Link`."]
+                deleted: &'a ::atomiks::AtomicField<::atomiks::Join<P, ::atomiks::Field<Link, 1, bool>>>
+            }
+        };
+        let code = written(&derive_atom(quote! {
+            struct Link { next: NonNull<Node>, deleted: bool }
+        }));
+        assert_eq!(code, expected.to_string(), "the impl, its layout and its projection");
+    }
+
+    #[test]
+    fn a_pointer_enum_of_a_unit_and_a_pointer_never_null_fills_the_pointers_niche() {
+        let expected = quote! {
+            const _: () = {
+                type Discriminant = ::core::primitive::isize;
+                const discriminant_0: Discriminant = 0;
+                const discriminant_1: Discriminant = 1;
+                const variant_1: ::atomiks::__private::PackedLayout =
+                    ::atomiks::__private::PackedLayout::new(&[]);
+                const layout: ::atomiks::__private::PointerEnumLayout =
+                    ::atomiks::__private::PointerEnumLayout::niche_or_tagged(&[
+                        ::atomiks::__private::PointerEnumVariant::unit(discriminant_0),
+                        ::atomiks::__private::PointerEnumVariant::pointer::<_, NonNull<Node> >(
+                            discriminant_1, variant_1
+                        )
+                    ]);
+                const promises: ::atomiks::__private::PointerEnumValidity =
+                    ::atomiks::__private::PointerEnumValidity::new(layout)
+                        .with_variant(discriminant_0, ::atomiks::__private::PackedValidity::EMPTY)
+                        .with_variant(
+                            discriminant_1,
+                            ::atomiks::__private::PackedValidity::EMPTY
+                                .with_field::<<NonNull<Node> as ::atomiks::Atom>::Validity>(
+                                    layout.pointer_layout()
+                                )
+                        );
+                const alignment: ::atomiks::__private::PointeeAlignment =
+                    ::atomiks::__private::PointeeAlignment::least(&[
+                        <NonNull<Node> as ::atomiks::Atom>::POINTEE_ALIGNMENT
+                    ]);
+                type Repr = *mut ();
+                const _: () = layout.assert_tags_fit::<Next, NonNull<Node> >("`Next::Node`");
+                #[automatically_derived]
+                const unsafe impl ::atomiks::Atom for Next {
+                    type Repr = Repr;
+                    type Validity = <::atomiks::__private::ValidityCode<{ promises.code() }>
+                        as ::atomiks::__private::SelectValidity>::Validity;
+                    const REPRS: ::atomiks::ReprRange<Repr> = promises.range();
+                    const TAG_WIDTH: ::core::primitive::u32 = layout.tag_width();
+                    const POINTEE_ALIGNMENT: ::atomiks::__private::PointeeAlignment = alignment;
+                    #[inline]
+                    fn to_repr(self) -> *mut () {
+                        let (repr, misaligned) = ::atomiks::__private::to_tagged_repr::<Self>(
+                            self,
+                            ::atomiks::__private::Tags::EMPTY
+                        );
+                        ::atomiks::__private::assert_aligned::<Self>(misaligned);
+                        repr
+                    }
+                    #[inline]
+                    fn to_tagged_repr(
+                        self, tags: ::atomiks::__private::Tags
+                    ) -> (*mut (), ::core::primitive::usize) {
+                        match self {
+                            Self::End => tags.set_in(layout.unit_repr(discriminant_0)),
+                            Self::Node(pointer) => ::atomiks::__private::to_tagged_pointer::<NonNull<Node> >(
+                                pointer,
+                                layout.pointer_tags(discriminant_1, 0, tags)
+                            ),
+                        }
+                    }
+                    #[inline]
+                    fn from_repr(repr: *mut ()) -> ::core::option::Option<Self> {
+                        match layout.discriminant::<Discriminant>(repr) {
+                            discriminant_0 if layout.is_unit(repr, discriminant_0) => ::core::option::Option::Some(Self::End),
+                            discriminant_1 => {
+                                let (pointer, bits) = layout.split(repr);
+                                if !layout.is_clear_above_fields(bits, variant_1) {
+                                    return ::core::option::Option::None;
+                                }
+                                match (::atomiks::__private::from_pointer::<NonNull<Node> >(pointer),) {
+                                    (::core::option::Option::Some(value_0),) => ::core::option::Option::Some(Self::Node(value_0)),
+                                    _ => ::core::option::Option::None,
+                                }
+                            },
+                            _ => ::core::option::Option::None,
+                        }
+                    }
+                    #[inline]
+                    unsafe fn from_repr_unchecked(repr: *mut ()) -> Self {
+                        match layout.discriminant::<Discriminant>(repr) {
+                            discriminant_0 => Self::End,
+                            discriminant_1 => {
+                                let (pointer, _) = layout.split(repr);
+                                Self::Node(unsafe {
+                                    ::atomiks::__private::from_pointer_unchecked::<NonNull<Node> >(pointer)
+                                })
+                            },
+                            _ => unsafe { ::core::hint::unreachable_unchecked() },
+                        }
+                    }
+                }
+            };
+        };
+        let code = written(&derive_atom(quote! { enum Next { End, Node(NonNull<Node>) } }));
+        assert_eq!(code, expected.to_string(), "the impl, its discriminants and its layout");
+    }
+
+    #[test]
     fn each_shape_names_atomiks_by_the_path_stated_alone() {
         let shapes = [
             quote! { struct Seq(u64); },
@@ -1007,6 +1290,10 @@ mod tests {
             quote! { #[atom(repr = u64)] struct Pair<A, B> { first: A, second: B } },
             quote! { enum Slot { Empty, Writing { lap: u32 }, Ready(u32) } },
             quote! { #[atom(repr = u64)] #[repr(u8)] enum Lock<O> { Free = 0, Owned(O) = 1 } },
+            quote! { struct Link { next: NonNull<Node>, deleted: bool } },
+            quote! { struct Tagged<P> { #[atom(ptr)] pointer: P, flag: bool } },
+            quote! { enum Slot { Empty, Inline(u32), Node(NonNull<Node>) } },
+            quote! { enum Either<A, B> { Left(#[atom(ptr)] A), Right(#[atom(ptr)] B) } },
         ];
         for shape in shapes {
             let code = written(&derive_atom(quote! { #[atom(crate = renamed)] #shape }));

@@ -1,0 +1,13 @@
+error: a second pointer field, `second`: a pointer word holds one pointer
+  --> tests/compile_fail/derive_on_a_pointer_word_with_two_pointers.rs:11:13
+   |
+11 |     second: *mut u64,
+   |             ^^^^^^^^
+   |
+note: the first is here
+  --> tests/compile_fail/derive_on_a_pointer_word_with_two_pointers.rs:10:12
+   |
+10 |     first: NonNull<u64>,
+   |            ^^^^^^^^^^^^
+   = note: two pointers take two words, and atomiks does not yet hold pointers in two
+   = help: store the second in an atomic of its own

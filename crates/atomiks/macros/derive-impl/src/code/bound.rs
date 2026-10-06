@@ -30,6 +30,36 @@ pub(crate) fn own_where_clause<I: IntoIterator<Item = TokenStream>>(
     (!predicates.is_empty()).then(|| quote!(where #(#predicates),*))
 }
 
+/// Where a where clause that bounds a field sits, which decides what it asks of the field.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum BoundSite {
+    /// `lay_out`'s, which reads only constants.
+    LayOut,
+    /// A projection's, beside the impl.
+    Projection,
+    /// The `Atom` impl's, `const` as the impl is.
+    Impl,
+}
+
+/// The bounds at `site` on each of `fields` that names a parameter: `PtrAtom` on a pointer, `Atom`
+/// on any other field, whose repr a projection and the impl ask to be stored as bits, each
+/// `[const]` in the impl's where clause.
+pub(crate) fn field_bounds<'f, I: IntoIterator<Item = &'f Field>>(
+    atomiks: &Path, fields: I, site: BoundSite,
+) -> impl Iterator<Item = TokenStream> {
+    let private = quote!(#atomiks::__private);
+    let generic_fields = fields.into_iter().filter(|field| field.is_generic);
+    generic_fields.map(move |Field { ty, is_pointer, .. }| match (*is_pointer, site) {
+        (true, BoundSite::LayOut | BoundSite::Projection) => quote!(#ty: #atomiks::PtrAtom),
+        (true, BoundSite::Impl) => quote!(#ty: [const] #atomiks::PtrAtom),
+        (false, BoundSite::LayOut) => quote!(#ty: #atomiks::Atom),
+        (false, BoundSite::Projection) => quote!(#ty: #atomiks::Atom<Repr: #private::FieldRepr>),
+        (false, BoundSite::Impl) => {
+            quote!(#ty: [const] #atomiks::Atom<Repr: [const] #private::FieldRepr>)
+        },
+    })
+}
+
 /// The bounds in an impl's where clause that each value of the implementor, of `fields`, may cross
 /// threads, as an `Atomic` of it may: `Send + Sync` on the type, where it has parameters, so no
 /// constant beside the impl names it.

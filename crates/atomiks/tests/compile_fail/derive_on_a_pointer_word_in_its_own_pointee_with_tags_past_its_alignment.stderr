@@ -1,0 +1,9 @@
+error[E0080]: evaluation panicked: `$CRATE::Link`: tag field `tag` needs 8 low bits, but `$CRATE::Node` is 8-byte aligned (3 free bits): shrink the tags, or raise the pointee's alignment with `#[repr(align(256))]`
+  --> tests/compile_fail/derive_on_a_pointer_word_in_its_own_pointee_with_tags_past_its_alignment.rs:14:8
+   |
+13 | #[derive(Clone, Copy, Atom)]
+   |                       ---- in this derive macro expansion
+14 | struct Link {
+   |        ^^^^ evaluation of `_::_` failed here
+   |
+   = note: this error originates in the derive macro `Atom` (in Nightly builds, run with -Z macro-backtrace for more info)
