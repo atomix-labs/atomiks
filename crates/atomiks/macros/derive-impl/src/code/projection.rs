@@ -76,7 +76,7 @@ impl<'a> ProjectionCode<'a> {
         let (name, alias) = (layout.name(), layout.repr_alias());
         let is_generic = layout.instance_repr().is_some();
         let field_implementations = self.fields.iter().zip(packed.placements()).enumerate().map(
-            |(index, (Field { ty, .. }, placement))| {
+            |(index, (Field { ty, member, .. }, placement))| {
                 let (placement, layout, reach) = if is_generic {
                     (
                         layout.instance_local(placement),
@@ -101,6 +101,10 @@ impl<'a> ProjectionCode<'a> {
                         const PLACEMENT: #atomiks::__private::PackedField = #placement;
                         const LAYOUT: #atomiks::__private::PackedLayout = #layout;
                         type Reach = #reach;
+                        #[inline]
+                        fn field(self) -> #ty {
+                            self.#member
+                        }
                     }
                 }
             },
@@ -112,11 +116,11 @@ impl<'a> ProjectionCode<'a> {
         // before it ends, where `to_repr` packs the field, each field in bits of its own; the
         // layout is the struct's, whose extension `to_repr` writes above the width; `from_repr`
         // decodes each field alone and checks only the bits above the width, so a repr decodes
-        // wherever each field's bits decode and the bits above extend the layout; and `Reach` is
+        // wherever each field's bits decode and the bits above extend the layout; `Reach` is
         // `Reach<true>` only where `reaches_top` finds the field ending at the repr's top bit, and
-        // never for a generic struct. `ProjectFields` keeps its own: `project` lends the place of
-        // each field, at its path from `place`, into the projection's field of that field's
-        // visibility, and no other place.
+        // never for a generic struct; and `field` returns the field. `ProjectFields` keeps its own:
+        // `project` lends the place of each field, at its path from `place`, into the
+        // projection's field of that field's visibility, and no other place.
         quote!(#(#field_implementations)* #project_fields #debug)
     }
 

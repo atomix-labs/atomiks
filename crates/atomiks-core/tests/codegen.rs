@@ -10,7 +10,14 @@
 //! A field's operation is its whole word's, its operand confined to the field: one LSE
 //! instruction on `aarch64`, one `lock` instruction on `x86_64`, where a bit's test is `lock bts`
 //! and its kin at every position, the lowest and the top bit's position in a register. A field of
-//! an arbitrary-int integer lowers as a built-in integer's does.
+//! an arbitrary-int integer lowers as a built-in integer's does. A pointer word's tag lowers as a
+//! field does, on the pointer itself; its load masks the tags off with an `and`, and the load of a
+//! word through its pointer's place masks the outer word's tags off alone. A word's store tests its
+//! pointer against every tag bit in one test, a word's over a word too, and an exchange tests both
+//! its pointers in one, each with one cold refusal off a fast path that saves no frame record. A
+//! decode clears the tags with the pointer's `mask`, so a loop tests no pointer it decoded: a
+//! word's `update` tests, calls and saves nothing, and a Treiber stack's pop tests only the next
+//! node's pointer, which it reads from the node, and saves a frame record once, for its refusal.
 
 // Miri cannot run the compiler, and loom's atomics are not what ships.
 #![cfg(on_hardware)]
@@ -20,7 +27,7 @@ mod testing;
 
 #[cfg(test)]
 mod tests {
-    use crate::testing::codegen::Lowering::{self, InOrder, Only, Retry};
+    use crate::testing::codegen::Lowering::{self, InOrder, Only, Refuses, Retry, RetryOnly};
     use crate::testing::codegen::{
         AARCH64_LINUX, AARCH64_MACOS, X86_64_LINUX, X86_64_MACOS, lowers_as_expected, refused,
     };
@@ -98,6 +105,28 @@ mod tests {
         ("ends64_top_test_and_set", Only(&["mov", "ldsetal", "lsr", "ret"])),
         ("ends64_top_test_and_clear", Only(&["mov", "ldclral", "lsr", "ret"])),
         ("ends64_top_test_and_toggle", Only(&["mov", "ldeoral", "lsr", "ret"])),
+        ("tag_set", Only(&["mov", "ldsetl", "ret"])),
+        ("tag_clear", Only(&["mov", "ldclrl", "ret"])),
+        ("tag_toggle", Only(&["mov", "ldeorl", "ret"])),
+        ("bit0_test_and_set", Only(&["mov", "ldsetal", "and", "ret"])),
+        ("bit0_test_and_clear", Only(&["mov", "ldclral", "and", "ret"])),
+        ("bit0_test_and_toggle", Only(&["mov", "ldeoral", "and", "ret"])),
+        ("bit1_test_and_set", Only(&["mov", "ldsetal", "ubfx", "ret"])),
+        ("bit1_test_and_clear", Only(&["mov", "ldclral", "ubfx", "ret"])),
+        ("bit1_test_and_toggle", Only(&["mov", "ldeoral", "ubfx", "ret"])),
+        ("bit2_test_and_set", Only(&["mov", "ldsetal", "ubfx", "ret"])),
+        ("bit2_test_and_clear", Only(&["mov", "ldclral", "ubfx", "ret"])),
+        ("bit2_test_and_toggle", Only(&["mov", "ldeoral", "ubfx", "ret"])),
+        ("tag_flags_or", Only(&["ubfiz", "ldsetl", "ret"])),
+        ("tag_flags_and", Only(&["mvn", "and", "ldclrl", "ret"])),
+        ("tag_flags_xor", Only(&["ubfiz", "ldeorl", "ret"])),
+        ("tag_flags_not", Only(&["mov", "ldeorl", "ret"])),
+        ("nested_tag_set", Only(&["mov", "ldsetl", "ret"])),
+        ("tag_fetch_or", Only(&["mov", "ldsetal", "and", "and", "ret"])),
+        ("word_store", Refuses(&["tbnz", "add", "stlr", "ret"])),
+        ("nested_store", Refuses(&["tst", "b.ne", "add", "stlr", "ret"])),
+        ("word_compare_exchange", Refuses(&["orr", "tst", "b.ne", "casal", "ret"])),
+        ("nested_compare_exchange", Refuses(&["orr", "tst", "b.ne", "casal", "ret"])),
     ];
 
     /// The rest on `aarch64` with the `+lse` floor, which has no LSE2.
@@ -114,6 +143,27 @@ mod tests {
         ("flags_load", Only(&["ldar", "lsr", "ret"])),
         ("quantity_load", Only(&["ldar", "ret"])),
         ("quantity_update", Retry(&["ldar", "casal"])),
+        ("word_load", Only(&["ldar", "and", "and", "ubfx", "str", "strb", "strb", "ret"])),
+        ("word_load_top", Only(&["ldar", "and", "ret"])),
+        ("option_word_load", Only(&["ldar", "mov", "and", "cmp", "and", "csel", "ret"])),
+        ("tag_load", Only(&["ldar", "and", "ret"])),
+        ("tag_update", Retry(&["ldar", "casal"])),
+        ("pointer_place_load", Only(&["ldar", "and", "and", "ret"])),
+        (
+            "word_update",
+            RetryOnly(&[
+                "ldar", "mov", "and", "and", "eor", "orr", "casal", "cmp", "mov", "b.ne", "and",
+                "and", "ubfx", "str", "strb", "strb", "ret",
+            ]),
+        ),
+        (
+            "word_pop",
+            RetryOnly(&[
+                "stp", "mov", "ldar", "mov", "ands", "b.eq", "ldr", "tst", "b.ne", "add", "and",
+                "and", "and", "add", "add", "add", "mov", "casal", "cmp", "b.ne", "ldp", "ret",
+                "adrp", "add", "bl",
+            ]),
+        ),
     ];
 
     /// The rest on `aarch64` with LSE2: `neoverse-v1` on Linux, and macOS's floor, `apple-m1`.
@@ -135,6 +185,53 @@ mod tests {
         ("flags_load", Only(&["ldapr", "lsr", "ret"])),
         ("quantity_load", Only(&["ldapr", "ret"])),
         ("quantity_update", Retry(&["ldapr", "casal"])),
+        ("word_load_top", Only(&["ldapr", "and", "ret"])),
+        ("tag_load", Only(&["ldapr", "and", "ret"])),
+        ("tag_update", Retry(&["ldapr", "casal"])),
+        ("pointer_place_load", Only(&["ldapr", "and", "and", "ret"])),
+    ];
+
+    /// The rest on `aarch64` Linux with LSE2, `neoverse-v1`, which puts a word's instructions
+    /// in the floor's order.
+    const AARCH64_LINUX_LSE2: &[(&str, Lowering)] = &[
+        ("word_load", Only(&["ldapr", "and", "and", "ubfx", "str", "strb", "strb", "ret"])),
+        ("option_word_load", Only(&["ldapr", "mov", "and", "cmp", "and", "csel", "ret"])),
+        (
+            "word_update",
+            RetryOnly(&[
+                "ldapr", "mov", "and", "and", "eor", "orr", "casal", "cmp", "mov", "b.ne", "and",
+                "and", "ubfx", "str", "strb", "strb", "ret",
+            ]),
+        ),
+        (
+            "word_pop",
+            RetryOnly(&[
+                "stp", "mov", "ldapr", "mov", "ands", "b.eq", "ldr", "tst", "b.ne", "add", "and",
+                "and", "and", "add", "add", "add", "mov", "casal", "cmp", "b.ne", "ldp", "ret",
+                "adrp", "add", "bl",
+            ]),
+        ),
+    ];
+
+    /// The rest on `aarch64` macOS, whose `apple-m1` puts a word's instructions in its own order.
+    const AARCH64_MACOS_LSE2: &[(&str, Lowering)] = &[
+        ("word_load", Only(&["ldapr", "and", "and", "str", "strb", "ubfx", "strb", "ret"])),
+        ("option_word_load", Only(&["ldapr", "and", "cmp", "mov", "csel", "and", "ret"])),
+        (
+            "word_update",
+            RetryOnly(&[
+                "ldapr", "mov", "and", "and", "eor", "orr", "casal", "cmp", "mov", "b.ne", "and",
+                "and", "str", "strb", "ubfx", "strb", "ret",
+            ]),
+        ),
+        (
+            "word_pop",
+            RetryOnly(&[
+                "stp", "mov", "mov", "ldapr", "ands", "b.eq", "ldr", "tst", "b.ne", "and", "add",
+                "and", "add", "add", "and", "add", "mov", "casal", "cmp", "b.ne", "ldp", "ret",
+                "adrp", "add", "bl",
+            ]),
+        ),
     ];
 
     /// Each function of the fixture on `x86_64`, Linux or macOS, at the `x86-64-v3` floor (AVX).
@@ -225,7 +322,133 @@ mod tests {
         ("ends64_top_test_and_set", Only(&["movl", "andl", "lock btsq", "setb", "retq"])),
         ("ends64_top_test_and_clear", Only(&["movl", "andl", "lock btrq", "setb", "retq"])),
         ("ends64_top_test_and_toggle", Only(&["movl", "andl", "lock btcq", "setb", "retq"])),
+        (
+            "word_load",
+            Only(&[
+                "movq", "movq", "movq", "andq", "movl", "andb", "shrb", "andb", "movq", "movb",
+                "movb", "retq",
+            ]),
+        ),
+        ("word_load_top", Only(&["movq", "andq", "retq"])),
+        (
+            "option_word_load",
+            Only(&["movq", "movq", "andq", "movl", "andl", "testq", "movl", "cmovnel", "retq"]),
+        ),
+        ("tag_set", Only(&["lock orq", "retq"])),
+        ("tag_clear", Only(&["lock andq", "retq"])),
+        ("tag_toggle", Only(&["lock xorq", "retq"])),
+        ("tag_load", Only(&["movq", "andb", "retq"])),
+        ("tag_update", Retry(&["lock cmpxchgq"])),
+        ("bit0_test_and_set", Only(&["xorl", "andl", "lock btsq", "setb", "retq"])),
+        ("bit0_test_and_clear", Only(&["xorl", "andl", "lock btrq", "setb", "retq"])),
+        ("bit0_test_and_toggle", Only(&["xorl", "andl", "lock btcq", "setb", "retq"])),
+        ("bit1_test_and_set", Only(&["lock btsq", "setb", "retq"])),
+        ("bit1_test_and_clear", Only(&["lock btrq", "setb", "retq"])),
+        ("bit1_test_and_toggle", Only(&["lock btcq", "setb", "retq"])),
+        ("bit2_test_and_set", Only(&["lock btsq", "setb", "retq"])),
+        ("bit2_test_and_clear", Only(&["lock btrq", "setb", "retq"])),
+        ("bit2_test_and_toggle", Only(&["lock btcq", "setb", "retq"])),
+        ("tag_flags_or", Only(&["addl", "andl", "lock orq", "retq"])),
+        ("tag_flags_and", Only(&["addl", "orq", "lock andq", "retq"])),
+        ("tag_flags_xor", Only(&["addl", "andl", "lock xorq", "retq"])),
+        ("tag_flags_not", Only(&["lock xorq", "retq"])),
+        ("nested_tag_set", Only(&["lock orq", "retq"])),
+        ("pointer_place_load", Only(&["movq", "movl", "andl", "andq", "retq"])),
+        ("word_store", Refuses(&["testb", "jne", "incq", "movq", "retq"])),
+        ("nested_store", Refuses(&["testb", "jne", "addq", "movq", "retq"])),
+        ("word_compare_exchange", Refuses(&["orl", "testb", "jne", "lock cmpxchgq", "retq"])),
+        ("nested_compare_exchange", Refuses(&["orl", "testb", "jne", "lock cmpxchgq", "retq"])),
+        (
+            "word_update",
+            RetryOnly(&[
+                "movq",
+                "movl",
+                "movq",
+                "andq",
+                "andl",
+                "xorq",
+                "orq",
+                "lock cmpxchgq",
+                "jne",
+                "movq",
+                "andq",
+                "movl",
+                "andb",
+                "shrb",
+                "andb",
+                "movq",
+                "movb",
+                "movb",
+                "movq",
+                "retq",
+            ]),
+        ),
     ];
+
+    /// The rest on `x86_64` Linux, where a function that calls aligns the stack with a push.
+    const X86_64_LINUX_PUSH: &[(&str, Lowering)] = &[(
+        "word_pop",
+        RetryOnly(&[
+            "pushq",
+            "movq",
+            "movq",
+            "andq",
+            "je",
+            "movq",
+            "testb",
+            "jne",
+            "movl",
+            "andl",
+            "leal",
+            "andl",
+            "addq",
+            "addq",
+            "andl",
+            "addq",
+            "lock cmpxchgq",
+            "jne",
+            "movq",
+            "popq",
+            "retq",
+            "xorl",
+            "movq",
+            "popq",
+            "retq",
+            "leaq",
+            "callq",
+        ]),
+    )];
+
+    /// The rest on `x86_64` macOS, where every function's frame record aligns the stack.
+    const X86_64_MACOS_FRAME: &[(&str, Lowering)] = &[(
+        "word_pop",
+        RetryOnly(&[
+            "movq",
+            "movq",
+            "andq",
+            "je",
+            "movq",
+            "testb",
+            "jne",
+            "movl",
+            "andl",
+            "leal",
+            "andl",
+            "addq",
+            "addq",
+            "andl",
+            "addq",
+            "lock cmpxchgq",
+            "jne",
+            "movq",
+            "retq",
+            "xorl",
+            "movq",
+            "retq",
+            "leaq",
+            "callq",
+        ]),
+    )];
 
     #[test]
     fn aarch64_linux_lowers_each_operation_to_its_instruction() {
@@ -234,22 +457,23 @@ mod tests {
 
     #[test]
     fn aarch64_linux_with_lse2_lowers_each_operation_to_its_instruction() {
-        lowers_as_expected(AARCH64_LINUX, Some("neoverse-v1"), &[AARCH64, AARCH64_LSE2]);
+        let tables = [AARCH64, AARCH64_LSE2, AARCH64_LINUX_LSE2];
+        lowers_as_expected(AARCH64_LINUX, Some("neoverse-v1"), &tables);
     }
 
     #[test]
     fn aarch64_macos_lowers_each_operation_to_its_instruction() {
-        lowers_as_expected(AARCH64_MACOS, None, &[AARCH64, AARCH64_LSE2]);
+        lowers_as_expected(AARCH64_MACOS, None, &[AARCH64, AARCH64_LSE2, AARCH64_MACOS_LSE2]);
     }
 
     #[test]
     fn x86_64_linux_lowers_each_operation_to_its_instruction() {
-        lowers_as_expected(X86_64_LINUX, None, &[X86_64]);
+        lowers_as_expected(X86_64_LINUX, None, &[X86_64, X86_64_LINUX_PUSH]);
     }
 
     #[test]
     fn x86_64_macos_lowers_each_operation_to_its_instruction() {
-        lowers_as_expected(X86_64_MACOS, None, &[X86_64]);
+        lowers_as_expected(X86_64_MACOS, None, &[X86_64, X86_64_MACOS_FRAME]);
     }
 
     /// Checks that `target`, an `x86_64` one, refuses each probe only `aarch64` has, each with its
@@ -272,7 +496,9 @@ mod tests {
         let aarch64_only = AARCH64
             .iter()
             .chain(AARCH64_FLOOR)
-            .filter(|(name, _)| X86_64.iter().all(|(other, _)| other != name))
+            .filter(|(name, _)| {
+                X86_64.iter().chain(X86_64_LINUX_PUSH).all(|(other, _)| other != name)
+            })
             .count();
         assert_eq!(errors.len(), aarch64_only, "one error per probe only aarch64 has:\n{stderr}");
         for line in [

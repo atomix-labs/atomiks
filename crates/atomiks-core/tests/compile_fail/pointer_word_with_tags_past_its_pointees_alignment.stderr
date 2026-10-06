@@ -1,0 +1,17 @@
+error[E0080]: evaluation panicked: `$CRATE::Head`: tags need 3 low bits, but `u32` is 4-byte aligned (2 free bits): shrink the tags, or raise the pointee's alignment with `#[repr(align(8))]`
+  --> tests/compile_fail/../testing/pointer_word.rs
+   |
+   |   macro_rules! pointer_word {
+...
+   |               const _: () = WORD_LAYOUT.assert_tags_fit::<$name, $pointer_type>("tags need");
+   |                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `_::_` failed here
+   |
+  ::: tests/compile_fail/pointer_word_with_tags_past_its_pointees_alignment.rs:13:1
+   |
+13 | / pointer_word::pointer_word! {
+14 | |     /// A pointer to a `u32`, a version of 0 to 3 and a mark: three bits.
+15 | |     struct Head, projected as HeadFields {
+16 | |         0 => top: NonNull<u32>,
+...  |
+20 | | }
+   | |_- in this macro invocation

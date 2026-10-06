@@ -5,12 +5,12 @@ mod ptr;
 mod ranged;
 mod scalar;
 
+pub use self::ptr::PtrAtom;
 // For deranged's ranged integers, which take the impls atomiks' own do.
 #[cfg(feature = "deranged-05")]
-pub(crate) use ranged::ranged_atom;
-
+pub(crate) use self::ranged::ranged_atom;
 use crate::primitive::{Bitwise, CompareExchange, ExactBits, FetchAdd, Primitive};
-use crate::range::ReprRange;
+use crate::range::{PointeeAlignment, ReprRange, Tags};
 use crate::validity::{Partial, Total, Validity};
 
 /// A value that packs into one atomic word: stored as its [`Repr`](Atom::Repr), and decoded on
@@ -35,7 +35,9 @@ use crate::validity::{Partial, Total, Validity};
 /// - [`Validity`](Atom::Validity) is truthful: every repr it promises decodes, and for
 ///   [`ZeroNiche`] and [`TotalZeroNiche`], zero does not;
 /// - `v` may move to another thread, whatever `Self`'s auto traits say: `Atomic<Self>` is `Send`
-///   and `Sync`.
+///   and `Sync`;
+/// - an impl that writes the hidden `to_tagged_repr`, as the derive does for a tagged pointer,
+///   keeps its doc's promise: an impl that writes none keeps it already.
 ///
 /// # Examples
 /// ```
@@ -106,8 +108,36 @@ pub const unsafe trait Atom: Copy {
     /// `Option`'s `None` takes a repr outside it, or zero where the validity says zero does not
     /// decode.
     const REPRS: ReprRange<Self::Repr>;
+    /// How many low bits of a value stored as a pointer hold tags, its own or those of a value it
+    /// holds: a word that holds it keeps its own above them. None for a value stored as bits, and
+    /// for a hand impl, which no word then holds beside a tag.
+    ///
+    /// A type's layout may read it, so it reads no pointee's alignment, which
+    /// [`POINTEE_ALIGNMENT`](Self::POINTEE_ALIGNMENT) holds apart.
+    #[doc(hidden)]
+    const TAG_WIDTH: u32 = 0;
+    /// The alignment of what a value stored as a pointer points to, the least of its pointers'
+    /// where it holds several, which leaves the low bits clear that its tags, and those of a word
+    /// that holds it, go in. None for a value stored as bits, and for a hand impl.
+    ///
+    /// Only code and the checks read it, never a type's layout, which may hold the pointee.
+    #[doc(hidden)]
+    const POINTEE_ALIGNMENT: PointeeAlignment = PointeeAlignment::NONE;
     /// The repr this value is.
     fn to_repr(self) -> Self::Repr;
+    /// The repr this value is, `tags` set in its low bits as [`Tags::set_in`] sets them, beside
+    /// the bits under the tags it had set already: none, unless its pointer is misaligned for
+    /// them, and the repr is then no value's, for the caller to refuse.
+    ///
+    /// A pointer word passes its own tags on to its pointer field, so a word nested in others
+    /// tests its pointer once, against every tag each word sets; an exchange encodes two values
+    /// and refuses either misaligned in one test. With no tags, and no bit found set, the repr is
+    /// `to_repr`'s.
+    #[doc(hidden)]
+    #[inline]
+    fn to_tagged_repr(self, tags: Tags) -> (Self::Repr, usize) {
+        tags.set_in(self.to_repr())
+    }
     /// The value `repr` encodes, or `None` for a repr no value encodes.
     fn from_repr(repr: Self::Repr) -> Option<Self>;
     /// The value `repr` encodes, without `from_repr`'s check.

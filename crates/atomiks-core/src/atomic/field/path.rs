@@ -80,7 +80,12 @@ impl<C> fmt::Debug for Whole<C> {
 /// complement; and no other bit depends on the field, but, above a signed last field, the
 /// container's bits that copy its sign. Writing any repr of `Value` that decodes there, its sign
 /// copied so, and leaving every other bit as it is, leaves a repr of `Container` that decodes,
-/// with that field alone changed: [`AtomicField`](super::AtomicField)'s operations rest on it.
+/// with that field alone changed: [`AtomicField`](super::AtomicField)'s operations rest on it. A
+/// pointer repr's bits are its address, and each write keeps its provenance.
+///
+/// A field stored as a pointer, a pointer word's pointer, is not its bits: the bits from `OFFSET`
+/// hold only the low `WIDTH` bits of its repr, its own tags, which a path to one of them goes on
+/// from, and its value is read through the container's whole value.
 ///
 /// # Examples
 /// [`#[derive(Atom)]`'s example][derive] lends each field of a packed struct as a place, its path
@@ -111,6 +116,9 @@ pub impl(crate) trait FieldPath: Copy {
     /// [`Whole`], so a field of an atomic's whole value has the path its own type names.
     #[doc(hidden)]
     type Join<B: FieldPath<Container = Self::Value>>: FieldPath<Container = Self::Container, Value = B::Value>;
+    /// The field of `container`.
+    #[doc(hidden)]
+    fn field(container: Self::Container) -> Self::Value;
 }
 
 /// The path to the field `B` of the value at the path `P`: `Then<P, B>`, or `B` where `P` is
@@ -155,8 +163,14 @@ pub impl(crate) trait TopField: FieldPath {}
 /// so the field takes the bits [`FieldBitwise`](crate::FieldBitwise) and
 /// [`FieldAdd`](crate::FieldAdd) speak for; `to_repr` packs that field there, each other field in
 /// bits of its own, and extends the bits above the value's width as `LAYOUT` does; a repr decodes
-/// wherever each field's bits decode as its type and the bits above extend the layout; and `Reach`
-/// is `Reach<true>` only where the field ends at the repr's top bit.
+/// wherever each field's bits decode as its type and the bits above extend the layout; `Reach` is
+/// `Reach<true>` only where the field ends at the repr's top bit; and `field` returns the field.
+///
+/// Where `Self`'s repr is a pointer, a pointer word's, each field lies below `Self::TAG_WIDTH`: its
+/// tag fields above its pointer field's own tags, and its `LAYOUT` is one whose top field is the
+/// pointer, above the tags, so no tag reaches the top. Its pointer field, `V` stored as a pointer,
+/// takes the low bits of `Self`'s repr that are the low bits of `V`'s, below `V::TAG_WIDTH`, where
+/// `V`'s own fields lie, at offset 0.
 #[doc(hidden)]
 #[expect(unsafe_code, reason = "`FieldPath` for `Field` trusts the placement")]
 pub unsafe trait HasPackedField<const INDEX: u32, V: Atom>: Atom {
@@ -166,6 +180,8 @@ pub unsafe trait HasPackedField<const INDEX: u32, V: Atom>: Atom {
     const LAYOUT: PackedLayout;
     /// `Reach<true>` where the field ends at the repr's top bit, else `Reach<false>`.
     type Reach;
+    /// The field's value.
+    fn field(self) -> V;
 }
 
 /// Whether a field ends at its container repr's top bit, as a type, which a constant the derive
@@ -191,6 +207,10 @@ impl<C: Atom> FieldPath for Whole<C> {
     const IS_SIGNED: bool = false;
     const END: u32 = C::Repr::BITS;
     type Join<B: FieldPath<Container = C>> = B;
+    #[inline]
+    fn field(container: C) -> C {
+        container
+    }
 }
 
 // `HasPackedField` places the field where `to_repr` packs it and `from_repr` reads it back, in the
@@ -210,6 +230,10 @@ impl<C: HasPackedField<INDEX, V>, const INDEX: u32, V: Atom> FieldPath for Field
         C::PLACEMENT.next_offset()
     };
     type Join<B: FieldPath<Container = Self::Value>> = Then<Self, B>;
+    #[inline]
+    fn field(container: C) -> V {
+        <C as HasPackedField<INDEX, V>>::field(container)
+    }
 }
 
 // `B`'s container is `A`'s value, whose repr's low `A::WIDTH` bits `A` stores, each of its fields
@@ -234,6 +258,10 @@ impl<A: FieldPath, B: FieldPath<Container = A::Value>> FieldPath for Then<A, B> 
         A::OFFSET.saturating_add(A::WIDTH)
     };
     type Join<N: FieldPath<Container = Self::Value>> = Then<Self, N>;
+    #[inline]
+    fn field(container: A::Container) -> B::Value {
+        B::field(A::field(container))
+    }
 }
 
 // `do_not_recommend`, so a field below the top reports `TopField`'s message, not `ReachesTop`'s.

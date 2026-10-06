@@ -18,8 +18,8 @@ where
     T::Repr: Atom<Repr = T::Repr> + Load,
 {
     // SAFETY: `as_ptr` points to the atomic's repr, aligned and live for the borrow; every access
-    // to it is atomic and of its width, as this load is; and every repr of an integer or a `bool`
-    // decodes, as itself.
+    // to it is atomic and of its width, as this load is; and every repr of an integer, a `bool` or
+    // a pointer decodes, as itself.
     #[expect(unsafe_code, reason = "reads the whole repr as itself, to check it decodes")]
     let whole = unsafe { Atomic::<T::Repr>::from_ptr(atomic.as_ptr()) };
     let repr = whole.load(Relaxed);

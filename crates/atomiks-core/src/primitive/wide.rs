@@ -38,6 +38,14 @@ macro_rules! wide_bits {
             fn is_bits(self, bits: u128) -> bool {
                 self.to_bits() == bits
             }
+            #[inline]
+            fn packed_bits(self) -> u128 {
+                self.to_bits()
+            }
+            #[inline]
+            fn with_packed_bits(self, bits: u128) -> Self {
+                Self::from_bits(bits)
+            }
         }
         const impl ExactBits for $int {
             #[inline]

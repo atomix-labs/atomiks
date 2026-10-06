@@ -2,8 +2,14 @@
 //!
 //! Each `should_panic` model is a bug loom must report; the rest hold under every interleaving.
 
+#![feature(const_trait_impl)]
+
 // Loom's types exist only under `--cfg loom`; a crate-level `cfg` would empty the crate, and with
 // it the attributes `just check-rust-lints` injects.
+#[cfg(loom)]
+#[cfg(test)]
+mod testing;
+
 #[cfg(loom)]
 #[cfg(test)]
 mod tests {
@@ -12,7 +18,9 @@ mod tests {
     use atomiks_core::cell::UnsafeCell;
     use atomiks_core::model::{Arc, check, thread};
     use atomiks_core::ordering::{AcqRel, Acquire, Relaxed, Release, StoreOrdering, StoreStore};
-    use atomiks_core::{AtomicBool, AtomicPtr, AtomicU64, fence, hint};
+    use atomiks_core::{Atomic, AtomicBool, AtomicPtr, AtomicU64, fence, hint};
+
+    use crate::testing::pointer_word::pointer_word;
 
     /// A value published behind a flag the writer stores with `order`.
     fn publish<O: StoreOrdering + Send + Sync + 'static>(order: O) {
@@ -169,6 +177,35 @@ mod tests {
                 base.wrapping_add(3),
                 "every offset lands: 3 - 1 + 2 - 1"
             );
+        });
+    }
+
+    pointer_word! {
+        /// Two tags below an address no model reads through.
+        struct Tagged, projected as TaggedFields {
+            0 => pointer: *mut u64,
+            1 => low: bool,
+            2 => high: bool,
+        }
+    }
+
+    /// Loom's pointer cell has no bitwise operation, so each tag operation is a compare-exchange
+    /// loop: one that loses a race retries on what it found, keeping the other's bit and the
+    /// address.
+    #[test]
+    fn concurrent_tag_operations_never_lose_one() {
+        check(|| {
+            let base = ptr::without_provenance_mut::<u64>(0x1000);
+            let word = Arc::new(Atomic::new(Tagged { pointer: base, low: false, high: false }));
+            let other = {
+                let word = Arc::clone(&word);
+                thread::spawn(move || word.fields().low.set(AcqRel))
+            };
+            let was_set = word.fields().high.test_and_set(AcqRel);
+            other.join().expect("the other thread does not panic");
+            assert!(!was_set, "the high bit clear before its test-and-set");
+            let last = Tagged { pointer: base, low: true, high: true };
+            assert_eq!(word.load(Acquire), last, "both bits set, and the address kept");
         });
     }
 

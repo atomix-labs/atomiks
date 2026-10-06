@@ -1,4 +1,4 @@
-error[E0080]: evaluation panicked: `Option<$CRATE::Low>`: a pointer repr marks `None` only with null, but null lies in the value's range: leave it out, as `NonNull`'s `ReprRange::NONZERO` does
+error[E0080]: evaluation panicked: `Option<$CRATE::Low>`: a pointer repr marks `None` with null alone, but null is a value's repr: leave it out, as `NonNull`'s `ReprRange::NONZERO` does, or, for an enum, declare first a variant whose pointer is never null
  --> src/atom/option.rs
   |
   |             None => <T::Repr as Primitive>::from_bits(const { none_repr::<T>() }),
@@ -8,8 +8,9 @@ note: inside `atomiks_core::atom::option::none_repr::<Low>`
  --> src/atom/option.rs
   |
   | /             refuse_option::<T>(&Message::new().text(concat!(
-  | |                 "a pointer repr marks `None` only with null, but null lies in the value's range: ",
-  | |                 "leave it out, as `NonNull`'s `ReprRange::NONZERO` does"
+  | |                 "a pointer repr marks `None` with null alone, but null is a value's repr: leave it ",
+  | |                 "out, as `NonNull`'s `ReprRange::NONZERO` does, or, for an enum, declare first a ",
+  | |                 "variant whose pointer is never null"
   | |             )));
   | |_______________^
 note: inside `atomiks_core::atom::option::refuse_option::<Low>`

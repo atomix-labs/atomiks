@@ -106,6 +106,23 @@ unsafe fn decode<P: FieldPath>(bits: u128) -> P::Value {
     unsafe { P::Value::from_repr_unchecked(Primitive::from_bits(unpack::<P>(bits))) }
 }
 
+/// The field `P` of `repr`, a repr of its container's: its bits read back, or, for a field stored
+/// as a pointer, whose bits do not hold its provenance, the field of the value `repr` decodes as.
+///
+/// # Safety
+/// `repr` decodes as `P`'s container.
+#[expect(unsafe_code, reason = "decodes a field of a container repr that decodes")]
+#[inline]
+unsafe fn decode_repr<P: FieldPath>(repr: ContainerRepr<P>) -> P::Value {
+    if <<P::Value as Atom>::Repr as Primitive>::IS_BITS_EXACT {
+        // SAFETY: the caller's repr decodes.
+        unsafe { decode::<P>(repr.packed_bits()) }
+    } else {
+        // SAFETY: the caller's repr decodes.
+        P::field(unsafe { P::Container::from_repr_unchecked(repr) })
+    }
+}
+
 /// `value` packed in the place of the field `P`, every other bit clear: the operand of an or and
 /// of a xor.
 #[inline]
@@ -170,7 +187,7 @@ where
 /// Whether the bit of `mask` is set in `value`.
 #[inline]
 fn has_bit<R: MaskBitwise>(value: R, mask: R::Mask) -> bool {
-    value.to_mask().to_bits() & mask.to_bits() != 0
+    value.packed_bits() & mask.to_bits() != 0
 }
 
 impl<C: Atom> Atomic<C> {
@@ -241,7 +258,10 @@ where
 ///   [`fetch_add`](Self::fetch_add) and [`fetch_sub`](Self::fetch_sub), where it has [`FetchAdd`].
 ///
 /// Each `fetch_` form returns the container before: the one snapshot of every field that the
-/// instruction reads.
+/// instruction reads. A pointer word's tag field has each operation its value gives it but the add,
+/// since the pointer lies above it, and each keeps the pointer's provenance. Its pointer field has
+/// only [`load`](Self::load), which reads it through the word, and, where the pointer is a word
+/// too, [`fields`](Self::fields).
 ///
 /// # Examples
 /// [`#[derive(Atom)]`'s example][derive] claims a ring buffer slot with one field's
@@ -297,17 +317,18 @@ impl<P: FieldPath> AtomicField<P> {
         P::Value::project(self)
     }
 
-    /// Reads the field: a load of the whole word, and the field's bits read back.
+    /// Reads the field: a load of the whole word, and the field's bits read back, or, for a
+    /// pointer word's pointer, the word decoded.
     #[expect(unsafe_code, reason = "decodes a field of a repr read from the cell")]
     #[inline]
     pub fn load<O: LoadOrdering>(&self, order: O) -> P::Value
     where
-        ContainerRepr<P>: Load + ExactBits,
+        ContainerRepr<P>: Load,
     {
         let _ = order;
         let repr = ContainerRepr::<P>::load(self.cell(), O::CORE);
         // SAFETY: by `Atomic`'s field INVARIANT, the repr read from the cell decodes.
-        unsafe { decode::<P>(repr.to_bits()) }
+        unsafe { decode_repr::<P>(repr) }
     }
 
     /// Reads the field with a compare-exchange of the whole word, for a container whose repr has
@@ -336,14 +357,13 @@ impl<P: FieldPath> AtomicField<P> {
         &self, set_order: S, fetch_order: F, mut f: U,
     ) -> P::Container
     where
-        ContainerRepr<P>: ExactBits,
         <P::Value as Atom>::Repr: ExactBits,
     {
         let replace_field = |seen: ContainerRepr<P>| {
-            let bits = seen.to_bits();
+            let bits = seen.packed_bits();
             // SAFETY: by `Atomic`'s field INVARIANT, the repr read from the cell decodes.
             let value = f(unsafe { decode::<P>(bits) }).to_repr().to_bits();
-            Some(ContainerRepr::<P>::from_bits(replace::<P>(bits, value)))
+            Some(seen.with_packed_bits(replace::<P>(bits, value)))
         };
         // SAFETY: each repr `replace_field` returns is one read from the cell, which decodes, by
         // `Atomic`'s field INVARIANT, with the field replaced by a repr of a value of it, so it
@@ -366,14 +386,13 @@ impl<P: FieldPath> AtomicField<P> {
         &self, set_order: S, fetch_order: F, mut f: U,
     ) -> Result<P::Container, P::Container>
     where
-        ContainerRepr<P>: ExactBits,
         <P::Value as Atom>::Repr: ExactBits,
     {
         let replace_field = |seen: ContainerRepr<P>| {
-            let bits = seen.to_bits();
+            let bits = seen.packed_bits();
             // SAFETY: by `Atomic`'s field INVARIANT, the repr read from the cell decodes.
             let value = f(unsafe { decode::<P>(bits) })?.to_repr().to_bits();
-            Some(ContainerRepr::<P>::from_bits(replace::<P>(bits, value)))
+            Some(seen.with_packed_bits(replace::<P>(bits, value)))
         };
         // SAFETY: as in `update`.
         let replaced =
@@ -652,7 +671,7 @@ impl<P: FieldPath> AtomicField<P> {
 impl<P: FieldPath> fmt::Debug for AtomicField<P>
 where
     P::Value: fmt::Debug,
-    ContainerRepr<P>: Load + ExactBits,
+    ContainerRepr<P>: Load,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // ORDERING: Relaxed, as `Atomic`'s `Debug`: printing publishes nothing and pairs with no

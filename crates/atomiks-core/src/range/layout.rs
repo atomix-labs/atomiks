@@ -198,7 +198,7 @@ impl PackedLayout {
     /// The layout of a value whose top field is `top`, beside any fields below it.
     #[inline]
     #[must_use]
-    const fn from_top_field(top: PackedField) -> Self {
+    pub(super) const fn from_top_field(top: PackedField) -> Self {
         Self { top, layout: FieldLayout::from_top_field(top) }
     }
 

@@ -6,7 +6,8 @@
 //! tests that it refuses them and that macOS's floor, with LSE2, refuses the exchange and maximum.
 //! atomiks-core's `deranged-05` feature is always on, for the probes of its conversions, and its
 //! `arbitrary-int` feature, for those of a field of an arbitrary-int integer. The field operations'
-//! probes are in `fields`, over packed structs `tests/testing/packed.rs` writes out.
+//! probes are in `fields`, over packed structs `tests/testing/packed.rs` writes out, and a pointer
+//! word's in `pointer_words`, over words `tests/testing/pointer_word.rs` writes out.
 //!
 //! The empty `[workspace]` in its manifest makes it a workspace of its own: the repository's does
 //! not list it, and the test builds it alone.
@@ -17,6 +18,9 @@
 pub mod fields;
 #[path = "../../testing/packed.rs"]
 mod packed;
+#[path = "../../testing/pointer_word.rs"]
+mod pointer_word;
+pub mod pointer_words;
 
 use core::cell::Cell;
 use core::num::NonZero;

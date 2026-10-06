@@ -442,6 +442,10 @@ mod tests {
                     type Reach = ::atomiks::__private::Reach<{
                         ::atomiks::__private::reaches_top::<Repr>(placement_0)
                     }>;
+                    #[inline]
+                    fn field(self) -> u8 {
+                        self.length
+                    }
                 }
                 #[automatically_derived]
                 unsafe impl ::atomiks::__private::HasPackedField<1, Sign> for Step {
@@ -450,6 +454,10 @@ mod tests {
                     type Reach = ::atomiks::__private::Reach<{
                         ::atomiks::__private::reaches_top::<Repr>(placement_1)
                     }>;
+                    #[inline]
+                    fn field(self) -> Sign {
+                        self.sign
+                    }
                 }
                 #[automatically_derived]
                 const unsafe impl ::atomiks::ProjectFields for Step {

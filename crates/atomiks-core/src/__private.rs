@@ -5,12 +5,16 @@
 //! that derives.
 
 use core::any::type_name;
+use core::ptr;
 
-use crate::atom::{Atom, AtomAdd, AtomBitwise, AtomOrd};
+use crate::atom::{Atom, AtomAdd, AtomBitwise, AtomOrd, PtrAtom};
 pub use crate::atomic::{HasPackedField, Reach, project_field};
 use crate::message::{Message, refuse};
 use crate::primitive::{CompareExchange, ExactBits, Primitive};
-pub use crate::range::{EnumLayout, PackedField, PackedLayout};
+pub use crate::range::{
+    EnumLayout, PackedField, PackedLayout, PointeeAlignment, PointerEnumLayout, PointerEnumVariant,
+    PointerWordLayout, Tags, assert_aligned,
+};
 use crate::range::{FieldLayout, ReprRange};
 use crate::validity::{Partial, Total, TotalZeroNiche, Validity, ZeroNiche, ZeroValid};
 
@@ -38,6 +42,46 @@ pub const fn from_repr<T: const Atom>(repr: T::Repr) -> Option<T> {
 pub const unsafe fn from_repr_unchecked<T: const Atom>(repr: T::Repr) -> T {
     // SAFETY: the caller's repr decodes.
     unsafe { T::from_repr_unchecked(repr) }
+}
+
+/// `value`'s repr with `tags` set in its low bits: [`Atom::to_tagged_repr`].
+///
+/// A pointer word passes its tags on to its pointer field through it, and a newtype to its field.
+#[inline]
+#[must_use]
+pub const fn to_tagged_repr<F: const Atom>(value: F, tags: Tags) -> (F::Repr, usize) {
+    value.to_tagged_repr(tags)
+}
+
+/// The pointer `value`, a pointer enum's pointer field, is stored as, with `tags` set in its low
+/// bits, as [`to_tagged_repr`] sets them.
+///
+/// Its bound refuses a field marked a pointer that is none, at its type.
+#[inline]
+#[must_use]
+pub const fn to_tagged_pointer<F: const PtrAtom>(value: F, tags: Tags) -> (*mut (), usize) {
+    let (pointer, misaligned) = value.to_tagged_repr(tags);
+    (pointer.cast(), misaligned)
+}
+
+/// The value of a pointer enum's pointer field stored as `pointer`: [`Atom::from_repr`].
+#[inline]
+#[must_use]
+pub const fn from_pointer<F: const PtrAtom>(pointer: *mut ()) -> Option<F> {
+    F::from_repr(pointer.cast())
+}
+
+/// The value of a pointer enum's pointer field stored as `pointer`, without the check:
+/// [`Atom::from_repr_unchecked`].
+///
+/// # Safety
+/// `pointer` decodes: `F::from_repr(pointer.cast())` is `Some`.
+#[expect(unsafe_code, reason = "forwards `Atom::from_repr_unchecked`, and its contract")]
+#[inline]
+#[must_use]
+pub const unsafe fn from_pointer_unchecked<F: const PtrAtom>(pointer: *mut ()) -> F {
+    // SAFETY: the caller's pointer decodes.
+    unsafe { F::from_repr_unchecked(pointer.cast()) }
 }
 
 /// A repr a packed value stores a field as: one whose bits are its whole value, never a pointer,
@@ -443,17 +487,79 @@ impl EnumValidity {
     }
 }
 
+/// What an enum whose variants hold a pointer promises of its zero repr, from which a concrete
+/// derived impl picks its validity and range.
+///
+/// It is what the variant zero holds promises, folded variant by variant from
+/// [`new`](Self::new). Nothing else is promised: no pointer's repr is read as bits, so none is
+/// [`Total`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PointerEnumValidity {
+    /// The discriminant of the variant the zero repr holds, as unsigned bits: the unit that fills
+    /// the niche, or the variant of tag 0.
+    zero_discriminant: u128,
+    /// What that variant promises of zero, once it is folded in.
+    promises: PackedValidity,
+}
+
+impl PointerEnumValidity {
+    /// The promises of an enum laid out in `layout`, before any variant: zero, until its variant
+    /// is folded in, never decodes.
+    #[inline]
+    #[must_use]
+    pub const fn new(layout: PointerEnumLayout) -> Self {
+        let promises = PackedValidity {
+            every_pattern_decodes: false,
+            zero_decodes: false,
+            none_takes_zero: true,
+        };
+        Self { zero_discriminant: layout.discriminant_bits(ptr::null_mut()), promises }
+    }
+
+    /// The promises with the variant of `discriminant` added, whose fields promise `fields`: a
+    /// unit's are [`PackedValidity::EMPTY`], a pointer variant's its pointer's and its tags'.
+    #[inline]
+    #[must_use]
+    pub const fn with_variant<D: const ExactBits>(
+        self, discriminant: D, fields: PackedValidity,
+    ) -> Self {
+        if discriminant.to_bits() == self.zero_discriminant {
+            Self { promises: fields, ..self }
+        } else {
+            self
+        }
+    }
+
+    /// The number of the strongest validity the promises give: [`ZeroValid`]'s where the variant
+    /// zero holds promises its zero decodes, [`ZeroNiche`]'s where it promises it does not, or
+    /// where no variant's tag is zero, else [`Partial`]'s.
+    #[inline]
+    #[must_use]
+    pub const fn code(self) -> u8 {
+        self.promises.code(0, usize::BITS)
+    }
+
+    /// The enum's range, of its repr `R`: every repr but zero where zero never decodes, else every
+    /// repr.
+    #[inline]
+    #[must_use]
+    pub const fn range<R: Primitive>(self) -> ReprRange<R> {
+        if self.promises.none_takes_zero { ReprRange::NONZERO } else { ReprRange::FULL }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use core::array;
     use core::num::NonZero;
+    use core::ptr::NonNull;
 
     use super::{
         EnumLayout, EnumValidity, FieldLayout, PARTIAL, PackedField, PackedLayout, PackedValidity,
-        SelectRepr, SelectValidity, TOTAL, TOTAL_ZERO_NICHE, ValidityCode, Width, ZERO_NICHE,
-        ZERO_VALID, assert_stated_width, assert_width, discriminant_range,
-        discriminant_validity_code, discriminant_width, from_bits, from_bits_unchecked,
-        narrowest_width, to_bits,
+        PointerEnumLayout, PointerEnumValidity, PointerEnumVariant, SelectRepr, SelectValidity,
+        TOTAL, TOTAL_ZERO_NICHE, ValidityCode, Width, ZERO_NICHE, ZERO_VALID, assert_stated_width,
+        assert_width, discriminant_range, discriminant_validity_code, discriminant_width,
+        from_bits, from_bits_unchecked, narrowest_width, to_bits,
     };
     use crate::primitive::Primitive;
     use crate::range::ReprRange;
@@ -631,6 +737,35 @@ mod tests {
         let maybe = EnumValidity::new(EnumLayout::niche_or_tagged(1, id, 1_u8));
         let maybe = maybe.with_unit(0_u8).with_variant(1_u8, id, ids);
         assert_eq!(maybe.code(8), ZERO_VALID, "zero is the unit's");
+    }
+
+    #[test]
+    fn an_enum_of_pointers_promises_what_the_variant_at_tag_zero_does() {
+        let no_tags = PackedLayout::new(&[]);
+        let node_first = PointerEnumLayout::tagged(&[
+            PointerEnumVariant::pointer::<_, NonNull<u64>>(0_u8, no_tags),
+            PointerEnumVariant::unit(1_u8),
+        ]);
+        let null_node =
+            PackedValidity::EMPTY.with_field::<TotalZeroNiche>(node_first.pointer_layout());
+        let zero_is_no_node = PointerEnumValidity::new(node_first).with_variant(0_u8, null_node);
+        assert_eq!(zero_is_no_node.code(), ZERO_NICHE, "a null node at tag 0 decodes as nothing");
+        assert_eq!(zero_is_no_node.range::<*mut ()>(), ReprRange::NONZERO, "so zero lies outside");
+        let no_tag_zero = PointerEnumLayout::tagged(&[
+            PointerEnumVariant::unit(1_u8),
+            PointerEnumVariant::pointer::<_, *mut u64>(2_u8, no_tags),
+        ]);
+        let no_variant = PointerEnumValidity::new(no_tag_zero);
+        assert_eq!(no_variant.code(), ZERO_NICHE, "nor where no variant's tag is 0");
+        let digit = PackedField::new(ReprRange::<u8>::new(0, 9), 0).layout();
+        let data_first = PointerEnumLayout::tagged(&[
+            PointerEnumVariant::data(0_u8),
+            PointerEnumVariant::pointer::<_, *mut u64>(1_u8, no_tags),
+        ]);
+        let unsure = PointerEnumValidity::new(data_first)
+            .with_variant(0_u8, PackedValidity::EMPTY.with_field::<Partial>(digit));
+        assert_eq!(unsure.code(), PARTIAL, "and a value at tag 0 that promises nothing, nothing");
+        assert_eq!(unsure.range::<*mut ()>(), ReprRange::FULL, "every repr");
     }
 
     #[test]
