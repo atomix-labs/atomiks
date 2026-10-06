@@ -1,7 +1,7 @@
 //! arbitrary-int's integers in an atomic: each stored as its base integer, every repr of an 8-bit
 //! base decoding exactly when it is a value; the `Atom` laws at the edges of each width, and on
-//! random bits; `None` beside the range; statics; and `max` and `min`, through zero for the signed,
-//! on aarch64.
+//! random bits; `None` beside the range; statics; and `fetch_max` and `fetch_min`, through zero for
+//! the signed, on aarch64.
 //!
 //! The dev-dependency turns on arbitrary-int's `hint`, so these run against the `value` of each
 //! base it swaps in, whose promise that the value fits Miri checks; the library builds without it,
@@ -208,11 +208,11 @@ mod tests {
         assert_eq!(unsigned.fetch_min(u20::new(3), Relaxed), u20::MAX, "the largest before");
         assert_eq!(unsigned.load(Relaxed), u20::new(3), "then 3");
         let signed = Atomic::new(i20::new(-1));
-        signed.max(i20::new(1), Relaxed);
+        signed.fetch_max(i20::new(1), Relaxed);
         assert_eq!(signed.load(Relaxed), i20::new(1), "1 is above -1");
-        signed.min(i20::MIN, Relaxed);
+        signed.fetch_min(i20::MIN, Relaxed);
         assert_eq!(signed.load(Relaxed), i20::MIN, "the smallest is below 1");
-        signed.max(i20::new(-3), Relaxed);
+        signed.fetch_max(i20::new(-3), Relaxed);
         assert_eq!(signed.load(Relaxed), i20::new(-3), "-3 is above the smallest");
     }
 

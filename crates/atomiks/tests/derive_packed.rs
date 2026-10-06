@@ -60,7 +60,7 @@ mod tests {
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
     struct Quote {
         /// How many.
-        qty: u32,
+        quantity: u32,
         /// Which side.
         side: Side,
         /// Whether it may fill.
@@ -181,7 +181,7 @@ mod tests {
         side: Side,
     }
 
-    static QUOTE: Atomic<Quote> = Atomic::new(Quote { qty: 0, side: Side::Bid, live: false });
+    static QUOTE: Atomic<Quote> = Atomic::new(Quote { quantity: 0, side: Side::Bid, live: false });
     static STEP: Atomic<Option<Step>> = Atomic::new(None);
     static ORDER: Atomic<Option<Order>> = Atomic::new(None);
     static SLOT: Atomic<Slot> = Atomic::new(Slot { quote: None, seq: 0 });
@@ -189,7 +189,7 @@ mod tests {
     #[test]
     fn each_field_packs_from_bit_zero_in_declaration_order() {
         repr_and_validity_are::<Quote, u64, ZeroValid>();
-        let quote = Quote { qty: 5, side: Side::Ask, live: true };
+        let quote = Quote { quantity: 5, side: Side::Ask, live: true };
         assert_eq!(quote.to_repr(), 5 | 1 << 32 | 1 << 33, "34 bits, the quantity lowest");
         assert_eq!(Quote::REPRS, ReprRange::new(0, (1 << 34) - 1), "zeros above them");
         assert_eq!(Quote::from_repr(quote.to_repr()), Some(quote), "and back");
@@ -261,8 +261,10 @@ mod tests {
     #[test]
     fn a_packed_value_and_an_option_pack_as_fields() {
         repr_and_validity_are::<Order, u64, ZeroNiche>();
-        let order =
-            Order { quote: Quote { qty: 9, side: Side::Bid, live: true }, id: NonZero::<u16>::MIN };
+        let order = Order {
+            quote: Quote { quantity: 9, side: Side::Bid, live: true },
+            id: NonZero::<u16>::MIN,
+        };
         assert_eq!(order.to_repr(), 9 | 1 << 33 | 1 << 34, "the id above the quote's 34 bits");
         assert_eq!(None::<Order>.to_repr(), 0, "and `None` zero, which no id is");
         repr_and_validity_are::<Slot, u64, ZeroValid>();
@@ -273,7 +275,7 @@ mod tests {
 
     #[test]
     fn statics_hold_packed_values() {
-        let quote = Quote { qty: 9, side: Side::Ask, live: true };
+        let quote = Quote { quantity: 9, side: Side::Ask, live: true };
         QUOTE.store(quote, Release);
         assert_eq!(QUOTE.load(Acquire), quote, "a quote");
         STEP.store(Some(Step { length: 2, sign: Sign::Minus }), Release);

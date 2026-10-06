@@ -1,6 +1,6 @@
 # What `check.yml`, on x86_64 Linux, cannot show: the tests and the loom models on arm64 Linux,
-# where `fetch_or`, `max` and `min` exist and the 128-bit atomics are core's; on arm64 macOS, whose
-# floor adds LSE2's 128-bit load and store; and on x86_64 macOS.
+# where `fetch_or`, `fetch_max` and `fetch_min` exist and the 128-bit atomics are core's; on arm64
+# macOS, whose floor adds LSE2's 128-bit load and store; and on x86_64 macOS.
 name: platforms
 
 on:

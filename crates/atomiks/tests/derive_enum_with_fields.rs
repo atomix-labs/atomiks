@@ -121,7 +121,7 @@ mod tests {
         /// Filled.
         Filled {
             /// How many.
-            qty: u8,
+            quantity: u8,
             /// Which way the price moved.
             sign: Sign,
         },
@@ -311,7 +311,7 @@ mod tests {
     fn units_beside_a_top_field_above_others_clear_the_bits_below_it() {
         repr_and_validity_are::<Order, u16, ZeroValid>();
         assert_eq!(Order::Pending.to_repr(), 0xFE00, "-2 above a clear byte, sign-extended");
-        let filled = Order::Filled { qty: 3, sign: Sign::Minus };
+        let filled = Order::Filled { quantity: 3, sign: Sign::Minus };
         assert_eq!(filled.to_repr(), 0xFF03, "the quantity below the sign");
         assert_eq!(Order::from_repr(0xFE01), None, "a unit holds no quantity");
     }

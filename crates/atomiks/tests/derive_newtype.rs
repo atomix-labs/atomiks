@@ -147,21 +147,21 @@ mod tests {
     #[test]
     fn the_capability_derives_bring_their_read_modify_writes() {
         has_every_capability::<Count>();
-        COUNT.add(2, Relaxed);
+        COUNT.fetch_add(2, Relaxed);
         assert_eq!(COUNT.load(Relaxed), Count(3), "add");
         COUNT.or(Count(0b100), Relaxed);
         assert_eq!(COUNT.load(Relaxed), Count(0b111), "then or");
     }
 
-    // x86_64 has no atomic maximum, so `max` exists on aarch64 alone.
+    // x86_64 has no atomic maximum, so `fetch_max` exists on aarch64 alone.
     #[cfg(target_arch = "aarch64")]
     #[test]
-    fn atom_ord_brings_max_where_the_target_has_one() {
+    fn atom_ord_brings_fetch_max_where_the_target_has_one() {
         let count = Atomic::new(Count(1));
-        count.max(Count(9), Relaxed);
+        count.fetch_max(Count(9), Relaxed);
         assert_eq!(count.load(Relaxed), Count(9), "the larger");
         let owner = Atomic::new(OwnerId(RangedU64::MIN));
-        owner.max(OwnerId(RangedU64::MAX), Relaxed);
+        owner.fetch_max(OwnerId(RangedU64::MAX), Relaxed);
         assert_eq!(owner.load(Relaxed), OwnerId(RangedU64::MAX), "and the larger id");
     }
 }

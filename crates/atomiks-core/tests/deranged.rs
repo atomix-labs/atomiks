@@ -1,8 +1,8 @@
 //! deranged 0.5's ranged integers in an atomic: each stored as its integer, every repr of an 8-bit
 //! one decoding exactly when it is a value, and the `Atom` laws at the edges and on random bits; an
 //! `OptionRanged`'s `None` at the integer deranged keeps for it, beside atomiks' own `Option` rule;
-//! the conversions to atomiks' ranged integers and back, for all twelve; statics; and `max` and
-//! `min` on aarch64.
+//! the conversions to atomiks' ranged integers and back, for all twelve; statics; and `fetch_max`
+//! and `fetch_min` on aarch64.
 //!
 //! A value compared with another names its bounds, by an alias or in full, as a user's code must:
 //! deranged's `PartialEq` holds across bounds, so a bare `RangedU8::MIN` infers none.
@@ -283,9 +283,9 @@ mod tests {
     #[test]
     fn max_and_min_follow_the_order_through_zero() {
         let atomic = Atomic::new(PriceMove::new_static::<-1>());
-        atomic.max(PriceMove::new_static::<2>(), Relaxed);
+        atomic.fetch_max(PriceMove::new_static::<2>(), Relaxed);
         assert_eq!(atomic.load(Relaxed).get(), 2, "2 is above -1");
-        atomic.min(PriceMove::MIN, Relaxed);
+        atomic.fetch_min(PriceMove::MIN, Relaxed);
         assert_eq!(atomic.load(Relaxed).get(), -5, "-5 is below 2");
     }
 

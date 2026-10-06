@@ -34,7 +34,7 @@ pub enum Sign {
 #[derive(Clone, Copy, Atom)]
 pub struct Quote {
     /// How many.
-    pub qty: u32,
+    pub quantity: u32,
     /// Which side.
     pub side: Side,
     /// Whether it may fill.

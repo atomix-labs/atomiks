@@ -6,5 +6,5 @@ use atomiks_core::Atomic;
 use atomiks_core::ordering::Relaxed;
 
 fn main() {
-    Atomic::new(Saturating(u8::MAX)).add(1, Relaxed);
+    Atomic::new(Saturating(u8::MAX)).fetch_add(1, Relaxed);
 }

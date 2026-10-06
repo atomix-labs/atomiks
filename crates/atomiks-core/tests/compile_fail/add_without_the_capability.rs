@@ -5,5 +5,5 @@ use atomiks_core::AtomicBool;
 use atomiks_core::ordering::Relaxed;
 
 fn main() {
-    let _ = AtomicBool::new(false).fetch_add(true, Relaxed);
+    AtomicBool::new(false).fetch_add(true, Relaxed);
 }

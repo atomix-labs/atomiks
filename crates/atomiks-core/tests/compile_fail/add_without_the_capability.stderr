@@ -1,8 +1,8 @@
 error[E0277]: `bool` has no atomic add
- --> tests/compile_fail/add_without_the_capability.rs:8:36
+ --> tests/compile_fail/add_without_the_capability.rs:8:28
   |
-8 |     let _ = AtomicBool::new(false).fetch_add(true, Relaxed);
-  |                                    ^^^^^^^^^ `add`, `sub`, `fetch_add` and `fetch_sub` need `AtomAdd`
+8 |     AtomicBool::new(false).fetch_add(true, Relaxed);
+  |                            ^^^^^^^^^ `fetch_add` and `fetch_sub` need `AtomAdd`
   |
   = help: the trait `AtomAdd` is not implemented for `bool`
   = note: for your own newtype over a value that has it, derive it: `#[derive(AtomAdd)]`

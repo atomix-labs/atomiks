@@ -94,10 +94,10 @@ mod tests {
         let mut slot = 5_u64;
         let base = ptr::from_mut(&mut slot);
         let cell = AtomicPtr::new(base);
-        cell.byte_sub(base.addr(), AcqRel);
+        cell.fetch_byte_sub(base.addr(), AcqRel);
         // `load_rmw` would write a null over it, without the provenance: it takes only integers.
         assert_eq!(cell.load(Acquire).addr(), 0, "the address is zero");
-        cell.byte_add(base.addr(), AcqRel);
+        cell.fetch_byte_add(base.addr(), AcqRel);
         // SAFETY: the pointer is `base` again, with its provenance, and `slot` is live.
         #[expect(unsafe_code, reason = "reading through the pointer the cell holds")]
         let value = unsafe { cell.load(Acquire).read() };
@@ -108,13 +108,13 @@ mod tests {
     fn a_pointer_offsets_by_elements_or_by_bytes() {
         let base = ptr::null_mut::<u64>();
         let cell = AtomicPtr::new(base);
-        cell.ptr_add(3, AcqRel);
+        cell.fetch_ptr_add(3, AcqRel);
         assert_eq!(cell.load(Relaxed), base.wrapping_add(3), "three elements on");
-        cell.byte_sub(8, AcqRel);
+        cell.fetch_byte_sub(8, AcqRel);
         assert_eq!(cell.load(Relaxed), base.wrapping_add(2), "one 8-byte element back");
-        cell.ptr_sub(2, AcqRel);
+        cell.fetch_ptr_sub(2, AcqRel);
         assert_eq!(cell.load(Relaxed), base, "two elements back");
-        cell.byte_add(24, AcqRel);
+        cell.fetch_byte_add(24, AcqRel);
         assert_eq!(cell.load(Relaxed), base.wrapping_add(3), "three elements' bytes on");
         assert_eq!(cell.fetch_ptr_sub(1, AcqRel), base.wrapping_add(3), "the pointer before");
         assert_eq!(cell.fetch_byte_sub(8, AcqRel), base.wrapping_add(2), "the pointer before");
