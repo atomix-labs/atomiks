@@ -45,6 +45,10 @@ use proc_macro::{Diagnostic, Level, Span, TokenStream};
 ///   one pointer that is never null takes null, and no tag, unless a variant states its
 ///   discriminant. Its `to_repr` panics as a pointer word's does.
 ///
+/// A pointer word's or a pointer enum's layout reads its pointers' tags but not their pointees'
+/// alignment, which the build checks once the pointees are laid out, so a node may hold an atomic
+/// of the word that points to it, as a list's node holds the link to the next.
+///
 /// `from_repr` refuses each repr no value encodes to, so each value has one repr.
 ///
 /// # Fields
@@ -312,6 +316,94 @@ use proc_macro::{Diagnostic, Level, Span, TokenStream};
 /// let owner = OwnerId(NonZero::new(7).expect("7 is not zero"));
 /// assert_eq!(Lock::Held(owner).to_repr(), 7, "an owner's id as it is");
 /// assert_eq!(Lock::Free.to_repr(), 0, "and `Free` zero");
+/// ```
+///
+/// ## Tagging a Pointer
+/// ```
+/// # extern crate atomiks_core as atomiks;
+/// # use atomiks_derive::Atom;
+/// use core::ptr::{self, NonNull};
+///
+/// use atomiks::ordering::{AcqRel, Acquire, Release};
+/// use atomiks::{Atom, Atomic};
+///
+/// /// A node of a list, which holds the link to the next node, or none: aligned to 8, so a
+/// /// pointer to one leaves three low bits clear.
+/// #[repr(align(8))]
+/// struct Node {
+///     value: u64,
+///     next: Atomic<Option<Link>>,
+/// }
+///
+/// /// A Harris list's link: the next node, and whether the node that holds the link is deleted.
+/// #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+/// struct Link {
+///     next: NonNull<Node>,
+///     deleted: bool,
+/// }
+///
+/// /// A link and a lock its writer takes: a word holding another, its tag above the link's.
+/// #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+/// struct Guarded {
+///     #[atom(ptr)]
+///     link: Link,
+///     locked: bool,
+/// }
+///
+/// let node = Node { value: 7, next: Atomic::new(None) };
+/// let next = NonNull::from(&node);
+/// let deleted = Link { next, deleted: true };
+/// assert_eq!(deleted.to_repr().addr(), next.as_ptr().addr() | 1, "the mark in bit 0");
+/// assert_eq!(None::<Link>.to_repr(), ptr::null_mut(), "`None` null, which no link is");
+///
+/// let guarded = Atomic::new(Guarded { link: Link { next, deleted: false }, locked: false });
+/// guarded.fields().locked.set(Release);
+/// // A field of a field, in bit 0 below the lock: one `lock bts`, or `ldsetal`.
+/// assert!(!guarded.fields().link.fields().deleted.test_and_set(AcqRel), "this thread deleted it");
+/// assert_eq!(guarded.fields().link.load(Acquire), deleted, "the link, read through the word");
+/// assert_eq!(guarded.load(Acquire).to_repr().addr(), next.as_ptr().addr() | 0b11, "both tags");
+/// ```
+///
+/// ## Storing a Pointer Enum
+/// ```
+/// # extern crate atomiks_core as atomiks;
+/// # use atomiks_derive::Atom;
+/// use core::ptr::{self, NonNull};
+///
+/// use atomiks::{Atom, Atomic};
+///
+/// /// A leaf of a tree, aligned to 8.
+/// #[repr(align(8))]
+/// struct Leaf {
+///     value: u64,
+/// }
+///
+/// /// A branch of a tree, aligned to 8.
+/// #[repr(align(8))]
+/// struct Branch {
+///     left: u64,
+///     right: u64,
+/// }
+///
+/// /// A child of a tree: a leaf or a branch, its tag in bit 0, which both alignments leave clear.
+/// #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+/// enum Child {
+///     Leaf(NonNull<Leaf>),
+///     Branch(NonNull<Branch>),
+/// }
+///
+/// /// The next leaf of a list, or its end, which takes null: `Option<NonNull<Leaf>>`'s layout.
+/// #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+/// enum Next {
+///     End,
+///     Leaf(NonNull<Leaf>),
+/// }
+///
+/// let subtree = Branch { left: 1, right: 2 };
+/// let branch = NonNull::from(&subtree);
+/// assert_eq!(Child::Branch(branch).to_repr().addr(), branch.as_ptr().addr() | 1, "tagged 1");
+/// assert_eq!(Next::End.to_repr(), ptr::null_mut(), "the end null, with no tag");
+/// assert_eq!(size_of::<Atomic<Option<Child>>>(), 8, "and `None` null, which no child is");
 /// ```
 ///
 /// ## Deriving for a Generic Type

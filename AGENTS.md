@@ -96,6 +96,19 @@ What a change here keeps, beyond what the checks hold it to.
   The projection is the one way to a field's place, since a private field may
   carry an invariant its module's unsafe code relies on: a path is a type alone,
   and the hidden `project_field` that builds each place is `unsafe`.
+- A pointer word, a struct of one pointer beside tags, and a pointer enum, an
+  enum some of whose variants hold one, are that one pointer, the tags in the
+  low bits its pointee's alignment leaves clear, and keep its provenance
+  strictly: an address changes only through `wrapping_byte_add`,
+  `wrapping_byte_sub`, `map_addr`, `mask`, or `AtomicPtr`'s `fetch_or`,
+  `fetch_and` and `fetch_xor`; one that is no pointer's, a unit's or a value's,
+  is `without_provenance`; and no integer is cast to a pointer, nor a provenance
+  exposed. A pointer word projects as a packed struct does, its pointer a place
+  whose `load` reads it through the word. Neither's `Validity`, `REPRS` or
+  `TAG_WIDTH`, nor the layout they come from, reads a pointee's alignment, since
+  a type's layout may read them: only code and the checks read
+  `POINTEE_ALIGNMENT`, so a node can hold an atomic of the word that points to
+  it.
 - A function that can be `const` is, and a trait whose impls can be is a `const
   trait`.
 - Each `unsafe` block sits under an `#[expect(unsafe_code, reason = "…")]` with
@@ -109,10 +122,16 @@ What a change here keeps, beyond what the checks hold it to.
   `serde`, `bytemuck`, `arbitrary`, `arbitrary-int`. `loom`, the model-checking
   seam rather than an integration, keeps its name.
 - A nightly feature is taken where it makes the API right, never to reach core's
-  internals beyond the 128-bit intrinsics and a ranged integer's pattern-type
-  field, which `transmute_neo` alone converts and a plain integer replaces
-  should a nightly break it; `generic_const_exprs`, `specialization` and
-  `unsafe_fields` stay out.
+  internals beyond three: the 128-bit intrinsics; a ranged integer's
+  pattern-type field, which `transmute_neo` alone converts and a plain integer
+  replaces should a nightly break it; and `const_eval_select`, whose three
+  callers each read null's address alone in a constant, and at run time do what
+  no constant can: `address` reads a pointer's address with `addr`;
+  `clear_tags`, a word's decode, clears its tag bits with `ptr_mask`'s `mask`,
+  which tells LLVM they are clear; and `subtract_tags`, a pointer enum's,
+  offsets the pointer back by its tag, which a match's arm knows, and tells LLVM
+  through `assert_unchecked` that the bits are clear. `generic_const_exprs`,
+  `specialization` and `unsafe_fields` stay out.
 
 ### Docs
 

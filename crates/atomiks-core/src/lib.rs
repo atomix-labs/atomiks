@@ -8,6 +8,11 @@
 //! derived `Quote` with `lock or`, or `ldset`. [`Atomic::fields`] lends them, through the
 //! [`ProjectFields`] atomiks' derive implements for the struct.
 //!
+//! A pointer keeps small fields as tags in the low bits its pointee's alignment leaves clear, and
+//! keeps its provenance through every operation: `HEAD.fields().closed.test_and_set(AcqRel)`
+//! closes a derived Treiber stack's `Head` with `lock bts`, or `ldsetal`, on its top node's
+//! pointer. [`PtrAtom`] is any value stored as a pointer.
+//!
 //! # Examples
 //! ```
 //! use core::num::NonZero;
