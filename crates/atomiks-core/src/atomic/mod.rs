@@ -26,7 +26,7 @@ pub use self::field::{AtomicField, Field, FieldPath, Join, ProjectFields, Then, 
 pub use self::field::{HasPackedField, Reach, project_field};
 pub use self::ptr::AtomicPtr;
 
-/// A value of `T` shared between threads through one atomic word.
+/// A value of `T` shared between threads through one atomic primitive, its repr.
 ///
 /// Each operation through `&self` is one atomic instruction on `T`'s repr, decoded on the way
 /// out, except [`update`](Self::update), [`try_update`](Self::try_update) and

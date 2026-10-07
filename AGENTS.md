@@ -96,19 +96,27 @@ What a change here keeps, beyond what the checks hold it to.
   The projection is the one way to a field's place, since a private field may
   carry an invariant its module's unsafe code relies on: a path is a type alone,
   and the hidden `project_field` that builds each place is `unsafe`.
-- A pointer word, a struct of one pointer beside tags, and a pointer enum, an
-  enum some of whose variants hold one, are that one pointer, the tags in the
-  low bits its pointee's alignment leaves clear, and keep its provenance
-  strictly: an address changes only through `wrapping_byte_add`,
+- A pointer word, a struct of pointers beside tags, and a pointer enum, an enum
+  some of whose variants hold a pointer, keep their tags in the low bits a
+  pointee's alignment leaves clear, or, a pointer word of two words, in an
+  integer word beside its pointer. In one word, they keep the pointer's
+  provenance strictly: an address changes only through `wrapping_byte_add`,
   `wrapping_byte_sub`, `map_addr`, `mask`, or `AtomicPtr`'s `fetch_or`,
   `fetch_and` and `fetch_xor`; one that is no pointer's, a unit's or a value's,
   is `without_provenance`; and no integer is cast to a pointer, nor a provenance
-  exposed. A pointer word projects as a packed struct does, its pointer a place
-  whose `load` reads it through the word. Neither's `Validity`, `REPRS` or
-  `TAG_WIDTH`, nor the layout they come from, reads a pointee's alignment, since
-  a type's layout may read them: only code and the checks read
-  `POINTEE_ALIGNMENT`, so a node can hold an atomic of the word that points to
-  it.
+  exposed. Two words, a `DoubleWord`, are the one place atomiks exposes a
+  provenance, in its cell alone, since no Rust operation keeps one through a
+  16-byte atomic: each pointer stored is exposed, and each loaded takes an
+  exposed provenance back. Its cell lends no place, having no `RawAccess`, so
+  its atomic operations alone reach it. Under Miri the cell is a lock around
+  plain copies, which keeps each pointer's own provenance, so strict-provenance
+  Miri checks every pointer those operations read back, though not their
+  orderings, which the lock makes stronger. A pointer word projects as a packed
+  struct does, its pointer a place whose `load` reads it through the word.
+  Neither's `Validity`, `REPRS` or `TAG_WIDTH`, nor the layout they come from,
+  one word or two, reads a pointee's alignment, since a type's layout may read
+  them: only code and the checks read `POINTEE_ALIGNMENT`, so a node can hold an
+  atomic of the word that points to it.
 - A function that can be `const` is, and a trait whose impls can be is a `const
   trait`.
 - Each `unsafe` block sits under an `#[expect(unsafe_code, reason = "…")]` with
@@ -121,17 +129,25 @@ What a change here keeps, beyond what the checks hold it to.
   next 0.y can sit beside it; a 1.x or later dependency's feature is its name:
   `serde`, `bytemuck`, `arbitrary`, `arbitrary-int`. `loom`, the model-checking
   seam rather than an integration, keeps its name.
-- A nightly feature is taken where it makes the API right, never to reach core's
-  internals beyond three: the 128-bit intrinsics; a ranged integer's
-  pattern-type field, which `transmute_neo` alone converts and a plain integer
-  replaces should a nightly break it; and `const_eval_select`, whose three
-  callers each read null's address alone in a constant, and at run time do what
-  no constant can: `address` reads a pointer's address with `addr`;
-  `clear_tags`, a word's decode, clears its tag bits with `ptr_mask`'s `mask`,
-  which tells LLVM they are clear; and `subtract_tags`, a pointer enum's,
-  offsets the pointer back by its tag, which a match's arm knows, and tells LLVM
-  through `assert_unchecked` that the bits are clear. `generic_const_exprs`,
-  `specialization` and `unsafe_fields` stay out.
+- A nightly feature is taken where it makes the API right, as `ptr_metadata`
+  lets one `Atom` impl of a pointer choose its repr by its pointee's metadata,
+  never to reach core's internals beyond four: the 128-bit intrinsics; a ranged
+  integer's pattern-type field, which `transmute_neo` alone converts and a plain
+  integer replaces should a nightly break it; `DynMetadata`'s layout, its vtable
+  pointer, which `transmute` reads, as core's own `vtable_ptr` does, and writes
+  back, since the compiler hard-codes it: `transmute` refuses a change of its
+  size, and `crates/atomiks-core/tests/double_words.rs` calls through a trait
+  object's pointer read back; and `const_eval_select`, whose four callers read
+  in a constant no address of a pointer with provenance, three null's alone and
+  `exposed_address` that of a pointer made of an integer, a tagged null, by a
+  `transmute` a constant refuses of any other, and at run time do what no
+  constant can: `address` reads a pointer's address with `addr`;
+  `exposed_address`, a double word's, exposes its provenance with
+  `expose_provenance`; `clear_tags`, a word's decode, clears its tag bits with
+  `ptr_mask`'s `mask`, which tells LLVM they are clear; and `subtract_tags`, a
+  pointer enum's, offsets the pointer back by its tag, which a match's arm
+  knows, and tells LLVM through `assert_unchecked` that the bits are clear.
+  `generic_const_exprs`, `specialization` and `unsafe_fields` stay out.
 
 ### Docs
 
@@ -155,10 +171,13 @@ What a change here keeps, beyond what the checks hold it to.
 - What the types refuse has a fixture in
   `crates/atomiks-core/tests/compile_fail/`, what aarch64 Linux's floor alone
   refuses one under its `aarch64_without_lse2/`, and what the derive refuses one
-  in `crates/atomiks/tests/compile_fail/`. A new toolchain may reword a message;
-  `TRYBUILD=overwrite cargo test -p atomiks-core --test trybuild`, and
-  `TRYBUILD=overwrite cargo test -p atomiks --features derive --test compiled
-  trybuild` for the derive's, write it again, to be read before it is committed.
+  in `crates/atomiks/tests/compile_fail/`, under its `aarch64/` where `x86_64`
+  adds notes. What x86_64 without `cmpxchg16b` refuses, which trybuild's floor
+  cannot build, the codegen fixtures' `x86-64-refused` probes pin. A new
+  toolchain may reword a message; `TRYBUILD=overwrite cargo test -p atomiks-core
+  --test trybuild`, and `TRYBUILD=overwrite cargo test -p atomiks --features
+  derive --test compiled trybuild` for the derive's, write it again, to be read
+  before it is committed.
 - The checks of a value's repr, validity and decodes, the `Atom` laws, and the
   reading of a codegen fixture's assembly live once in
   `crates/atomiks-core/tests/testing/`, which the facade's tests reach by path:

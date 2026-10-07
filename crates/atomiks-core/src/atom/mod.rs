@@ -17,8 +17,8 @@ use crate::primitive::{Bitwise, CompareExchange, ExactBits, FetchAdd, Primitive}
 use crate::range::{PointeeAlignment, ReprRange, Tags};
 use crate::validity::{Partial, Total, Validity};
 
-/// A value that packs into one atomic word: stored as its [`Repr`](Atom::Repr), and decoded on
-/// every load without a check, because an atomic only ever holds reprs that decode.
+/// A value one atomic holds: stored as its [`Repr`](Atom::Repr), and decoded on every load
+/// without a check, because an atomic only ever holds reprs that decode.
 ///
 /// A repr decodes when [`from_repr`](Atom::from_repr) returns `Some` for it. So that a
 /// compare-exchange loop converges, a repr that decodes should re-encode to itself: every value has

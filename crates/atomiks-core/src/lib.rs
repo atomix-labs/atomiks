@@ -13,6 +13,11 @@
 //! closes a derived Treiber stack's `Head` with `lock bts`, or `ldsetal`, on its top node's
 //! pointer. [`PtrAtom`] is any value stored as a pointer.
 //!
+//! Two pointers, or one beside a counter or a slice's length, share a 16-byte atomic, a
+//! [`DoubleWord`], which exposes each pointer's provenance, as no Rust operation keeps one through
+//! 16 bytes: `HEAD.compare_exchange(pushed, popped, AcqRel, Acquire)` pops a derived Treiber
+//! stack's `Head`, a top node beside a `u64` version, with `lock cmpxchg16b`, or `caspal`.
+//!
 //! # Examples
 //! ```
 //! use core::num::NonZero;
@@ -42,6 +47,12 @@
 //! | `deranged-05`   | `Atom`, `AtomOrd` and `From` with atomiks' own for deranged 0.5's integers |
 //! | `loom`          | loom's types under `--cfg loom`; nothing without the cfg                   |
 
+// Where no atomic holds two words, no `DoubleWord` exists: its links lead to where one does.
+#![cfg_attr(
+    not(wide),
+    doc = "",
+    doc = "[`DoubleWord`]: https://docs.rs/atomiks/latest/atomiks/#platforms"
+)]
 #![no_std]
 #![feature(
     associated_type_defaults,

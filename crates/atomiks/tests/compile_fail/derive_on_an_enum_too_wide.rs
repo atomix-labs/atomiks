@@ -1,4 +1,4 @@
-//! A value is stored in one atomic word, of at most 128 bits: an enum whose tag lies above 128 bits
+//! A value is stored in one atomic, of at most 128 bits: an enum whose tag lies above 128 bits
 //! of fields is refused once, naming the bits it needs.
 
 use atomiks::Atom;
