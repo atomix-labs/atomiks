@@ -375,10 +375,18 @@ pub(crate) fn lowers_as_expected(
     }
 }
 
-/// The stderr of `cargo check` on the fixture for `target` with `feature`, which must fail.
-pub(crate) fn refused(target: &str, feature: &str) -> String {
-    let out = target_directory(&format!("{target}-{feature}"));
-    let check = run(cargo("check", target, &out).args(["--features", feature]), target);
+/// The stderr of `cargo check` on the fixture for `target` with `feature`, which must fail: with
+/// the floor, or, with `cpu`, for that CPU, which `RUSTFLAGS` names, as the justfile's lints do,
+/// since it replaces the floor where a `--config` would join it.
+pub(crate) fn refused(target: &str, cpu: Option<&str>, feature: &str) -> String {
+    let name = cpu
+        .map_or_else(|| format!("{target}-{feature}"), |cpu| format!("{target}-{cpu}-{feature}"));
+    let out = target_directory(&name);
+    let mut check = cargo("check", target, &out);
+    if let Some(cpu) = cpu {
+        check.env("RUSTFLAGS", format!("-C target-cpu={cpu}"));
+    }
+    let check = run(check.args(["--features", feature]), target);
     let stderr = String::from_utf8_lossy(&check.stderr).into_owned();
     assert!(!check.status.success(), "{target} refuses the `{feature}` probes:\n{stderr}");
     stderr

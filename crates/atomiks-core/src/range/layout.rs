@@ -235,6 +235,22 @@ impl PackedLayout {
         R::from_bits(self.layout.unpack(bits, 0, R::BITS))
     }
 
+    /// The value whose fields' bits are `bits`, as 128 bits: those bits, extended above the value's
+    /// width as [`repr`](Self::repr) extends them over a repr's.
+    #[inline]
+    #[must_use]
+    pub(crate) const fn extended(self, bits: u128) -> u128 {
+        self.layout.unpack(bits, 0, u128::BITS)
+    }
+
+    /// Whether `bits`, 128 of them, are those of a value of this layout, extended above its width
+    /// as [`extended`](Self::extended) extends them.
+    #[inline]
+    #[must_use]
+    pub(crate) const fn holds(self, bits: u128) -> bool {
+        self.layout.holds(bits, u128::BITS)
+    }
+
     /// The bits of `repr`, or `None` where those above the value's width do not extend its top
     /// field as [`repr`](Self::repr) extends it: the canonical check, refusing a repr that no
     /// value encodes to.

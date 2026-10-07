@@ -12,7 +12,7 @@ use loom::sync::atomic;
 
 use super::{
     BitTest, Bitwise, CellAccess, CompareExchange, ExactBits, FetchAdd, Load, MaskBitwise,
-    Primitive, PtrOffset, Store, Swap,
+    Primitive, PtrOffset, RawAccess, Store, Swap,
 };
 #[cfg(target_arch = "aarch64")]
 use super::{FetchBitwise, MinMax};
@@ -38,7 +38,8 @@ macro_rules! loom_exclusive {
     };
 }
 
-/// Implements `CellAccess`, `CompareExchange`, `Load`, `Store` and `Swap` for a primitive.
+/// Implements `CellAccess`, `RawAccess`, `CompareExchange`, `Load`, `Store` and `Swap` for a
+/// primitive.
 ///
 /// Its loom cell has the same name as its core one; `relaxed` marks a loom cell without `with_mut`.
 macro_rules! cells {
@@ -62,6 +63,9 @@ macro_rules! cells {
             fn set(cell: &mut Self::Cell, value: Self) {
                 *cell.get_mut() = value;
             }
+        }
+        #[cfg(not(loom))]
+        const impl$(<$param>)? RawAccess for $kind {
             #[inline]
             fn get_mut(cell: &mut Self::Cell) -> &mut Self {
                 cell.get_mut()
@@ -71,6 +75,8 @@ macro_rules! cells {
                 cell.as_ptr()
             }
         }
+        #[cfg(loom)]
+        impl$(<$param>)? RawAccess for $kind {}
         #[cfg(loom)]
         impl$(<$param>)? CellAccess for $kind {
             type Cell = $cell;
@@ -347,9 +353,9 @@ const impl<T> Primitive for *mut T {
 /// A pointer's address, which a constant reads of null alone.
 ///
 /// No constant reads the address of a pointer with provenance, so one that reads any but null's
-/// fails to build. It is one of atomiks' three branches on whether it runs at compile time: `addr`
-/// is not `const`, and core's `is_null` branches so too. [`clear_tags`] and [`subtract_tags`] are
-/// the others.
+/// fails to build. It is one of atomiks' four branches on whether it runs at compile time: `addr`
+/// is not `const`, and core's `is_null` branches so too. [`clear_tags`], [`subtract_tags`] and a
+/// double word's `exposed_address` are the others.
 #[inline]
 #[must_use]
 pub(crate) const fn address<T>(pointer: *mut T) -> usize {

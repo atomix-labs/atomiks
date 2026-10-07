@@ -2,12 +2,15 @@
 //!
 //! The operations only `aarch64` has build there, or anywhere with the `aarch64-only` feature, for
 //! the test that `x86_64` refuses each; the `aarch64-refused` feature adds a probe of each
-//! capability `aarch64` Linux's floor lacks for 128 bits (load, store, exchange, maximum), for the
-//! tests that it refuses them and that macOS's floor, with LSE2, refuses the exchange and maximum.
+//! capability `aarch64` Linux's floor lacks for 128 bits (load, store, exchange, maximum), of a
+//! `u128` and of a double word, for the tests that it refuses them and that macOS's floor, with
+//! LSE2, refuses the exchange and maximum; and the `x86-64-refused` feature adds a pair of
+//! pointers and a slice's pointer, for the test that `x86_64` without `cmpxchg16b` refuses them.
 //! atomiks-core's `deranged-05` feature is always on, for the probes of its conversions, and its
 //! `arbitrary-int` feature, for those of a field of an arbitrary-int integer. The field operations'
-//! probes are in `fields`, over packed structs `tests/testing/packed.rs` writes out, and a pointer
-//! word's in `pointer_words`, over words `tests/testing/pointer_word.rs` writes out.
+//! probes are in `fields`, over packed structs `tests/testing/packed.rs` writes out, a pointer
+//! word's in `pointer_words`, over words `tests/testing/pointer_word.rs` writes out, and a double
+//! word's, a pair's and a slice pointer's, in `double_words`.
 //!
 //! The empty `[workspace]` in its manifest makes it a workspace of its own: the repository's does
 //! not list it, and the test builds it alone.
@@ -15,12 +18,16 @@
 #![no_std]
 #![feature(const_trait_impl)]
 
+#[cfg(any(target_arch = "aarch64", target_feature = "cmpxchg16b"))]
+pub mod double_words;
 pub mod fields;
 #[path = "../../testing/packed.rs"]
 mod packed;
 #[path = "../../testing/pointer_word.rs"]
 mod pointer_word;
 pub mod pointer_words;
+#[cfg(feature = "x86-64-refused")]
+pub mod without_cmpxchg16b;
 
 use core::cell::Cell;
 use core::num::NonZero;

@@ -336,6 +336,94 @@ mod tests {
         });
     }
 
+    /// A double word: two pointers, or a slice's pointer and length, in one 16-byte atomic.
+    #[cfg(wide)]
+    mod double {
+        use core::ptr::NonNull;
+
+        use atomiks_core::Atomic;
+        use atomiks_core::model::{Arc, check, thread};
+        use atomiks_core::ordering::{AcqRel, Acquire, Relaxed, Release, RmwOrdering};
+
+        use super::AtomicU64;
+
+        /// What the double words point to: never written, so shared without a lock.
+        static NODES: [u64; 4] = [10, 11, 12, 13];
+
+        /// A pointer to the node at `index`.
+        fn node(index: usize) -> NonNull<u64> {
+            NonNull::from(&NODES[index])
+        }
+
+        /// What the node `pointer` points to holds, read through it.
+        fn read(pointer: NonNull<u64>) -> u64 {
+            // SAFETY: every node is a static's, never written.
+            #[expect(unsafe_code, reason = "reads through a pointer a pair held")]
+            let value = unsafe { pointer.as_ref() };
+            *value
+        }
+
+        /// A value published behind a pair of pointers an exchange of `order` writes.
+        fn publish<O: RmwOrdering + Send + Sync + 'static>(order: O) {
+            check(move || {
+                let shared = Arc::new((AtomicU64::new(0), Atomic::new((node(0), node(0)))));
+                let writer = {
+                    let shared = Arc::clone(&shared);
+                    thread::spawn(move || {
+                        shared.0.store(7, Relaxed);
+                        let published = shared.1.compare_exchange(
+                            (node(0), node(0)),
+                            (node(1), node(2)),
+                            order,
+                            Relaxed,
+                        );
+                        assert_eq!(
+                            published,
+                            Ok((node(0), node(0))),
+                            "nothing else writes the pair"
+                        );
+                    })
+                };
+                let seen = shared.1.load_rmw(Acquire);
+                if seen == (node(1), node(2)) {
+                    assert_eq!(shared.0.load(Relaxed), 7, "the pair publishes the value");
+                    let read_through = (read(seen.0), read(seen.1));
+                    assert_eq!(read_through, (11, 12), "each pointer reads its node");
+                }
+                writer.join().expect("the writer does not panic");
+            });
+        }
+
+        #[test]
+        fn a_release_pair_exchange_publishes() {
+            publish(Release);
+        }
+
+        #[test]
+        #[should_panic(expected = "the pair publishes the value")]
+        fn a_relaxed_pair_exchange_does_not() {
+            publish(Relaxed);
+        }
+
+        /// Two threads each lengthen a slice pointer by one element: neither update is lost.
+        #[test]
+        fn concurrent_slice_updates_never_lose_one() {
+            check(|| {
+                let lengthen = |seen: NonNull<[u64]>| NonNull::from(&NODES[..=seen.len()]);
+                let slice = Arc::new(Atomic::new(NonNull::from(&NODES[..1])));
+                let other = {
+                    let slice = Arc::clone(&slice);
+                    thread::spawn(move || {
+                        let _ = slice.update(AcqRel, Acquire, lengthen);
+                    })
+                };
+                let _ = slice.update(AcqRel, Acquire, lengthen);
+                other.join().expect("the other updater does not panic");
+                assert_eq!(slice.load_rmw(Acquire).len(), 3, "both updates landed");
+            });
+        }
+    }
+
     #[cfg(wide)]
     mod wide {
         use core::sync::atomic::{AtomicU64 as CoreAtomicU64, Ordering as CoreOrdering};

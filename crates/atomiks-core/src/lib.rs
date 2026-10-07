@@ -61,6 +61,7 @@
     pattern_type_macro,
     pattern_types,
     ptr_mask,
+    ptr_metadata,
     step_trait,
     structural_match,
     transmute_neo
@@ -116,6 +117,12 @@ mod range;
 mod ranged;
 pub mod validity;
 
+#[cfg(wide)]
+#[doc(cfg(any(
+    target_arch = "aarch64",
+    all(target_arch = "x86_64", target_feature = "cmpxchg16b")
+)))]
+pub use crate::atom::VtablePointer;
 pub use crate::atom::{Atom, AtomAdd, AtomBitwise, AtomOrd, FieldAdd, FieldBitwise, PtrAtom};
 pub use crate::atomic::{
     Atomic, AtomicBool, AtomicField, AtomicI8, AtomicI16, AtomicI32, AtomicI64, AtomicIsize,
@@ -130,8 +137,15 @@ pub use crate::atomic::{
 pub use crate::atomic::{AtomicI128, AtomicU128};
 pub use crate::errors::{ParseRangeError, RangeError};
 pub use crate::fence::{compiler_fence, fence};
+#[cfg(wide)]
+#[doc(cfg(any(
+    target_arch = "aarch64",
+    all(target_arch = "x86_64", target_feature = "cmpxchg16b")
+)))]
+pub use crate::primitive::DoubleWord;
 pub use crate::primitive::{
-    BitTest, ExactBits, FetchAdd, FetchBitwise, Load, MaskBitwise, MinMax, Primitive, Store, Swap,
+    BitTest, ExactBits, FetchAdd, FetchBitwise, Load, MaskBitwise, MinMax, Primitive, RawAccess,
+    ReadByExchange, Store, Swap,
 };
 pub use crate::range::ReprRange;
 pub use crate::ranged::{

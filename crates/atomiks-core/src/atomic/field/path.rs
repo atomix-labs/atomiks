@@ -170,7 +170,9 @@ pub impl(crate) trait TopField: FieldPath {}
 /// tag fields above its pointer field's own tags, and its `LAYOUT` is one whose top field is the
 /// pointer, above the tags, so no tag reaches the top. Its pointer field, `V` stored as a pointer,
 /// takes the low bits of `Self`'s repr that are the low bits of `V`'s, below `V::TAG_WIDTH`, where
-/// `V`'s own fields lie, at offset 0.
+/// `V`'s own fields lie, at offset 0. Where it is a double word, its tag fields lie so in its first
+/// pointer's low bits, or in an integer word from bit 64, whose `LAYOUT` is theirs; and a second
+/// pointer field takes the low bits of the second word that hold its own tags, at bit 64.
 #[doc(hidden)]
 #[expect(unsafe_code, reason = "`FieldPath` for `Field` trusts the placement")]
 pub unsafe trait HasPackedField<const INDEX: u32, V: Atom>: Atom {

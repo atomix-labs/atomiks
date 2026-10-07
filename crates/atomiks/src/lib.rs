@@ -338,14 +338,14 @@ pub use atomiks_core::{
     AtomicUsize, BitTest, ExactBits, FetchAdd, FetchBitwise, Field, FieldAdd, FieldBitwise,
     FieldPath, Join, Load, MaskBitwise, MinMax, ParseRangeError, Primitive, ProjectFields, PtrAtom,
     RangeError, RangedI8, RangedI16, RangedI32, RangedI64, RangedI128, RangedIsize, RangedU8,
-    RangedU16, RangedU32, RangedU64, RangedU128, RangedUsize, ReprRange, Store, Swap, Then,
-    TopField, Whole, compiler_fence, fence,
+    RangedU16, RangedU32, RangedU64, RangedU128, RangedUsize, RawAccess, ReadByExchange, ReprRange,
+    Store, Swap, Then, TopField, Whole, compiler_fence, fence,
 };
 #[cfg(any(
     target_arch = "aarch64",
     all(target_arch = "x86_64", target_feature = "cmpxchg16b")
 ))]
-pub use atomiks_core::{AtomicI128, AtomicU128};
+pub use atomiks_core::{AtomicI128, AtomicU128, DoubleWord, VtablePointer};
 #[doc(inline)]
 pub use atomiks_core::{cell, hint, ordering, validity};
 #[cfg(feature = "derive")]

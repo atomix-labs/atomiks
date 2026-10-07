@@ -18,6 +18,12 @@
 //! decode clears the tags with the pointer's `mask`, so a loop tests no pointer it decoded: a
 //! word's `update` tests, calls and saves nothing, and a Treiber stack's pop tests only the next
 //! node's pointer, which it reads from the node, and saves a frame record once, for its refusal.
+//!
+//! A double word, two pointers or a slice's pointer and length, lowers as a 128-bit integer does,
+//! each pointer's exposure no instruction: its load and store are `ldp` and `stp` with LSE2, and
+//! `vmovdqa` with AVX; its read without them, and its exchange, are `casp` and `cmpxchg16b`, on
+//! `x86_64` `u128`'s instructions exactly, with no branch or `cmov` to join the words found. Where
+//! `x86_64` has no `cmpxchg16b`, two words are refused as 128 bits are, naming the CPU they need.
 
 // Miri cannot run the compiler, and loom's atomics are not what ships.
 #![cfg(on_hardware)]
@@ -59,6 +65,9 @@ mod tests {
         ("ptr_fetch_ptr_sub", InOrder(&["neg", "ldaddal"])),
         ("u128_compare_exchange", InOrder(&["caspal"])),
         ("u128_load_rmw", InOrder(&["caspa"])),
+        ("pair_load_rmw", Only(&["mov", "mov", "caspa", "mov", "mov", "ret"])),
+        ("pair_compare_exchange", InOrder(&["caspal", "cmp", "ccmp", "cset"])),
+        ("slice_compare_exchange", InOrder(&["caspal", "cmp", "ccmp", "cset"])),
         ("store_store_fence", InOrder(&["str", "dmb ishst", "str"])),
         ("seq_cst_compiler_fence", Only(&["ret"])),
         ("acquire_fence", Only(&["dmb ishld", "ret"])),
@@ -139,6 +148,7 @@ mod tests {
         ("option_load", Only(&["ldar", "ret"])),
         ("ranged_load", Only(&["ldar", "ret"])),
         ("u128_update", Retry(&["caspa", "caspal"])),
+        ("pair_update", Retry(&["caspa", "caspal"])),
         ("field_load", Only(&["ldar", "ubfx", "ret"])),
         ("flags_load", Only(&["ldar", "lsr", "ret"])),
         ("quantity_load", Only(&["ldar", "ret"])),
@@ -181,6 +191,9 @@ mod tests {
         ("u128_store", InOrder(&["dmb ish", "stp"])),
         ("u128_store_seq_cst", InOrder(&["dmb ish", "stp", "dmb ish"])),
         ("u128_update", Retry(&["ldp", "dmb ishld", "caspal"])),
+        ("pair_load", Only(&["ldp", "dmb ishld", "ret"])),
+        ("pair_store", Only(&["dmb ish", "stp", "ret"])),
+        ("pair_update", Retry(&["ldp", "dmb ishld", "caspal"])),
         ("field_load", Only(&["ldapr", "ubfx", "ret"])),
         ("flags_load", Only(&["ldapr", "lsr", "ret"])),
         ("quantity_load", Only(&["ldapr", "ret"])),
@@ -267,6 +280,51 @@ mod tests {
         ("u128_compare_exchange", InOrder(&["lock cmpxchg16b"])),
         ("u128_load_rmw", InOrder(&["lock cmpxchg16b"])),
         ("u128_update", Retry(&["vmovdqa", "lock cmpxchg16b"])),
+        ("pair_load", Only(&["vmovdqa", "vmovq", "vpextrq", "retq"])),
+        ("pair_store", Only(&["vmovq", "vmovq", "vpunpcklqdq", "vmovdqa", "retq"])),
+        (
+            "pair_load_rmw",
+            Only(&["pushq", "xorl", "xorl", "xorl", "xorl", "lock cmpxchg16b", "popq", "retq"]),
+        ),
+        (
+            "pair_compare_exchange",
+            Only(&[
+                "pushq",
+                "movq",
+                "xorl",
+                "movq",
+                "movq",
+                "movq",
+                "lock cmpxchg16b",
+                "setne",
+                "movq",
+                "movq",
+                "movq",
+                "movq",
+                "popq",
+                "retq",
+            ]),
+        ),
+        ("pair_update", Retry(&["vmovdqa", "lock cmpxchg16b"])),
+        (
+            "slice_compare_exchange",
+            Only(&[
+                "pushq",
+                "movq",
+                "xorl",
+                "movq",
+                "movq",
+                "movq",
+                "lock cmpxchg16b",
+                "setne",
+                "movq",
+                "movq",
+                "movq",
+                "movq",
+                "popq",
+                "retq",
+            ]),
+        ),
         ("store_store_fence", Only(&["movq", "movq", "retq"])),
         ("seq_cst_compiler_fence", Only(&["retq"])),
         ("acquire_fence", Only(&["retq"])),
@@ -479,7 +537,7 @@ mod tests {
     /// Checks that `target`, an `x86_64` one, refuses each probe only `aarch64` has, each with its
     /// capability's message.
     fn refuses_each_operation_only_aarch64_has(target: &str) {
-        let stderr = refused(target, "aarch64-only");
+        let stderr = refused(target, None, "aarch64-only");
         let errors: Vec<&str> = stderr.lines().filter(|line| line.starts_with("error[")).collect();
         let fetch_bitwise = "has no `fetch_and`, `fetch_or`, `fetch_xor` or `fetch_not` without a \
                              compare-exchange loop on this target";
@@ -527,11 +585,17 @@ mod tests {
 
     #[test]
     fn aarch64_linux_refuses_each_wide_capability() {
-        let stderr = refused(AARCH64_LINUX, "aarch64-refused");
+        let stderr = refused(AARCH64_LINUX, None, "aarch64-refused");
         let errors: Vec<&str> = stderr.lines().filter(|line| line.starts_with("error[")).collect();
         assert_eq!(
             errors,
             [
+                "error[E0277]: `DoubleWord<*mut double_words::Node, *mut double_words::Node>` has \
+                 no pure-read atomic load on this target",
+                "error[E0277]: `DoubleWord<*mut double_words::Node, *mut double_words::Node>` has \
+                 no atomic store without a compare-exchange loop on this target",
+                "error[E0277]: `DoubleWord<*mut double_words::Node, *mut double_words::Node>` has \
+                 no atomic exchange without a compare-exchange loop on this target",
                 "error[E0277]: `u128` has no pure-read atomic load on this target",
                 "error[E0277]: `u128` has no atomic store without a compare-exchange loop on this \
                  target",
@@ -540,7 +604,8 @@ mod tests {
                 "error[E0277]: `u128` has no atomic maximum or minimum without a compare-exchange \
                  loop on this target",
             ],
-            "one error per probe: `Load`'s, `Store`'s, `Swap`'s and `MinMax`'s:\n{stderr}"
+            "one error per probe: a double word's `Load`, `Store` and `Swap`, and a `u128`'s and \
+             its `MinMax`:\n{stderr}"
         );
         for line in [
             "= note: a 128-bit load is one instruction with FEAT_LSE2",
@@ -556,18 +621,40 @@ mod tests {
     }
 
     #[test]
+    fn x86_64_without_cmpxchg16b_refuses_two_words_as_it_refuses_128_bits() {
+        let stderr = refused(X86_64_LINUX, Some("x86-64"), "x86-64-refused");
+        let refusals: Vec<&str> =
+            stderr.lines().filter(|line| line.starts_with("error[E0277]")).collect();
+        assert_eq!(
+            refusals,
+            [
+                "error[E0277]: `(NonNull<without_cmpxchg16b::Node>, \
+                 NonNull<without_cmpxchg16b::Node>)` cannot be stored in an atomic",
+                "error[E0277]: `NonNull<[u64]>` cannot be stored in an atomic",
+            ],
+            "the pair and the slice's pointer, each refused as no `Atom`:\n{stderr}"
+        );
+        let advice = "= note: a 128-bit value needs `cmpxchg16b` on x86_64: build with `-C \
+                      target-cpu=x86-64-v2` or newer";
+        assert_eq!(stderr.matches(advice).count(), 2, "each names the CPU it needs:\n{stderr}");
+        assert!(!stderr.contains("PointerMetadata"), "and no hidden trait:\n{stderr}");
+    }
+
+    #[test]
     fn aarch64_macos_refuses_the_wide_exchange_and_maximum() {
-        let stderr = refused(AARCH64_MACOS, "aarch64-refused");
+        let stderr = refused(AARCH64_MACOS, None, "aarch64-refused");
         let errors: Vec<&str> = stderr.lines().filter(|line| line.starts_with("error[")).collect();
         assert_eq!(
             errors,
             [
+                "error[E0277]: `DoubleWord<*mut double_words::Node, *mut double_words::Node>` has \
+                 no atomic exchange without a compare-exchange loop on this target",
                 "error[E0277]: `u128` has no atomic exchange without a compare-exchange loop on \
                  this target",
                 "error[E0277]: `u128` has no atomic maximum or minimum without a compare-exchange \
                  loop on this target",
             ],
-            "LSE2 has the load and store, so only `Swap`'s and `MinMax`'s probes fail:\n{stderr}"
+            "LSE2 has the load and store, so only the `Swap` and `MinMax` probes fail:\n{stderr}"
         );
     }
 }

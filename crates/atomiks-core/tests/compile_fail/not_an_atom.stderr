@@ -14,13 +14,13 @@ help: the trait `Atom` is not implemented for `Order`
   = note: for a type of your own, derive it, `#[derive(Atom)]`, with atomiks' `derive` feature, or keep each promise of `Atom`'s `# Safety` section in a `const unsafe impl`
   = help: the following other types implement trait `Atom`:
             ()
-            *const T
-            *mut T
-            NonNull<T>
+            (P, Q)
             NonZero<i128>
             NonZero<i16>
             NonZero<i32>
             NonZero<i64>
+            NonZero<i8>
+            NonZero<isize>
           and $N others
 note: required by a bound in `atomiks_core::Atomic::<T>::new`
  --> src/atomic/mod.rs
@@ -46,13 +46,13 @@ help: the trait `Atom` is not implemented for `Order`
   = note: for a type of your own, derive it, `#[derive(Atom)]`, with atomiks' `derive` feature, or keep each promise of `Atom`'s `# Safety` section in a `const unsafe impl`
   = help: the following other types implement trait `Atom`:
             ()
-            *const T
-            *mut T
-            NonNull<T>
+            (P, Q)
             NonZero<i128>
             NonZero<i16>
             NonZero<i32>
             NonZero<i64>
+            NonZero<i8>
+            NonZero<isize>
           and $N others
 note: required by a bound in `atomiks_core::Atomic`
  --> src/atomic/mod.rs

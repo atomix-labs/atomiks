@@ -1,0 +1,68 @@
+error[E0277]: `DoubleWord<*mut u64, *mut u64>` lends no place of its own
+  --> tests/compile_fail/raw_access_to_two_words.rs:16:18
+   |
+16 |     let _ = pair.as_ptr();
+   |                  ^^^^^^ expected a primitive other than a `DoubleWord`
+   |
+   = help: the trait `RawAccess` is not implemented for `DoubleWord<*mut u64, *mut u64>`
+   = note: a double word's cell holds each pointer's address, its provenance exposed, so a pointer read through a place would have none: reach two words through `load`, `store` and the compare-exchanges
+   = help: the following other types implement trait `RawAccess`:
+             *mut T
+             bool
+             i128
+             i16
+             i32
+             i64
+             i8
+             isize
+           and $N others
+note: required by a bound in `atomiks_core::Atomic::<T>::as_ptr`
+  --> src/atomic/mod.rs
+   |
+   | impl<T: Atom> Atomic<T> {
+...
+   |     pub const fn as_ptr(&self) -> *mut T::Repr
+   |     where
+   |         T::Repr: [const] RawAccess,
+   |                  ^^^^^^^^^^^^^^^^^ required by this bound in `Atomic::<T>::as_ptr`
+
+error[E0599]: the method `get_mut` exists for struct `atomiks_core::Atomic<(NonNull<u64>, NonNull<u64>)>`, but its trait bounds were not satisfied
+  --> tests/compile_fail/raw_access_to_two_words.rs:17:18
+   |
+17 |     let _ = pair.get_mut();
+   |                  ^^^^^^^ method cannot be called on `atomiks_core::Atomic<(NonNull<u64>, NonNull<u64>)>` due to unsatisfied trait bounds
+   |
+   = note: the following trait bounds were not satisfied:
+           `<(NonNull<u64>, NonNull<u64>) as Atom>::Repr = (NonNull<u64>, NonNull<u64>)`
+           `<(NonNull<u64>, NonNull<u64>) as Atom>::Validity = Total`
+           `(NonNull<u64>, NonNull<u64>): RawAccess`
+
+error[E0277]: `DoubleWord<*mut (), usize>` lends no place of its own
+  --> tests/compile_fail/raw_access_to_two_words.rs:19:56
+   |
+19 |     let _ = unsafe { Atomic::<NonNull<[u8]>>::from_ptr(ptr::null_mut()) };
+   |                      --------------------------------- ^^^^^^^^^^^^^^^ expected a primitive other than a `DoubleWord`
+   |                      |
+   |                      required by a bound introduced by this call
+   |
+   = help: the trait `RawAccess` is not implemented for `DoubleWord<*mut (), usize>`
+   = note: a double word's cell holds each pointer's address, its provenance exposed, so a pointer read through a place would have none: reach two words through `load`, `store` and the compare-exchanges
+   = help: the following other types implement trait `RawAccess`:
+             *mut T
+             bool
+             i128
+             i16
+             i32
+             i64
+             i8
+             isize
+           and $N others
+note: required by a bound in `atomiks_core::Atomic::<T>::from_ptr`
+  --> src/atomic/mod.rs
+   |
+   | impl<T: Atom> Atomic<T> {
+...
+   |     pub const unsafe fn from_ptr<'a>(ptr: *mut T::Repr) -> &'a Self
+   |     where
+   |         T::Repr: RawAccess,
+   |                  ^^^^^^^^^ required by this bound in `Atomic::<T>::from_ptr`

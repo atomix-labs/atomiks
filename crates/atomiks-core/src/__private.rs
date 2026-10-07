@@ -11,9 +11,11 @@ use crate::atom::{Atom, AtomAdd, AtomBitwise, AtomOrd, PtrAtom};
 pub use crate::atomic::{HasPackedField, Reach, project_field};
 use crate::message::{Message, refuse};
 use crate::primitive::{CompareExchange, ExactBits, Primitive};
+#[cfg(wide)]
+use crate::primitive::{DoubleWord, Word};
 pub use crate::range::{
     EnumLayout, PackedField, PackedLayout, PointeeAlignment, PointerEnumLayout, PointerEnumVariant,
-    PointerWordLayout, Tags, assert_aligned,
+    PointerWordLayout, PointerWordRepr, Tags, assert_aligned,
 };
 use crate::range::{FieldLayout, ReprRange};
 use crate::validity::{Partial, Total, TotalZeroNiche, Validity, ZeroNiche, ZeroValid};
@@ -197,6 +199,71 @@ select! {
 select!(Width<128> => u128, u128 => u128, i128 => i128);
 #[cfg(not(wide))]
 select!(u128 => u64, i128 => i64);
+
+/// A count of words, one or two, which [`SelectPointerWordRepr`] maps to the repr of a value of a
+/// pointer field and tag fields that many words wide.
+#[derive(Debug)]
+pub struct Words<const COUNT: u32>;
+
+/// The repr of a value of a pointer field, stored as `P`, and tag fields, a [`Words`] wide.
+///
+/// It is `P` in one word, the tags in its low bits, or, in two, a `DoubleWord` of `P` beside an
+/// integer word of the tags, as [`PointerWordLayout::word_count`] counts them. Where no atomic
+/// holds two words, two words select `P` too, so the selection itself never fails, and
+/// [`PointerWordLayout::assert_tags_fit`] refuses the value once, naming the CPU it needs.
+pub impl(crate) trait SelectPointerWordRepr<P> {
+    /// The repr.
+    type Repr: const Primitive + CompareExchange + const PointerWordRepr<P>;
+}
+
+impl<P: const Primitive + CompareExchange> SelectPointerWordRepr<P> for Words<1> {
+    type Repr = P;
+}
+
+#[cfg(wide)]
+impl<P: const Word> SelectPointerWordRepr<P> for Words<2> {
+    type Repr = DoubleWord<P, usize>;
+}
+
+#[cfg(not(wide))]
+impl<P: const Primitive + CompareExchange> SelectPointerWordRepr<P> for Words<2> {
+    type Repr = P;
+}
+
+/// Writes the items of a value two words wide whatever its fields, `{ items }`; or, where no
+/// atomic holds two words, refuses the value named `name` once, naming the CPU it needs, and writes
+/// `else { stub }`, an `Atom` impl that keeps each use of the value from a refusal of its own.
+///
+/// atomiks' own `cfg` chooses, as it chooses whether a `DoubleWord` exists, so the code a derive
+/// writes agrees with the atomiks it builds against, whatever flags read the deriving crate.
+#[cfg(wide)]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __in_two_words {
+    ($name:literal { $($items:tt)* } else { $($stub:tt)* }) => {
+        $($items)*
+    };
+}
+
+/// The refusal of the value `name` and its stub, where no atomic holds two words: as the macro
+/// where one does says.
+#[cfg(not(wide))]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __in_two_words {
+    ($name:literal { $($items:tt)* } else { $($stub:tt)* }) => {
+        ::core::compile_error!(::core::concat!(
+            "`",
+            ::core::module_path!(),
+            "::",
+            $name,
+            "` needs two words, but an atomic holds at most one: build with `-C target-cpu=x86-64-v2` or newer for two"
+        ));
+        $($stub)*
+    };
+}
+
+pub use crate::__in_two_words as in_two_words;
 
 /// The [`Width`] of the narrowest integer that holds `bits` bits: 8, 16, 32, 64 or 128.
 ///

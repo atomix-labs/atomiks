@@ -6,10 +6,14 @@ use core::marker::Destruct;
 use core::panic::RefUnwindSafe;
 use core::sync::atomic::Ordering as CoreOrdering;
 
+#[cfg(wide)]
+mod double;
 mod narrow;
 #[cfg(wide)]
 mod wide;
 
+#[cfg(wide)]
+pub use self::double::{DoubleWord, Word};
 pub(crate) use self::narrow::{address, subtract_tags};
 
 /// A primitive's cell, and every access to it that is not an atomic instruction.
@@ -27,18 +31,13 @@ pub impl(crate) const trait CellAccess: Sized {
     fn get(cell: &mut Self::Cell) -> Self;
     /// Replaces the value, through exclusive access.
     fn set(cell: &mut Self::Cell, value: Self);
-    /// The value's place, through exclusive access.
-    #[cfg(not(loom))]
-    fn get_mut(cell: &mut Self::Cell) -> &mut Self;
-    /// The value's address.
-    #[cfg(not(loom))]
-    fn as_ptr(cell: &Self::Cell) -> *mut Self;
 }
 
 /// Declares `Primitive`, whose cell access is const exactly where `CellAccess` is.
 macro_rules! primitive {
     ($($cell:tt)+) => {
-        /// A primitive an atomic cell holds: `bool`, an integer, or a `*mut T`.
+        /// A primitive an atomic cell holds: `bool`, an integer, a `*mut T`, or, where the target
+        /// has 16-byte atomics, a `DoubleWord` of two pointers or integers.
         ///
         /// Every primitive has a compare-exchange; [`Load`], [`Store`], [`Swap`], [`FetchAdd`],
         /// [`MaskBitwise`], [`BitTest`], [`FetchBitwise`] and [`MinMax`] say which other operations
@@ -98,6 +97,30 @@ primitive!([const] CellAccess);
 #[cfg(loom)]
 primitive!(CellAccess);
 
+/// A primitive whose cell holds it as its own type lays it out, so the place the cell lends is the
+/// primitive's: every primitive but a `DoubleWord`.
+///
+/// [`Atomic::as_ptr`](crate::Atomic::as_ptr), [`Atomic::from_ptr`](crate::Atomic::from_ptr) and
+/// [`Atomic::get_mut`](crate::Atomic::get_mut) need it. A double word's cell holds its pointers'
+/// addresses, their provenance exposed, so a pointer read from its place would have no provenance,
+/// and one written there unexposed none for a load to take back: its words are reached through its
+/// atomic operations alone.
+#[diagnostic::on_unimplemented(
+    message = "`{Self}` lends no place of its own",
+    label = "expected a primitive other than a `DoubleWord`",
+    note = "a double word's cell holds each pointer's address, its provenance exposed, so a pointer read through a place would have none: reach two words through `load`, `store` and the compare-exchanges"
+)]
+pub impl(crate) const trait RawAccess: [const] Primitive {
+    /// The value's place, through exclusive access.
+    #[cfg(not(loom))]
+    #[doc(hidden)]
+    fn get_mut(cell: &mut Self::Cell) -> &mut Self;
+    /// The value's address.
+    #[cfg(not(loom))]
+    #[doc(hidden)]
+    fn as_ptr(cell: &Self::Cell) -> *mut Self;
+}
+
 /// A primitive whose bits are its whole value: `bool` or an integer, never a pointer, whose
 /// provenance its bits do not hold.
 // `Primitive::IS_BITS_EXACT` is true exactly for the primitives that implement this.
@@ -141,6 +164,30 @@ pub impl(crate) trait CompareExchange: Primitive {
         cell: &Self::Cell, current: Self, new: Self, success: CoreOrdering, failure: CoreOrdering,
     ) -> Result<Self, Self>;
 }
+
+/// A primitive a compare-exchange reads without changing: one of zero for zero, which writes zero
+/// over zero alone, and strips no provenance.
+///
+/// [`Atomic::load_rmw`](crate::Atomic::load_rmw) and a field's `load_rmw` need it, so generic
+/// code that reads with one states it: `bool`, an integer, or a `DoubleWord`. An integer's exchange
+/// compares every bit, and a double word's cell holds its pointers' addresses, their provenance
+/// exposed. A pointer's compares its address alone, so one of null for null would write a null
+/// without the provenance of the null it found; a pointer has a [`Load`] instead.
+#[diagnostic::on_unimplemented(
+    message = "`{Self}` is not a primitive a compare-exchange reads without changing",
+    label = "expected `bool`, an integer or a `DoubleWord`",
+    note = "a pointer's compare-exchange compares its address alone, so one of null for null would strip a null's provenance: for a pure-read load of a pointer, call `load`"
+)]
+pub impl(crate) trait ReadByExchange: CompareExchange {}
+
+// `do_not_recommend`, so a pointer reports this trait's message, not `ExactBits`'.
+#[diagnostic::do_not_recommend]
+impl<R: ExactBits + CompareExchange> ReadByExchange for R {}
+
+// `do_not_recommend`, so a pointer's refusal lists no double word's impl as a fix.
+#[cfg(wide)]
+#[diagnostic::do_not_recommend]
+impl<A: Word, B: Word> ReadByExchange for DoubleWord<A, B> {}
 
 /// A primitive whose atomic load never writes.
 #[diagnostic::on_unimplemented(

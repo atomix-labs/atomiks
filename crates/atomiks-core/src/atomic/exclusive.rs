@@ -4,7 +4,7 @@ use super::Atomic;
 use crate::atom::Atom;
 use crate::primitive::CellAccess;
 #[cfg(not(loom))]
-use crate::primitive::Primitive;
+use crate::primitive::RawAccess;
 #[cfg(not(loom))]
 use crate::validity::Total;
 use crate::validity::Validity;
@@ -63,14 +63,15 @@ impl<T: Atom> Atomic<T> {
 }
 
 #[cfg(not(loom))]
-impl<T: Atom<Repr = T, Validity = Total> + const Primitive> Atomic<T> {
-    /// The value's place, for a primitive (every repr of which is a value).
+impl<T: Atom<Repr = T, Validity = Total> + const RawAccess> Atomic<T> {
+    /// The value's place, for a primitive (every repr of which is a value) whose cell holds it as
+    /// its own type lays it out, as [`RawAccess`] says.
     ///
     /// [`with_mut`](Self::with_mut) lends any other value, and every value under loom.
     #[inline]
     #[must_use]
     pub const fn get_mut(&mut self) -> &mut T {
-        <T as CellAccess>::get_mut(Total::get_mut::<T>(&mut self.cell))
+        <T as RawAccess>::get_mut(Total::get_mut::<T>(&mut self.cell))
     }
 }
 

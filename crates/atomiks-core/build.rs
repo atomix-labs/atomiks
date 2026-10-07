@@ -16,6 +16,9 @@ fn main() {
         // Neither loom's model nor Miri's interpreter: the atomics are the CPU's, and a test can
         // run cargo.
         on_hardware: { not(any(loom, miri)) },
+        // A double word's cell is a lock around plain copies of its words, which keeps each pointer's
+        // provenance: Miri's model, as loom's is the index table of the 16-byte cell it shares.
+        double_word_lock: { all(miri, not(loom)) },
         // `fence(StoreStore)` is `dmb ishst`, an `asm!` that neither loom nor Miri runs.
         dmb_ishst: { all(target_arch = "aarch64", on_hardware) },
         // A bit's position at either end of a word goes through an empty `asm!`, so x86_64 tests
