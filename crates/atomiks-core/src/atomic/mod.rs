@@ -10,7 +10,9 @@ use zerocopy::{FromBytes, IntoBytes, KnownLayout, Unaligned};
 
 use crate::atom::Atom;
 use crate::ordering::{LoadOrdering, Relaxed, RmwOrdering, StoreOrdering};
-use crate::primitive::{CellAccess, CompareExchange, ExactBits, Load, Primitive, Store, Swap};
+#[cfg(not(loom))]
+use crate::primitive::RawAccess;
+use crate::primitive::{CellAccess, CompareExchange, Load, Primitive, ReadByExchange, Store, Swap};
 use crate::range::{Tags, assert_aligned};
 use crate::validity::Validity;
 
@@ -24,7 +26,7 @@ pub use self::field::{AtomicField, Field, FieldPath, Join, ProjectFields, Then, 
 pub use self::field::{HasPackedField, Reach, project_field};
 pub use self::ptr::AtomicPtr;
 
-/// A value of `T` shared between threads through one atomic word.
+/// A value of `T` shared between threads through one atomic primitive, its repr.
 ///
 /// Each operation through `&self` is one atomic instruction on `T`'s repr, decoded on the way
 /// out, except [`update`](Self::update), [`try_update`](Self::try_update) and
@@ -85,7 +87,8 @@ pub struct Atomic<T: Atom> {
     // which either needs `Total` (add, the bitwise operations, the pointer offsets), keeps one of
     // its operands (max, min), or leaves the repr as it was (`load_rmw`, and a 128-bit
     // `read_for_rmw` without `Load`, each a compare-exchange of zero for zero, on an integer repr,
-    // whose exchange compares every bit); one a field operation left, which changes only the bits
+    // whose exchange compares every bit, or a double word's, whose cell holds addresses alone, as
+    // `ReadByExchange` says); one a field operation left, which changes only the bits
     // its `FieldPath` governs: to a repr of the field's value placed as the path says (`update`,
     // `try_update`), to any pattern of a field whose every pattern decodes (the bitwise
     // operations, on `FieldBitwise`, `bool` among them), or by an add whose carry leaves the word
@@ -95,7 +98,8 @@ pub struct Atomic<T: Atom> {
     // or zeros, which they do only where the cell is the primitive's own, so `Total`'s; or the
     // zero repr bytemuck's `Zeroable` writes, only where `ZeroValid` says it decodes. Its writers
     // are this module and its submodules, the zerocopy and bytemuck impls, and whoever writes
-    // through `get_mut`'s place, `as_ptr` or `from_ptr`, whose bounds and contracts keep it.
+    // through `get_mut`'s place, `as_ptr` or `from_ptr`, whose bounds and contracts keep it, each
+    // bounded by `RawAccess`, which no double word has.
     /// The cell holding `T`'s repr: the validity's wrapper around the primitive's cell.
     cell: <T::Validity as Validity>::Cell<T::Repr>,
     /// The type of the value the repr encodes.
@@ -448,14 +452,17 @@ impl<T: Atom> Atomic<T> {
         }
     }
 
-    /// Reads the value with a compare-exchange, for an [`ExactBits`] repr without [`Load`].
+    /// Reads the value with a compare-exchange, for a repr without [`Load`]: a 128-bit integer's,
+    /// or a `DoubleWord`'s, where the target has no 16-byte load.
     ///
     /// The exchange takes the cache line exclusive and writes it, so it faults on read-only memory.
+    /// A pointer, which has a [`Load`] everywhere, has no `load_rmw`: its exchange compares its
+    /// address alone, so one of null for null could strip a null's provenance.
     #[expect(unsafe_code, reason = "decodes a repr read from the cell")]
     #[inline]
     pub fn load_rmw<O: LoadOrdering>(&self, order: O) -> T
     where
-        T::Repr: ExactBits,
+        T::Repr: ReadByExchange,
     {
         let repr = self.load_rmw_repr(order);
         // SAFETY: by the field INVARIANT, the repr read from the cell decodes.
@@ -467,14 +474,15 @@ impl<T: Atom> Atomic<T> {
     #[inline]
     fn load_rmw_repr<O: LoadOrdering>(&self, order: O) -> T::Repr
     where
-        T::Repr: ExactBits,
+        T::Repr: ReadByExchange,
     {
         let _ = order;
         let zero = T::Repr::from_bits(0);
-        // It writes zero only over zero, and an integer's exchange compares every bit, so the repr
-        // stays as it was, whether or not zero decodes. A pointer's compares only the address, so
-        // over address zero it would write a null without the pointer's provenance: hence
-        // `ExactBits`, which costs nothing, as every pointer has a `Load`.
+        // It writes zero only over zero, and an integer's exchange compares every bit, as a double
+        // word's does of a cell that holds addresses alone, so the repr stays as it was, whether or
+        // not zero decodes. A pointer's compares only the address, so over address zero it would
+        // write a null without the pointer's provenance: hence `ReadByExchange`, which costs
+        // nothing, as every pointer has a `Load`.
         match T::Repr::compare_exchange(self.primitive_cell(), zero, zero, O::CORE, O::CORE) {
             Ok(current) | Err(current) => current,
         }
@@ -494,15 +502,22 @@ impl<T: Atom> Atomic<T> {
     /// The repr's address, for interop.
     ///
     /// Every access through it while the atomic is shared is atomic and of the repr's width, and a
-    /// write leaves a repr [`from_repr`](Atom::from_repr) decodes.
+    /// write leaves a repr [`from_repr`](Atom::from_repr) decodes. A repr of two words, whose cell
+    /// holds its pointers' addresses alone, lends none, as [`RawAccess`] says.
     #[cfg(not(loom))]
     #[inline]
     #[must_use]
-    pub const fn as_ptr(&self) -> *mut T::Repr {
+    pub const fn as_ptr(&self) -> *mut T::Repr
+    where
+        T::Repr: [const] RawAccess,
+    {
         T::Repr::as_ptr(self.primitive_cell())
     }
 
     /// The atomic `ptr` points to.
+    ///
+    /// A repr of two words, whose cell holds its pointers' addresses alone, has none, as
+    /// [`RawAccess`] says.
     ///
     /// # Safety
     /// For all of `'a`: `ptr` is aligned to `align_of::<Atomic<T>>()` and valid for reads and
@@ -532,7 +547,10 @@ impl<T: Atom> Atomic<T> {
     #[expect(unsafe_code, reason = "a reference to memory only the caller knows")]
     #[inline]
     #[must_use]
-    pub const unsafe fn from_ptr<'a>(ptr: *mut T::Repr) -> &'a Self {
+    pub const unsafe fn from_ptr<'a>(ptr: *mut T::Repr) -> &'a Self
+    where
+        T::Repr: RawAccess,
+    {
         // SAFETY: `Atomic<T>` is `repr(transparent)` over `T::Validity`'s cell, which has the
         // primitive's cell's layout (the cell itself, or `Opaque`'s `repr(transparent)` over it),
         // which has the primitive's size; the caller upholds `from_ptr`'s contract, which keeps the

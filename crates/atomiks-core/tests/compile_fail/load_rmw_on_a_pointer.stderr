@@ -1,25 +1,11 @@
-error[E0277]: `*mut u64` is not a primitive whose bits are its whole value
+error[E0277]: `*mut u64` is not a primitive a compare-exchange reads without changing
   --> tests/compile_fail/load_rmw_on_a_pointer.rs:10:52
    |
 10 |     let _ = AtomicPtr::<u64>::new(ptr::null_mut()).load_rmw(Acquire);
-   |                                                    ^^^^^^^^ expected `bool` or an integer
+   |                                                    ^^^^^^^^ expected `bool`, an integer or a `DoubleWord`
    |
-   = help: the trait `ExactBits` is not implemented for `*mut u64`
-   = note: a pointer's bits do not hold its provenance: for a pure-read load of a pointer, call `load`
-help: the trait `ExactBits` is implemented for `u64`
-  --> src/primitive/narrow.rs
-   |
-   |           const impl ExactBits for $int {
-   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-...
-   | / integers! {
-   | |     u8 => AtomicU8;
-   | |     u16 => AtomicU16;
-   | |     u32 => AtomicU32;
-...  |
-   | |     isize => AtomicIsize, signed;
-   | | }
-   | |_- in this macro invocation
+   = help: the trait `ReadByExchange` is not implemented for `*mut u64`
+   = note: a pointer's compare-exchange compares its address alone, so one of null for null would strip a null's provenance: for a pure-read load of a pointer, call `load`
 note: required by a bound in `atomiks_core::Atomic::<T>::load_rmw`
   --> src/atomic/mod.rs
    |
@@ -27,6 +13,5 @@ note: required by a bound in `atomiks_core::Atomic::<T>::load_rmw`
 ...
    |     pub fn load_rmw<O: LoadOrdering>(&self, order: O) -> T
    |     where
-   |         T::Repr: ExactBits,
-   |                  ^^^^^^^^^ required by this bound in `Atomic::<T>::load_rmw`
-   = note: this error originates in the macro `integers` (in Nightly builds, run with -Z macro-backtrace for more info)
+   |         T::Repr: ReadByExchange,
+   |                  ^^^^^^^^^^^^^^ required by this bound in `Atomic::<T>::load_rmw`

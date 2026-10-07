@@ -8,6 +8,7 @@ publish = false
 default         = []
 aarch64-only    = []
 aarch64-refused = []
+x86-64-refused  = []
 
 [dependencies]
 # external

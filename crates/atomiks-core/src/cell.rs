@@ -1,4 +1,4 @@
-//! A cell for data that is not one atomic word, shaped as loom's, so the same code is the model.
+//! A cell for data no atomic holds, shaped as loom's, so the same code is the model.
 //!
 //! Off loom a window or guard is only a pointer; under loom each is tracked, and a conflicting
 //! access is reported.

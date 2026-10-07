@@ -14,6 +14,7 @@ use crate::atom::{Atom, FieldAdd, FieldBitwise};
 use crate::ordering::{LoadOrdering, Relaxed, RmwOrdering, StoreOrdering};
 use crate::primitive::{
     BitTest, CellAccess, ExactBits, FetchAdd, FetchBitwise, Load, MaskBitwise, Primitive,
+    ReadByExchange,
 };
 use crate::range::{mask, sign_extend};
 
@@ -340,11 +341,11 @@ impl<P: FieldPath> AtomicField<P> {
     #[inline]
     pub fn load_rmw<O: LoadOrdering>(&self, order: O) -> P::Value
     where
-        ContainerRepr<P>: ExactBits,
+        ContainerRepr<P>: ReadByExchange,
     {
         let repr = self.atomic.load_rmw_repr(order);
         // SAFETY: by `Atomic`'s field INVARIANT, the repr read from the cell decodes.
-        unsafe { decode::<P>(repr.to_bits()) }
+        unsafe { decode_repr::<P>(repr) }
     }
 
     /// Replaces the field with `f` of it, and returns the container before.

@@ -5,11 +5,14 @@ use core::str;
 /// What a name cut short ends with.
 const ELLIPSIS: &str = "…";
 
+/// How many bytes a message holds: room for two type names whole beside the longest advice.
+const CAPACITY: usize = 512;
+
 /// A message built in a const context, for a refusal at compile time or, outside a constant, at run
 /// time.
 pub(crate) struct Message {
     /// The bytes written so far; only `len` of them are the message.
-    bytes: [u8; 256],
+    bytes: [u8; CAPACITY],
     /// How many bytes are written.
     len: usize,
     /// Whether a piece was cut short at the buffer's end; nothing is appended after one.
@@ -19,7 +22,7 @@ pub(crate) struct Message {
 impl Message {
     /// An empty message.
     pub(crate) const fn new() -> Self {
-        Self { bytes: [0; 256], len: 0, cut: false }
+        Self { bytes: [0; CAPACITY], len: 0, cut: false }
     }
 
     /// Appends `text`, cut short at the last whole character the buffer holds.
@@ -116,7 +119,7 @@ pub(crate) const fn refuse(message: &Message) -> ! {
 mod tests {
     use core::str;
 
-    use super::Message;
+    use super::{CAPACITY, Message};
 
     #[test]
     fn text_and_numbers_are_appended_in_order() {
@@ -147,14 +150,14 @@ mod tests {
 
     #[test]
     fn a_message_past_the_buffer_is_cut_not_corrupted() {
-        let long = [b'x'; 300];
+        let long = [b'x'; CAPACITY + 44];
         let text = str::from_utf8(&long).expect("ASCII is UTF-8");
-        assert_eq!(Message::new().text(text).as_str().len(), 256, "cut at the buffer's end");
+        assert_eq!(Message::new().text(text).as_str().len(), CAPACITY, "cut at the buffer's end");
     }
 
     #[test]
     fn a_character_the_buffer_cannot_hold_whole_is_left_out() {
-        let short = [b'x'; 255];
+        let short = [b'x'; CAPACITY - 1];
         let text = str::from_utf8(&short).expect("ASCII is UTF-8");
         let message = Message::new().text(text).text("λ");
         assert_eq!(message.as_str(), text, "the two-byte `λ` left out, not the whole message");
@@ -162,7 +165,7 @@ mod tests {
 
     #[test]
     fn nothing_is_appended_after_a_cut() {
-        let short = [b'x'; 255];
+        let short = [b'x'; CAPACITY - 1];
         let text = str::from_utf8(&short).expect("ASCII is UTF-8");
         let message = Message::new().text(text).text("λ").text("y");
         assert_eq!(message.as_str(), text, "no `y` where the `λ` it follows is missing");
@@ -170,12 +173,12 @@ mod tests {
 
     #[test]
     fn a_long_name_is_cut_to_keep_the_text_after_it() {
-        let long = [b'n'; 300];
+        let long = [b'n'; CAPACITY + 44];
         let name = str::from_utf8(&long).expect("ASCII is UTF-8");
         let advice = ">`: use a type with a spare repr";
         let message = Message::new().text("`Option<").name(name, advice.len()).text(advice);
         let text = message.as_str();
-        assert_eq!(text.len(), 256, "the name takes what the advice leaves");
+        assert_eq!(text.len(), CAPACITY, "the name takes what the advice leaves");
         assert!(text.ends_with(advice), "the advice whole: {text}");
         assert!(text.contains("n…>"), "the name cut short with `…`: {text}");
         assert_eq!(Message::new().name("u64", 200).as_str(), "u64", "a name that fits, whole");

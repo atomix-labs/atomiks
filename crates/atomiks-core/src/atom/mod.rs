@@ -1,11 +1,15 @@
 //! A value storable in an atomic, and which read-modify-writes mean something on it.
 
 mod option;
+#[cfg(wide)]
+mod pair;
 mod ptr;
 mod ranged;
 mod scalar;
 
 pub use self::ptr::PtrAtom;
+#[cfg(wide)]
+pub use self::ptr::VtablePointer;
 // For deranged's ranged integers, which take the impls atomiks' own do.
 #[cfg(feature = "deranged-05")]
 pub(crate) use self::ranged::ranged_atom;
@@ -13,8 +17,8 @@ use crate::primitive::{Bitwise, CompareExchange, ExactBits, FetchAdd, Primitive}
 use crate::range::{PointeeAlignment, ReprRange, Tags};
 use crate::validity::{Partial, Total, Validity};
 
-/// A value that packs into one atomic word: stored as its [`Repr`](Atom::Repr), and decoded on
-/// every load without a check, because an atomic only ever holds reprs that decode.
+/// A value one atomic holds: stored as its [`Repr`](Atom::Repr), and decoded on every load
+/// without a check, because an atomic only ever holds reprs that decode.
 ///
 /// A repr decodes when [`from_repr`](Atom::from_repr) returns `Some` for it. So that a
 /// compare-exchange loop converges, a repr that decodes should re-encode to itself: every value has
@@ -116,9 +120,10 @@ pub const unsafe trait Atom: Copy {
     /// [`POINTEE_ALIGNMENT`](Self::POINTEE_ALIGNMENT) holds apart.
     #[doc(hidden)]
     const TAG_WIDTH: u32 = 0;
-    /// The alignment of what a value stored as a pointer points to, the least of its pointers'
-    /// where it holds several, which leaves the low bits clear that its tags, and those of a word
-    /// that holds it, go in. None for a value stored as bits, and for a hand impl.
+    /// The alignment of what a value stored as a pointer points to, which leaves the low bits
+    /// clear that its tags, and those of a word that holds it, go in: the least of its pointers'
+    /// where one word holds several, as a pointer enum's does, and the first pointer's of two
+    /// words, whose low bits alone hold tags. None for a value stored as bits, and for a hand impl.
     ///
     /// Only code and the checks read it, never a type's layout, which may hold the pointee.
     #[doc(hidden)]

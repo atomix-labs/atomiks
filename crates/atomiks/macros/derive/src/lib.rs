@@ -14,7 +14,7 @@
 use atomiks_derive_impl::{Capability, DeriveError, Expansion, expand_atom, expand_capability};
 use proc_macro::{Diagnostic, Level, Span, TokenStream};
 
-/// Derives `Atom` for a struct or an enum, so that an `Atomic` holds it in one word.
+/// Derives `Atom` for a struct or an enum, so that one `Atomic` holds it.
 ///
 /// The impl is `const`, so a `static` of the type builds, and a type without parameters needs no
 /// feature gate. `#[atom(…)]` on the type takes two keys: `repr`, below, and `crate = path`, which
@@ -34,20 +34,30 @@ use proc_macro::{Diagnostic, Level, Span, TokenStream};
 ///   discriminant. Where one variant alone has fields and none states a discriminant, niche-filling
 ///   instead, unless that is wider: the unit variants take the reprs beside that variant's range,
 ///   as `Option`'s `None` takes one.
-/// - **Pointer word**, a struct of several fields, one a pointer, written as a `NonNull`, an
-///   `Option` of one or a raw pointer, or marked: the pointer's repr, each other field a tag packed
-///   above the pointer's own tags into the low bits its pointee's alignment leaves clear, which the
-///   build checks, a generic word's in each instance. Its `to_repr` panics on a pointer with a bit
-///   set where the tags go.
+/// - **Pointer word**, a struct of several fields, one or two of them pointers, each written as a
+///   `NonNull`, an `Option` of one or a raw pointer, or marked: the pointer's repr, each other
+///   field a tag packed above the pointer's own tags into the low bits its pointee's alignment
+///   leaves clear, which the build checks, a generic word's in each instance. Its `to_repr` panics
+///   on a pointer with a bit set where the tags go. Two words, a `DoubleWord`, hold two pointers,
+///   the tags in the first one's low bits; a pointer to a slice or a `str`, the tags in its data
+///   pointer's, or to a trait object, beside no tag; or one pointer beside tags no alignment holds,
+///   more than 29 bits, since Rust's largest alignment is 2^29, in an integer word of their own. A
+///   pointer past those two words is refused. A pointer's width is read from its type as written:
+///   one to a slice, a `str` or a trait object behind an alias, or to a struct whose tail is a
+///   slice, is taken for one word, and refused beside tags, so write such a pointer out. Two words
+///   need a 16-byte atomic: where `x86_64` has no `cmpxchg16b`, the type is refused once, naming
+///   the CPU it needs.
 /// - **Pointer enum**, one variant or more holding a pointer: a `*mut ()`, each variant's tag its
 ///   discriminant, above its pointers' own tags; a pointer variant's tag fields above the tag, a
 ///   data variant's fields above the bits every pointer's alignment leaves clear; one unit beside
 ///   one pointer that is never null takes null, and no tag, unless a variant states its
 ///   discriminant. Its `to_repr` panics as a pointer word's does.
 ///
-/// A pointer word's or a pointer enum's layout reads its pointers' tags but not their pointees'
-/// alignment, which the build checks once the pointees are laid out, so a node may hold an atomic
-/// of the word that points to it, as a list's node holds the link to the next.
+/// A pointer word's or a pointer enum's layout, a pointer word's width of one word or two among
+/// it, reads its fields but never their pointees' alignment, which the build checks once the
+/// pointees are laid out: so a node may hold an atomic of the word that points to it, as a list's
+/// node holds the link to the next, and a pointee's alignment that shrinks below a word's tags
+/// fails the build, never widening the word.
 ///
 /// `from_repr` refuses each repr no value encodes to, so each value has one repr.
 ///
@@ -72,10 +82,13 @@ use proc_macro::{Diagnostic, Level, Span, TokenStream};
 ///
 /// # Repr
 /// A newtype's is its field's, a fieldless enum's the integer its `#[repr]` names, or C's `int`
-/// under `#[repr(C)]`, which must hold each discriminant, and a pointer word's or a pointer
-/// enum's its pointer's, which `repr = u64` or `usize` alone may state; any other is the narrowest
-/// unsigned integer that holds the layout. No repr is wider than 128 bits, or 64 on
-/// `x86_64` without `cmpxchg16b`: a value that needs more is refused.
+/// under `#[repr(C)]`, which must hold each discriminant, a pointer enum's its pointer's, which
+/// `repr = u64` or `usize` alone may state, and a pointer word's its pointer's, or a `DoubleWord`
+/// of two words; any other is the narrowest unsigned integer that holds the layout. Of a pointer
+/// word, `repr = u64` or `usize` states one word, and refuses tags its pointee's alignment cannot
+/// hold; `repr = u128` or `i128` states two, its tags in an integer word beside one pointer, even
+/// where they would fit its low bits. No repr is wider than 128 bits, or 64 on `x86_64` without
+/// `cmpxchg16b`: a value that needs more is refused.
 ///
 /// `#[atom(repr = u64)]` states the repr, any integer primitive, so the build refuses a type that
 /// outgrows it: a newtype's field must have it, a fieldless enum's `#[repr]`, where it has one,
@@ -90,10 +103,10 @@ use proc_macro::{Diagnostic, Level, Span, TokenStream};
 ///   promise of zero. With parameters, a packed struct is `ZeroValid` where each field's zero
 ///   decodes, an enum with fields where it states its discriminants and a unit variant's is 0,
 ///   stated or implied; else `Partial`.
-/// - A pointer word is what its fields promise, its pointer among them, and a pointer enum what the
-///   variant its zero repr holds promises of zero; with parameters, a pointer word is `ZeroValid`
-///   where each field's zero decodes, and a pointer enum where its first variant is a unit and none
-///   states a discriminant; else `Partial`.
+/// - A pointer word is what its fields promise, its pointers among them, and a pointer enum what
+///   the variant its zero repr holds promises of zero; with parameters, a pointer word is
+///   `ZeroValid` where each field's zero decodes, and a pointer enum where its first variant is a
+///   unit and none states a discriminant; else `Partial`.
 ///
 /// # Generic Types
 /// A crate enables `#![feature(const_trait_impl)]` where the impl converts a field that names one
@@ -105,8 +118,9 @@ use proc_macro::{Diagnostic, Level, Span, TokenStream};
 ///
 /// A newtype takes its field's layout in each instance; a packed struct or an enum with fields that
 /// has parameters states its repr, which each instance is checked against as it is built, but a
-/// pointer word or a pointer enum, whose repr is its pointer's, need not state one. A fieldless
-/// enum takes no parameters.
+/// pointer word or a pointer enum, whose repr is its pointer's, need not state one: a pointer word
+/// of one pointer is one word in each instance, unless it states `repr = u128`. A fieldless enum
+/// takes no parameters.
 ///
 /// # Threads
 /// An `Atomic` may cross threads, so the type must be `Send` and `Sync`: checked beside the impl,
@@ -362,6 +376,47 @@ use proc_macro::{Diagnostic, Level, Span, TokenStream};
 /// assert!(!guarded.fields().link.fields().deleted.test_and_set(AcqRel), "this thread deleted it");
 /// assert_eq!(guarded.fields().link.load(Acquire), deleted, "the link, read through the word");
 /// assert_eq!(guarded.load(Acquire).to_repr().addr(), next.as_ptr().addr() | 0b11, "both tags");
+/// ```
+///
+/// ## Tagging Pointers in Two Words
+/// ```
+/// # extern crate atomiks_core as atomiks;
+/// # use atomiks_derive::Atom;
+/// use core::ptr::NonNull;
+///
+/// use atomiks::Atom;
+///
+/// /// A node of a graph, aligned to 8, so a pointer to one leaves three low bits clear.
+/// #[repr(align(8))]
+/// struct Node {
+///     value: u64,
+/// }
+///
+/// /// An edge of a graph, and whether it is deleted: two pointers, so two words, the mark in the
+/// /// first one's bit 0.
+/// #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+/// struct Edge {
+///     source: NonNull<Node>,
+///     target: NonNull<Node>,
+///     deleted: bool,
+/// }
+///
+/// /// A link and how many readers hold it: 16 bits, more than a node's alignment leaves clear, so
+/// /// the link states two words, and the count takes a word of its own.
+/// #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+/// #[atom(repr = u128)]
+/// struct Link {
+///     next: Option<NonNull<Node>>,
+///     readers: u16,
+/// }
+///
+/// let nodes = [Node { value: 1 }, Node { value: 2 }];
+/// let (source, target) = (NonNull::from(&nodes[0]), NonNull::from(&nodes[1]));
+/// let repr = Edge { source, target, deleted: true }.to_repr();
+/// assert_eq!(repr.first.addr(), source.as_ptr().addr() | 1, "the mark in the first pointer");
+/// assert_eq!(repr.second, target.as_ptr(), "and the second as it is");
+/// let repr = Link { next: Some(source), readers: 3 }.to_repr();
+/// assert_eq!((repr.first, repr.second), (source.as_ptr(), 3), "the count beside the pointer");
 /// ```
 ///
 /// ## Storing a Pointer Enum

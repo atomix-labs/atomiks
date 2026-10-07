@@ -20,7 +20,7 @@ use core::sync::atomic::Ordering as CoreOrdering;
 use zerocopy::{FromBytes, IntoBytes, KnownLayout};
 
 #[cfg(not(loom))]
-use super::{CellAccess, CompareExchange};
+use super::{CellAccess, CompareExchange, RawAccess};
 use super::{ExactBits, Primitive};
 #[cfg(all(wide_load_store, not(loom)))]
 use super::{Load, Store};
@@ -115,7 +115,7 @@ impl Wide {
     }
 }
 
-/// Implements the cell traits for a 128-bit integer over `Wide`.
+/// Implements the cell traits and `RawAccess` for a 128-bit integer over `Wide`.
 ///
 /// `$to` converts the integer to its `u128`, `$from` converts back, and `$place` lends its place.
 #[cfg(not(loom))]
@@ -139,6 +139,8 @@ macro_rules! cells {
             fn set(cell: &mut Wide, value: Self) {
                 *cell.get_mut() = $to(value);
             }
+        }
+        const impl RawAccess for $int {
             #[inline]
             fn get_mut(cell: &mut Wide) -> &mut Self {
                 $place(cell.get_mut())
@@ -280,16 +282,24 @@ mod x86_64 {
     use super::Wide;
 
     impl Wide {
-        /// A compare-exchange on the bits.
+        /// The bits a compare-exchange found, whether or not it wrote `new`.
         #[expect(unsafe_code, reason = "`cmpxchg16b` on the cell's own 16-byte-aligned bits")]
+        #[inline]
+        fn exchange(
+            &self, current: u128, new: u128, success: CoreOrdering, failure: CoreOrdering,
+        ) -> u128 {
+            // SAFETY: `bits` is valid and aligned to 16 for the cell's life, every shared access
+            // is atomic (the field INVARIANT), and the target has `cmpxchg16b`, which the gate on
+            // `mod wide` in `primitive/mod.rs` requires.
+            unsafe { cmpxchg16b(self.bits.get(), current, new, success, failure) }
+        }
+
+        /// A compare-exchange on the bits.
         #[inline]
         pub(super) fn compare_exchange(
             &self, current: u128, new: u128, success: CoreOrdering, failure: CoreOrdering,
         ) -> Result<u128, u128> {
-            // SAFETY: `bits` is valid and aligned to 16 for the cell's life, every shared access
-            // is atomic (the field INVARIANT), and the target has `cmpxchg16b`, which the gate on
-            // `mod wide` in `primitive/mod.rs` requires.
-            let previous = unsafe { cmpxchg16b(self.bits.get(), current, new, success, failure) };
+            let previous = self.exchange(current, new, success, failure);
             if previous == current { Ok(previous) } else { Err(previous) }
         }
 
@@ -301,15 +311,14 @@ mod x86_64 {
             self.compare_exchange(current, new, success, failure)
         }
 
-        /// An update loop's first read: the AVX load, else a compare-exchange of zero for zero.
+        /// An update loop's first read: the AVX load, else a compare-exchange of zero for zero,
+        /// whose found bits it returns as they are, so no `Result` asks for a `cmov` to join them.
         #[inline]
         pub(super) fn read_for_rmw(&self, order: CoreOrdering) -> u128 {
             #[cfg(target_feature = "avx")]
             return self.load(order);
             #[cfg(not(target_feature = "avx"))]
-            match self.compare_exchange(0, 0, order, order) {
-                Ok(value) | Err(value) => value,
-            }
+            self.exchange(0, 0, order, order)
         }
 
         /// The AVX 16-byte load.
@@ -383,7 +392,7 @@ mod modelled {
 
     use loom::sync::atomic::AtomicUsize;
 
-    use crate::primitive::{CellAccess, CompareExchange};
+    use crate::primitive::{CellAccess, CompareExchange, RawAccess};
     #[cfg(wide_load_store)]
     use crate::primitive::{Load, Store};
 
@@ -413,7 +422,7 @@ mod modelled {
         index: AtomicUsize,
     }
 
-    /// Implements the cell traits for one 128-bit integer over the modelled cell.
+    /// Implements the cell traits and `RawAccess` for one 128-bit integer over the modelled cell.
     ///
     /// `$to` converts the integer to the table's `u128`, and `$from` converts back.
     macro_rules! cells {
@@ -438,6 +447,7 @@ mod modelled {
                     cell.index.with_mut(|place| *place = index);
                 }
             }
+            impl RawAccess for $int {}
             impl CompareExchange for $int {
                 #[inline]
                 fn read_for_rmw(cell: &Wide, order: CoreOrdering) -> Self {

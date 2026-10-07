@@ -1,5 +1,5 @@
-//! A pointer word is stored as its pointer, one word: a repr of fewer bits names no pointer's
-//! width, and is refused at the repr.
+//! A pointer word is stored in one word or two: a repr of fewer bits than a word names neither,
+//! and is refused at the repr.
 
 use core::ptr::NonNull;
 

@@ -1,4 +1,4 @@
-//! Typed atomics for any value that fits one atomic word.
+//! Typed atomics for any value that fits one atomic, and the locks built on them.
 //!
 //! [`Atomic<T>`](Atomic) holds a `T` as its [`Repr`](Atom::Repr), one primitive an atomic
 //! instruction reads and writes, and decodes it on the way out. The integer, `bool` and pointer
@@ -17,17 +17,23 @@
 //! - **Values.** [`Atom`] encodes a value as its repr and back, its [`ReprRange`] says which reprs
 //!   it takes and its [`validity`] which decode, and [`PtrAtom`] is a value stored as a pointer;
 //!   [`AtomAdd`], [`AtomOrd`] and [`AtomBitwise`] add the read-modify-writes that mean something
-//!   for it, and [`FieldBitwise`] and [`FieldAdd`] those of a field of it. With the `derive`
-//!   feature, each derives: `Atom` for a struct or an enum, a pointer word or a pointer enum among
-//!   them, which keeps small fields as tags in its pointer's low bits and the pointer's provenance,
-//!   and each capability for a newtype whose field has it. [`RangedU64<MIN, MAX>`](RangedU64) and
-//!   its siblings, `RangedU8` to `RangedIsize`, hold an integer from `MIN` to `MAX`, and
-//!   [`RangeError`] and [`ParseRangeError`] say why one refused an integer or a text.
+//!   for it, and [`FieldBitwise`] and [`FieldAdd`] those of a field of it. Two words hold a pair
+//!   `(P, Q)` of values stored as pointers, and a pointer to a slice, a `str` or a trait object.
+//!   With the `derive` feature, each derives: `Atom` for a struct or an enum, a pointer word or a
+//!   pointer enum among them, which keeps small fields as tags in its pointer's low bits and the
+//!   pointer's provenance, and each capability for a newtype whose field has it. A pointer word
+//!   takes two words where a second pointer, a wide one or tags no alignment holds need them.
+//!   [`RangedU64<MIN, MAX>`](RangedU64) and its siblings, `RangedU8` to `RangedIsize`, hold an
+//!   integer from `MIN` to `MAX`, and [`RangeError`] and [`ParseRangeError`] say why one refused an
+//!   integer or a text.
 //! - **Orderings.** The [`ordering`] types, each accepted only where it means something, and the
 //!   [`fence`](fn@fence) and [`compiler_fence`] they order.
-//! - **Primitives.** [`Primitive`], [`ExactBits`] where the bits are the whole value, and what the
-//!   target runs without a loop: [`Load`], [`Store`], [`Swap`], [`FetchBitwise`], [`MinMax`], and,
-//!   for a field's container, [`FetchAdd`], [`MaskBitwise`], [`BitTest`].
+//! - **Primitives.** [`Primitive`], [`ExactBits`] where the bits are the whole value, a
+//!   [`DoubleWord`], two words in one 16-byte atomic, and what the target runs without a loop:
+//!   [`Load`], [`Store`], [`Swap`], [`FetchBitwise`], [`MinMax`], and, for a field's container,
+//!   [`FetchAdd`], [`MaskBitwise`], [`BitTest`]; [`ReadByExchange`], which
+//!   [`load_rmw`](Atomic::load_rmw) needs; and [`RawAccess`], a primitive whose cell lends its
+//!   place, which every primitive but a double word is.
 //! - **Building blocks.** The loom-shaped [`cell`], the spin [`hint`], and `model` under loom.
 //!
 //! # Examples
@@ -155,6 +161,57 @@
 //! # }
 //! ```
 //!
+//! ## Holding Two Words in One Atomic
+//! ```
+//! # #[cfg(feature = "derive")] {
+//! use core::ptr::NonNull;
+//!
+//! use atomiks::ordering::{AcqRel, Acquire, Relaxed, Release};
+//! use atomiks::{Atom, Atomic};
+//!
+//! /// A node of a stack, which holds the node below it.
+//! struct Node {
+//!     value: u64,
+//!     next: Atomic<Option<NonNull<Node>>>,
+//! }
+//!
+//! /// A node that lives as long as the program, so the statics below may hold its pointer.
+//! static NODE: Node = Node { value: 7, next: Atomic::new(None) };
+//!
+//! /// A Treiber stack's head: the top node, and a version that counts the head's changes, so a top
+//! /// popped and pushed again is told from the one read. No alignment leaves its 64 bits clear in
+//! /// the pointer, so it takes a word of its own.
+//! #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+//! struct Head {
+//!     top: Option<NonNull<Node>>,
+//!     version: u64,
+//! }
+//!
+//! static HEAD: Atomic<Head> = Atomic::new(Head { top: None, version: 0 });
+//! /// The last message a feed received, as the bytes it arrived in: their pointer and their length.
+//! static LAST_MESSAGE: Atomic<Option<NonNull<[u8]>>> = Atomic::new(None);
+//! /// A message that lives as long as the program.
+//! static MESSAGE: [u8; 4] = *b"fill";
+//!
+//! let top = NonNull::from_ref(&NODE);
+//! let push = |head: Head| {
+//!     NODE.next.store(head.top, Relaxed);
+//!     Head { top: Some(top), version: head.version.wrapping_add(1) }
+//! };
+//! assert_eq!(HEAD.update(AcqRel, Acquire, push).top, None, "pushed onto the empty stack");
+//! // The pop changes both words in one `lock cmpxchg16b`, or `caspal`.
+//! let pushed = Head { top: Some(top), version: 1 };
+//! let popped = Head { top: NODE.next.load(Relaxed), version: 2 };
+//! assert_eq!(HEAD.compare_exchange(pushed, popped, AcqRel, Acquire), Ok(pushed), "popped");
+//! assert_eq!(size_of_val(&HEAD), 16, "the top and its version in two words");
+//!
+//! // `store_rmw` and `load_rmw` run on every target, with compare-exchanges: `store` and `load`
+//! // need LSE2 or AVX.
+//! LAST_MESSAGE.store_rmw(Some(NonNull::from_ref(&MESSAGE[..])), Release);
+//! assert_eq!(LAST_MESSAGE.load_rmw(Acquire).map(NonNull::len), Some(4), "its length, beside its pointer");
+//! # }
+//! ```
+//!
 //! ## Handing Out Ids
 //! ```
 //! use core::num::NonZero;
@@ -265,6 +322,27 @@
 //! merges arms that read through pointers of several tags, one mask takes the tags off. A constant
 //! reads no pointer's address but null's, so it decodes only null, and tags only a null pointer.
 //!
+//! Two words are one 16-byte atomic, with `u128`'s operations: a compare-exchange is
+//! `lock cmpxchg16b`, or `caspal`; [`load`](Atomic::load) and [`store`](Atomic::store) are AVX's
+//! `vmovdqa`, or LSE2's `ldp` and `stp`, and where [Platforms](#platforms) shows neither,
+//! [`load_rmw`](Atomic::load_rmw) reads with a compare-exchange and
+//! [`store_rmw`](Atomic::store_rmw) writes with a loop of them; and no target swaps 16 bytes in one
+//! instruction, so there is no `swap`. A field of a two-word value has its loads and its loops
+//! alone, as no target has a 16-byte bitwise instruction.
+//!
+//! No Rust operation keeps a provenance through a 16-byte atomic ([UCG #517][ucg-517]), so a
+//! [`DoubleWord`] exposes each pointer it stores, and each pointer it loads takes back an exposed
+//! provenance, which costs no instruction. It is the one place atomiks exposes a provenance, chosen
+//! per type by declaring one of two words: a pointer word or a pointer enum in one word keeps its
+//! pointer's strictly. [`DoubleWord`]'s page says what that means for a `static`, for an atomic's
+//! place and under Miri. A trait object's compare-exchange compares its vtable pointer beside its
+//! data pointer, and one type may have several vtables, so it takes `current` from a load or a
+//! failed exchange, as [`update`](Atomic::update) does, never from a pointer coerced afresh.
+//!
+//! A structure whose nodes share one arena keeps strict provenance in an integer word: it holds a
+//! node's offset from the arena's base, beside a version where both fit, and rebuilds the node's
+//! pointer from the base with `add` or `with_addr`, which keep the base's provenance.
+//!
 //! # Platforms
 //!
 //! atomiks builds for Linux and macOS, on `aarch64` and `x86_64`. What a target's default CPU
@@ -320,7 +398,14 @@
 //!
 //! atomiks holds `atomiks-derive`, which `derive` adds, at its own version whether the feature is
 //! on or not, so the code a derive writes always calls the hidden items it was written against.
+//!
+//! [ucg-517]: https://github.com/rust-lang/unsafe-code-guidelines/issues/517
 
+// Where no atomic holds two words, no `DoubleWord` exists: its links lead to where one does.
+#![cfg_attr(
+    not(any(target_arch = "aarch64", all(target_arch = "x86_64", target_feature = "cmpxchg16b"))),
+    doc = "[`DoubleWord`]: #platforms"
+)]
 #![no_std]
 #![feature(doc_cfg)]
 // No badge names `loom` or atomiks-core's alias `wide`: a loom build is a model of this one, not a
@@ -338,14 +423,14 @@ pub use atomiks_core::{
     AtomicUsize, BitTest, ExactBits, FetchAdd, FetchBitwise, Field, FieldAdd, FieldBitwise,
     FieldPath, Join, Load, MaskBitwise, MinMax, ParseRangeError, Primitive, ProjectFields, PtrAtom,
     RangeError, RangedI8, RangedI16, RangedI32, RangedI64, RangedI128, RangedIsize, RangedU8,
-    RangedU16, RangedU32, RangedU64, RangedU128, RangedUsize, ReprRange, Store, Swap, Then,
-    TopField, Whole, compiler_fence, fence,
+    RangedU16, RangedU32, RangedU64, RangedU128, RangedUsize, RawAccess, ReadByExchange, ReprRange,
+    Store, Swap, Then, TopField, Whole, compiler_fence, fence,
 };
 #[cfg(any(
     target_arch = "aarch64",
     all(target_arch = "x86_64", target_feature = "cmpxchg16b")
 ))]
-pub use atomiks_core::{AtomicI128, AtomicU128};
+pub use atomiks_core::{AtomicI128, AtomicU128, DoubleWord, VtablePointer};
 #[doc(inline)]
 pub use atomiks_core::{cell, hint, ordering, validity};
 #[cfg(feature = "derive")]

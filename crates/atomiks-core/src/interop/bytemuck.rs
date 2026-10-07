@@ -15,19 +15,27 @@ use bytemuck::{CheckedBitPattern, Contiguous, NoUninit};
 use crate::atom::Atom;
 #[cfg(not(loom))]
 use crate::atomic::Atomic;
+#[cfg(not(loom))]
+use crate::primitive::RawAccess;
 use crate::ranged::{self, each_ranged_integer};
 #[cfg(not(loom))]
 use crate::validity::{Validity, ZeroValid};
 
 /// All zeros, where the zero repr decodes: `0`, `false`, `'\0'`, a null pointer, or the `None` of
-/// a `NonZero` or a `NonNull`.
+/// a `NonZero` or a `NonNull`; and where the cell holds the repr as its own type lays it out, as
+/// [`RawAccess`] says, which two words' cell, of their pointers' addresses, does not.
 ///
 /// Not under loom, whose cells are not plain memory.
 // SAFETY: all-zero bytes are a cell holding the zero repr, since core's cells, `Opaque` over one,
 // and `Wide` each hold their bits as plain memory, and the marker has no bytes. That repr decodes,
 // as `ZeroValid` says, so the field INVARIANT holds.
 #[cfg(not(loom))]
-unsafe impl<T: Atom> Zeroable for Atomic<T> where T::Validity: Validity<ZeroValidity = ZeroValid> {}
+unsafe impl<T: Atom> Zeroable for Atomic<T>
+where
+    T::Validity: Validity<ZeroValidity = ZeroValid>,
+    T::Repr: RawAccess,
+{
+}
 
 /// Implements `NoUninit`, `CheckedBitPattern` and `Contiguous` for a ranged integer, `$name`, over
 /// `$int`.

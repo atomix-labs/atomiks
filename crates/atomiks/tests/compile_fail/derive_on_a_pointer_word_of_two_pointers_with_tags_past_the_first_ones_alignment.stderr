@@ -1,0 +1,9 @@
+error[E0080]: evaluation panicked: `$CRATE::Pair`: tag fields `marked`, `sealed` need 2 low bits, but `u16` is 2-byte aligned (1 free bit): shrink the tags, or raise the pointee's alignment with `#[repr(align(4))]`
+  --> tests/compile_fail/derive_on_a_pointer_word_of_two_pointers_with_tags_past_the_first_ones_alignment.rs:10:8
+   |
+ 9 | #[derive(Clone, Copy, Atom)]
+   |                       ---- in this derive macro expansion
+10 | struct Pair {
+   |        ^^^^ evaluation of `_::_` failed here
+   |
+   = note: this error originates in the derive macro `Atom` (in Nightly builds, run with -Z macro-backtrace for more info)

@@ -1,12 +1,7 @@
-error: `repr = u32` names no repr of a pointer word, which is its pointer's, one word
-  --> tests/compile_fail/derive_on_a_pointer_word_stating_a_repr_narrower_than_a_word.rs:9:15
-   |
- 9 | #[atom(repr = u32)]
-   |               ^^^
-   |
-note: its repr is this pointer's
-  --> tests/compile_fail/derive_on_a_pointer_word_stating_a_repr_narrower_than_a_word.rs:11:11
-   |
-11 |     next: NonNull<u64>,
-   |           ^^^^^^^^^^^^
-   = help: state `repr = u64` or `usize`, the one word it is, or leave it out
+error: `repr = u32` names no repr of a pointer word, which is one word or two
+ --> tests/compile_fail/derive_on_a_pointer_word_stating_a_repr_narrower_than_a_word.rs:9:15
+  |
+9 | #[atom(repr = u32)]
+  |               ^^^
+  |
+  = help: state `repr = u64` or `usize` for one word, `u128` for two, or leave it out

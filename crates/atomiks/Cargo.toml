@@ -1,6 +1,6 @@
 [package]
 name                   = "atomiks"
-description            = "typed atomics for any value that fits one atomic word."
+description            = "typed atomics for any value that fits one atomic, and the locks built on them."
 version.workspace      = true
 edition.workspace      = true
 rust-version.workspace = true

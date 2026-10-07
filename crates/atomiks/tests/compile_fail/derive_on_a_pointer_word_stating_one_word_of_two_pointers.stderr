@@ -1,0 +1,17 @@
+error: `repr = u64` states one word, and its pointers take two
+  --> tests/compile_fail/derive_on_a_pointer_word_stating_one_word_of_two_pointers.rs:8:15
+   |
+ 8 | #[atom(repr = u64)]
+   |               ^^^
+   |
+note: this pointer takes a word
+  --> tests/compile_fail/derive_on_a_pointer_word_stating_one_word_of_two_pointers.rs:10:12
+   |
+10 |     first: NonNull<u64>,
+   |            ^^^^^^^^^^^^
+note: this pointer takes a word
+  --> tests/compile_fail/derive_on_a_pointer_word_stating_one_word_of_two_pointers.rs:11:13
+   |
+11 |     second: NonNull<u64>,
+   |             ^^^^^^^^^^^^
+   = help: state `repr = u128`, the two words it is, or leave it out

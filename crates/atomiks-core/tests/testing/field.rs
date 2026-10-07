@@ -4,7 +4,7 @@
 use core::fmt::Debug;
 
 use atomiks_core::ordering::Relaxed;
-use atomiks_core::{Atom, Atomic, FieldPath, Load};
+use atomiks_core::{Atom, Atomic, FieldPath, Load, RawAccess};
 
 /// The offset and width of the field at the path `P`.
 pub(crate) const fn bits<P: FieldPath>() -> (u32, u32) {
@@ -15,7 +15,7 @@ pub(crate) const fn bits<P: FieldPath>() -> (u32, u32) {
 /// canonical.
 pub(crate) fn canonical<T: Atom + Debug + PartialEq>(atomic: &Atomic<T>) -> T
 where
-    T::Repr: Atom<Repr = T::Repr> + Load,
+    T::Repr: Atom<Repr = T::Repr> + Load + RawAccess,
 {
     // SAFETY: `as_ptr` points to the atomic's repr, aligned and live for the borrow; every access
     // to it is atomic and of its width, as this load is; and every repr of an integer, a `bool` or

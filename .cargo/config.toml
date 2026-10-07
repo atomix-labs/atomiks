@@ -1,21 +1,24 @@
 # CPU floors: a build runs on every machine that meets them, and a cache CI runners share never holds
-# an instruction another runner lacks. A build tuned to this machine sets
-# RUSTFLAGS="-C target-cpu=native", which replaces them.
+# an instruction another runner lacks. rustdoc takes the same floor, so a doctest builds as the crate
+# does. A build tuned to this machine sets RUSTFLAGS="-C target-cpu=native", which replaces them.
 
 # x86-64-v3 (Haswell, Excavator and newer): AVX2, BMI, and AVX, which makes an aligned 16-byte
 # load or store atomic: a 128-bit atomic load or store is one `vmovdqa`.
 [target.'cfg(target_arch = "x86_64")']
-rustflags = ["-C", "target-cpu=x86-64-v3"]
+rustflags    = ["-C", "target-cpu=x86-64-v3"]
+rustdocflags = ["-C", "target-cpu=x86-64-v3"]
 
 # Armv8.1 (Graviton 2, Cortex-A55 and A76 and newer; not Graviton 1 or a Raspberry Pi 4): CRC32,
 # and LSE's one-instruction read-modify-writes in place of an outline call or an LL/SC loop. LSE2's
 # 16-byte `ldp`/`stp` needs Armv8.4, which Graviton 2 lacks.
 [target.'cfg(all(target_arch = "aarch64", not(target_vendor = "apple")))']
-rustflags = ["-C", "target-feature=+crc,+lse"]
+rustflags    = ["-C", "target-feature=+crc,+lse"]
+rustdocflags = ["-C", "target-feature=+crc,+lse"]
 
 # The first Apple silicon.
 [target.'cfg(all(target_arch = "aarch64", target_vendor = "apple"))']
-rustflags = ["-C", "target-cpu=apple-m1"]
+rustflags    = ["-C", "target-cpu=apple-m1"]
+rustdocflags = ["-C", "target-cpu=apple-m1"]
 
 [future-incompat-report]
 frequency = "always"

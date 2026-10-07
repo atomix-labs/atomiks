@@ -1,4 +1,4 @@
-error[E0080]: evaluation panicked: `$CRATE::Union<core::ptr::non_null::NonNull<u8>, core::ptr::non_null::NonNull<…`: `Union::Left`'s tag and tag fields need 1 low bit, but `u8` is 1-byte aligned (0 free bits): shrink the tags, or raise the pointee's alignment with `#[repr(align(2))]`
+error[E0080]: evaluation panicked: `$CRATE::Union<core::ptr::non_null::NonNull<u8>, core::ptr::non_null::NonNull<u8>>`: `Union::Left`'s tag and tag fields need 1 low bit, but `u8` is 1-byte aligned (0 free bits): shrink the tags, or raise the pointee's alignment with `#[repr(align(2))]`
   --> tests/compile_fail/derive_on_a_pointer_enum_generic_instance_with_a_tag_past_its_pointees_alignment.rs:11:23
    |
 11 | #[derive(Clone, Copy, Atom)]

@@ -1,4 +1,4 @@
-error[E0080]: evaluation panicked: `$CRATE::Link`: tag field `tag` needs 8 low bits, but `$CRATE::Node` is 8-byte aligned (3 free bits): shrink the tags, or raise the pointee's alignment with `#[repr(align(256))]`
+error[E0080]: evaluation panicked: `$CRATE::Link`: tag field `tag` needs 8 low bits, but `$CRATE::Node` is 8-byte aligned (3 free bits): shrink the tags, raise the pointee's alignment with `#[repr(align(256))]`, or state `#[atom(repr = u128)]` for a word of their own
   --> tests/compile_fail/derive_on_a_pointer_word_in_its_own_pointee_with_tags_past_its_alignment.rs:14:8
    |
 13 | #[derive(Clone, Copy, Atom)]

@@ -3,7 +3,7 @@
 
 <h1 align="center">atomiks</h1>
 
-<p align="center">Typed atomics for any value that fits one atomic word, and the locks built on them.</p>
+<p align="center">Typed atomics for any value that fits one atomic, and the locks built on them.</p>
 
 <p align="center">
   <a href="https://github.com/atomix-labs/atomiks/actions/workflows/check.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/atomix-labs/atomiks/check.yml?branch=main&amp;style=flat-square&amp;label=check"></a>
@@ -15,21 +15,24 @@
 <!-- <<< devset: project <<< -->
 
 atomiks is a workspace of Rust crates for sharing state between threads. The
-`atomiks` crate gives any value that fits one atomic word a typed atomic:
-integers, plain or held to a range, `NonZero`s, `char`s, floats, pointers,
-`Option`s that spend a spare bit pattern on `None`, and the structs and enums
-`#[derive(Atom)]` packs into one word, with orderings checked at compile time
-and every operation the instruction its name promises. One instruction on the
-whole word changes one field of a packed struct alone:
-`QUOTE.fields().live.set(Release)` is a `lock or`, or an `ldset`. A pointer
-keeps small fields as tags in the low bits its pointee's alignment leaves clear,
-and keeps its provenance: `HEAD.fields().closed.test_and_set(AcqRel)` closes a
-Treiber stack's head with a `lock bts`, or an `ldsetal`. It works with serde,
-zerocopy, bytemuck, arbitrary, arbitrary-int and deranged, each behind a
-feature. `atomiks-core` holds the typed atomic, `atomiks-derive` the derive, and
-`atomiks` re-exports both, the derive under its `derive` feature; all build for
-Linux and macOS, on aarch64 and x86_64. atomiks is in early development, and no
-crate is released yet.
+`atomiks` crate gives any value that fits one atomic a typed atomic: integers,
+plain or held to a range, `NonZero`s, `char`s, floats, pointers, `Option`s that
+spend a spare bit pattern on `None`, and the structs and enums `#[derive(Atom)]`
+packs into one atomic, with orderings checked at compile time and every
+operation the instruction its name promises. One instruction on the whole word
+changes one field of a packed struct alone: `QUOTE.fields().live.set(Release)`
+is a `lock or`, or an `ldset`. A pointer keeps small fields as tags in the low
+bits its pointee's alignment leaves clear, and keeps its provenance:
+`HEAD.fields().closed.test_and_set(AcqRel)` closes a Treiber stack's head with a
+`lock bts`, or an `ldsetal`. Two pointers, or one beside a counter or a slice's
+length, share a 16-byte atomic, which exposes each pointer's provenance:
+`HEAD.compare_exchange(pushed, popped, AcqRel, Acquire)` pops a Treiber stack's
+head, a top node beside a `u64` version, with a `lock cmpxchg16b`, or a
+`caspal`. It works with serde, zerocopy, bytemuck, arbitrary, arbitrary-int and
+deranged, each behind a feature. `atomiks-core` holds the typed atomic,
+`atomiks-derive` the derive, and `atomiks` re-exports both, the derive under its
+`derive` feature; all build for Linux and macOS, on aarch64 and x86_64. atomiks
+is in early development, and no crate is released yet.
 
 ## Documentation
 

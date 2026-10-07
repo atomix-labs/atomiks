@@ -7,7 +7,7 @@ use core::any::type_name;
 use core::ptr;
 
 use super::layout::{FieldLayout, PackedLayout};
-use super::pointer_word::{PointeeAlignment, Tags, assert_low_bits};
+use super::pointer_word::{PointeeAlignment, SecondWord, Tags, assert_low_bits};
 use super::{bit_length, mask};
 use crate::atom::Atom;
 use crate::message::{Message, refuse};
@@ -344,7 +344,7 @@ impl PointerEnumLayout {
     pub const fn assert_tags_fit<T: ?Sized, F: Atom>(self, variant: &str) {
         let required = self.end().saturating_sub(F::TAG_WIDTH);
         let what = Message::new().text(variant).text("'s tag and tag fields need");
-        assert_low_bits::<T, F>(required, what.as_str());
+        assert_low_bits::<T, F>(required, what.as_str(), SecondWord::RuledOut);
     }
 
     /// Refuses the build of `T`, the enum, where a data variant's fields, laid out in `fields`,

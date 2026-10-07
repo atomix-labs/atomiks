@@ -22,9 +22,11 @@ check-loom:
 
 # macOS's aarch64 floor has LSE2, which Linux's lacks. x86_64's floor has AVX; x86-64-v2 has
 # `cmpxchg16b` but no AVX; x86-64 has neither, so no 128-bit atomics. The last two go through
-# `RUSTFLAGS`, which replaces the floor.
+# `RUSTFLAGS`, which replaces the floor. docs.rs builds the docs at x86-64, where an item of 128 bits
+# or two words does not exist, so they build there too, each link resolving.
 
-# Lints every crate for aarch64 and x86_64 on Linux and macOS, and x86_64 with x86-64-v2 and x86-64.
+# Lints every crate for aarch64 and x86_64 on Linux and macOS, and x86_64 with x86-64-v2 and x86-64;
+# builds the docs for x86-64.
 [metadata("rust")]
 check-targets:
     cargo clippy --workspace --all-targets --all-features --target aarch64-unknown-linux-gnu -- -D warnings
@@ -33,6 +35,7 @@ check-targets:
     cargo clippy --workspace --all-targets --all-features --target x86_64-apple-darwin -- -D warnings
     RUSTFLAGS='-C target-cpu=x86-64-v2' cargo clippy --workspace --all-targets --all-features --target x86_64-unknown-linux-gnu --target-dir target/x86-64-v2 -- -D warnings
     RUSTFLAGS='-C target-cpu=x86-64' cargo clippy --workspace --all-targets --all-features --target x86_64-unknown-linux-gnu --target-dir target/x86-64 -- -D warnings
+    RUSTFLAGS='-C target-cpu=x86-64' RUSTDOCFLAGS='-D warnings' cargo doc --workspace --all-features --no-deps --document-private-items --target x86_64-unknown-linux-gnu --target-dir target/x86-64
 
 # Checks the codegen fixtures' formatting, which `cargo fmt --all` misses: each is its own workspace.
 [metadata("rust")]

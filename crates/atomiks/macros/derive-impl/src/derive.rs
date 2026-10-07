@@ -1024,7 +1024,7 @@ mod tests {
         clippy::too_many_lines,
         reason = "the whole expansion it pins, written out, is that long"
     )]
-    fn a_pointer_word_packs_its_tags_above_its_pointers_own_and_projects_each_field() {
+    fn a_pointer_word_packs_its_tags_where_their_width_puts_them_and_projects_each_field() {
         let expected = quote! {
             const _: () = ::atomiks::__private::assert_send_and_sync::<bool>();
             const _: () = {
@@ -1042,7 +1042,9 @@ mod tests {
                 unsafe impl ::atomiks::__private::HasPackedField<1, bool> for Link {
                     const PLACEMENT: ::atomiks::__private::PackedField = placement_0;
                     const LAYOUT: ::atomiks::__private::PackedLayout = layout.packed_layout();
-                    type Reach = ::atomiks::__private::Reach<false>;
+                    type Reach = ::atomiks::__private::Reach<{
+                        ::atomiks::__private::reaches_top::<Repr>(placement_0)
+                    }>;
                     #[inline]
                     fn field(self) -> bool {
                         self.deleted
@@ -1080,20 +1082,30 @@ mod tests {
                             .finish()
                     }
                 }
+                const word_count: ::core::primitive::u32 = ::atomiks::__private::PointerWordLayout::word_count(
+                    <NonNull<Node> as ::atomiks::Atom>::TAG_WIDTH,
+                    &[::atomiks::__private::PackedField::new(<bool as ::atomiks::Atom>::REPRS, 0)]
+                );
                 const placement_0: ::atomiks::__private::PackedField = ::atomiks::__private::PackedField::new(
                     <bool as ::atomiks::Atom>::REPRS,
-                    <NonNull<Node> as ::atomiks::Atom>::TAG_WIDTH
+                    ::atomiks::__private::PointerWordLayout::tag_fields_offset(
+                        word_count,
+                        <NonNull<Node> as ::atomiks::Atom>::TAG_WIDTH
+                    )
                 );
                 const layout: ::atomiks::__private::PointerWordLayout =
-                    ::atomiks::__private::PointerWordLayout::new(
+                    ::atomiks::__private::PointerWordLayout::in_words(
+                        word_count,
                         <NonNull<Node> as ::atomiks::Atom>::TAG_WIDTH,
-                        ::atomiks::__private::PackedLayout::new(&[placement_0]),
+                        ::atomiks::__private::PackedLayout::new(&[placement_0])
                     );
                 const alignment: ::atomiks::__private::PointeeAlignment =
                     ::atomiks::__private::PointeeAlignment::least(&[
                         <NonNull<Node> as ::atomiks::Atom>::POINTEE_ALIGNMENT
                     ]);
-                type Repr = <NonNull<Node> as ::atomiks::Atom>::Repr;
+                type Repr = <::atomiks::__private::Words<{ word_count }> as ::atomiks::__private::SelectPointerWordRepr<
+                    <NonNull<Node> as ::atomiks::Atom>::Repr
+                >>::Repr;
                 const _: () = ::atomiks::__private::assert_pointer::<NonNull<Node> >();
                 const _: () = layout.assert_tags_fit::<Link, NonNull<Node> >("tag field `deleted` needs");
                 #[automatically_derived]
@@ -1107,7 +1119,7 @@ mod tests {
                                     layout.pointer_layout()
                                 )
                                 .code(
-                                    <Repr as ::atomiks::Primitive>::BITS,
+                                    layout.width::<Repr>(),
                                     <Repr as ::atomiks::Primitive>::BITS
                                 )
                         }
@@ -1129,17 +1141,19 @@ mod tests {
                     fn to_tagged_repr(
                         self, tags: ::atomiks::__private::Tags
                     ) -> (Repr, ::core::primitive::usize) {
-                        ::atomiks::__private::to_tagged_repr::<NonNull<Node> >(
+                        let bits = placement_0.pack(::atomiks::__private::to_bits::<bool>(self.deleted));
+                        let (pointer, misaligned) = ::atomiks::__private::to_tagged_repr::<NonNull<Node> >(
                             self.next,
-                            layout.pointer_tags(
-                                placement_0.pack(::atomiks::__private::to_bits::<bool>(self.deleted)),
-                                tags
-                            )
-                        )
+                            layout.pointer_tags(bits, tags)
+                        );
+                        (layout.join_words(pointer, bits), misaligned)
                     }
                     #[inline]
                     fn from_repr(repr: Repr) -> ::core::option::Option<Self> {
-                        let (pointer, bits) = layout.split(repr);
+                        let ::core::option::Option::Some((pointer, bits)) = layout.split_words(repr)
+                        else {
+                            return ::core::option::Option::None;
+                        };
                         match (
                             ::atomiks::__private::from_repr::<NonNull<Node> >(pointer),
                             ::atomiks::__private::from_bits::<bool>(placement_0.unpack(bits)),
@@ -1153,7 +1167,7 @@ mod tests {
                     }
                     #[inline]
                     unsafe fn from_repr_unchecked(repr: Repr) -> Self {
-                        let (pointer, bits) = layout.split(repr);
+                        let (pointer, bits) = unsafe { layout.split_words(repr).unwrap_unchecked() };
                         Self {
                             next: unsafe {
                                 ::atomiks::__private::from_repr_unchecked::<NonNull<Node> >(pointer)

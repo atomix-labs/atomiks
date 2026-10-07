@@ -13,7 +13,9 @@ use core::marker::PhantomData;
 pub(crate) use self::layout::FieldLayout;
 pub use self::layout::{EnumLayout, PackedField, PackedLayout};
 pub use self::pointer_enum::{PointerEnumLayout, PointerEnumVariant};
-pub use self::pointer_word::{PointeeAlignment, PointerWordLayout, Tags, assert_aligned};
+pub use self::pointer_word::{
+    PointeeAlignment, PointerWordLayout, PointerWordRepr, Tags, assert_aligned,
+};
 use crate::message::{Message, refuse};
 use crate::primitive::Primitive;
 

@@ -41,22 +41,30 @@ pub(crate) enum BoundSite {
     Impl,
 }
 
-/// The bounds at `site` on each of `fields` that names a parameter: `PtrAtom` on a pointer, `Atom`
-/// on any other field, whose repr a projection and the impl ask to be stored as bits, each
-/// `[const]` in the impl's where clause.
+/// The bounds at `site` on each of `fields` that names a parameter, each `[const]` in the impl's
+/// where clause: `PtrAtom` on a thin pointer; `Atom` on a wide one, two words; and `Atom` on any
+/// other field, whose repr a projection and the impl ask to be stored as bits.
 pub(crate) fn field_bounds<'f, I: IntoIterator<Item = &'f Field>>(
     atomiks: &Path, fields: I, site: BoundSite,
 ) -> impl Iterator<Item = TokenStream> {
     let private = quote!(#atomiks::__private);
     let generic_fields = fields.into_iter().filter(|field| field.is_generic);
-    generic_fields.map(move |Field { ty, is_pointer, .. }| match (*is_pointer, site) {
-        (true, BoundSite::LayOut | BoundSite::Projection) => quote!(#ty: #atomiks::PtrAtom),
-        (true, BoundSite::Impl) => quote!(#ty: [const] #atomiks::PtrAtom),
-        (false, BoundSite::LayOut) => quote!(#ty: #atomiks::Atom),
-        (false, BoundSite::Projection) => quote!(#ty: #atomiks::Atom<Repr: #private::FieldRepr>),
-        (false, BoundSite::Impl) => {
-            quote!(#ty: [const] #atomiks::Atom<Repr: [const] #private::FieldRepr>)
-        },
+    generic_fields.map(move |Field { ty, is_pointer, is_wide_pointer, .. }| {
+        let is_thin_pointer = *is_pointer && !*is_wide_pointer;
+        match (is_thin_pointer, *is_wide_pointer, site) {
+            (true, _, BoundSite::LayOut | BoundSite::Projection) => quote!(#ty: #atomiks::PtrAtom),
+            (true, _, BoundSite::Impl) => quote!(#ty: [const] #atomiks::PtrAtom),
+            (false, true, BoundSite::Impl) => quote!(#ty: [const] #atomiks::Atom),
+            (false, _, BoundSite::LayOut) | (false, true, BoundSite::Projection) => {
+                quote!(#ty: #atomiks::Atom)
+            },
+            (false, false, BoundSite::Projection) => {
+                quote!(#ty: #atomiks::Atom<Repr: #private::FieldRepr>)
+            },
+            (false, false, BoundSite::Impl) => {
+                quote!(#ty: [const] #atomiks::Atom<Repr: [const] #private::FieldRepr>)
+            },
+        }
     })
 }
 
