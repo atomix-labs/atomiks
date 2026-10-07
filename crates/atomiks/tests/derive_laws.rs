@@ -1,14 +1,20 @@
 //! The `Atom` laws over derived values, one of each shape and layout, generic instances and
 //! `Option`s of them: a value's repr lies in its range, which may wrap, and decodes back to it; a
-//! repr that decodes re-encodes to itself, unchecked too; each validity's promise holds; and `None`
-//! takes a spare repr: zero where zero is the niche, else one outside its value's range.
+//! repr that decodes re-encodes to itself, unchecked too; each validity's promise holds; `None`
+//! takes a spare repr: zero where zero is the niche, else one outside its value's range; and a
+//! pointer word's or a pointer enum's pointers, decoded, read the nodes they point to, those of
+//! each shape held in an atomic inside its own pointee too.
 //!
 //! The repr laws run on every repr of 16 bits or fewer; on a wider one, on the edges of each width,
-//! on random bits, and beside each value's repr.
+//! on random bits, and beside each value's repr. A pointer repr made of bits has no provenance,
+//! and is compared by its address; a value's own keeps its pointer's, which Miri checks as the
+//! node is read through it.
 
-// The derives on the generic `Wrap`, `Pair`, `Lock` and `LockWord` need it.
+// The derives on the generic `Wrap`, `Pair`, `Lock`, `LockWord` and `GenericLink` need it.
 #![feature(const_trait_impl)]
 #![cfg(feature = "derive")]
+// Loom's `Atomic::new` is not `const`, so no static of a node that holds one builds under it.
+#![cfg(not(loom))]
 
 // atomiks-core's, by its path; its `//!` says why.
 #[cfg(test)]
@@ -20,9 +26,10 @@ mod tests {
     use core::any::type_name;
     use core::fmt::Debug;
     use core::num::NonZero;
+    use core::ptr::NonNull;
 
-    use atomiks::validity::{Total, TotalZeroNiche, ZeroNiche, ZeroValid};
-    use atomiks::{Atom, ExactBits, Primitive, RangedI8, RangedU64, ReprRange};
+    use atomiks::validity::{Partial, Total, TotalZeroNiche, ZeroNiche, ZeroValid};
+    use atomiks::{Atom, Atomic, ExactBits, Primitive, RangedI8, RangedU8, RangedU64, ReprRange};
     use proptest::prelude::{Just, Strategy, any, prop_oneof};
     use proptest::sample::select;
     use proptest::test_runner::TestCaseError;
@@ -30,7 +37,8 @@ mod tests {
 
     use crate::testing::atom::{repr_and_validity_are, with_every_byte};
     use crate::testing::law::{
-        Promise, assert_holds, decodes_as_promised, edge_or_random_bits, none_laws, round_trips,
+        Promise, assert_holds, decodes_as_promised, edge_or_random_bits, keeps_provenance,
+        none_laws, round_trips,
     };
 
     /// The side of the book an order rests on: one bit, from zero.
@@ -330,6 +338,371 @@ mod tests {
         Poisoned = 3,
     }
 
+    /// A node a pointer shape points to, aligned to 16, so its pointer leaves four low bits clear.
+    #[derive(Debug)]
+    #[repr(align(16))]
+    struct Node {
+        /// What it holds.
+        value: u64,
+    }
+
+    /// The nodes the pointer shapes point to, which live as long as the tests.
+    static NODES: [Node; 4] =
+        [Node { value: 10 }, Node { value: 11 }, Node { value: 12 }, Node { value: 13 }];
+
+    /// A Treiber stack's head: the top node or none, a sign and a mark, in three of the four bits
+    /// a node's alignment leaves clear.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+    struct Head {
+        /// The top node.
+        top: Option<NonNull<Node>>,
+        /// Which way the price last moved.
+        sign: Sign,
+        /// Whether a pop is under way.
+        marked: bool,
+    }
+
+    /// A link never null, and its mark.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+    struct Link {
+        /// The next node.
+        next: NonNull<Node>,
+        /// Whether the node that holds the link is deleted.
+        marked: bool,
+    }
+
+    /// A link and a lock above its mark: a word over a word.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+    struct Guarded {
+        /// The link.
+        #[atom(ptr)]
+        link: Link,
+        /// Whether the link is locked.
+        locked: bool,
+    }
+
+    /// The next node, or the end, which takes null: one unit fills the niche of a pointer never
+    /// null.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+    enum Next {
+        /// The end.
+        End,
+        /// A node.
+        Node(NonNull<Node>),
+    }
+
+    /// A bucket of a table, tagged: a node beside tag fields, the index and generation of the next
+    /// vacant bucket above the four clear bits, or closed.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+    enum Bucket {
+        /// Holds a node.
+        Occupied {
+            /// The node.
+            node: NonNull<Node>,
+            /// Whether it is deleted.
+            marked: bool,
+            /// The side it rests on.
+            side: Side,
+        },
+        /// Free, beside the next free one.
+        Vacant {
+            /// The next free bucket's index.
+            next: u32,
+            /// How many times it was freed.
+            generation: u16,
+        },
+        /// Closed.
+        Closed,
+    }
+
+    /// A pointer of any kind and a flag.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+    struct Flagged<P> {
+        /// The pointer.
+        #[atom(ptr)]
+        pointer: P,
+        /// The flag.
+        flag: bool,
+    }
+
+    /// One of two pointers of any kind, by one tag bit.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+    enum Either<A, B> {
+        /// The left pointer.
+        Left(#[atom(ptr)] A),
+        /// The right pointer.
+        Right(#[atom(ptr)] B),
+    }
+
+    /// A node of a list, a stack, a chain and a table at once, which holds an atomic link of each
+    /// shape to a node like it, as a lock-free structure's nodes hold theirs: no shape's layout
+    /// reads the node's alignment, which the node's own layout, holding the links, decides.
+    #[expect(dead_code, reason = "the links are there for their types; the laws read the value")]
+    struct Linked {
+        /// What it holds.
+        value: u64,
+        /// The next node in a list, and whether this one is deleted.
+        next: Atomic<ListLink>,
+        /// The head of a stack below it.
+        below: Atomic<StackHead>,
+        /// The next node in a chain, or its end.
+        chain: Atomic<ChainLink>,
+        /// A table's slot.
+        slot: Atomic<TableSlot>,
+        /// A locked link to a node, or none.
+        guarded: Atomic<Option<GuardedLink>>,
+    }
+
+    /// A Harris list's link: the next node or none, and whether the node that holds it is deleted.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+    struct ListLink {
+        /// The next node.
+        next: Option<NonNull<Linked>>,
+        /// Whether the node that holds this link is deleted.
+        deleted: bool,
+    }
+
+    /// A Treiber stack's head, which its nodes hold too: the top node or none, and a version.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+    struct StackHead {
+        /// The top node.
+        top: Option<NonNull<Linked>>,
+        /// How many times the head changed, wrapping.
+        version: RangedU8<0, 3>,
+    }
+
+    /// The next node of a chain, or its end, which fills the pointer's niche.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+    enum ChainLink {
+        /// The end.
+        End,
+        /// The next node.
+        Node(NonNull<Linked>),
+    }
+
+    /// A table's slot, tagged: empty, a value inline above the node's alignment, or a node.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+    enum TableSlot {
+        /// Nothing.
+        Empty,
+        /// A value, held inline.
+        Inline(u32),
+        /// A node.
+        Node(NonNull<Linked>),
+    }
+
+    /// A link to a node never null, and its mark.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+    struct MarkedLink {
+        /// The next node.
+        next: NonNull<Linked>,
+        /// Whether the node that holds this link is deleted.
+        deleted: bool,
+    }
+
+    /// A marked link and a lock above its mark: a word over a word.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+    struct GuardedLink {
+        /// The marked link.
+        #[atom(ptr)]
+        link: MarkedLink,
+        /// Whether the link is locked.
+        locked: bool,
+    }
+
+    /// A list's node of any value, which holds the link to the next.
+    #[expect(dead_code, reason = "the link is there for its type; the laws read the value")]
+    struct GenericNode<T> {
+        /// What it holds.
+        value: T,
+        /// The next node, and whether this one is deleted.
+        next: Atomic<GenericLink<T>>,
+    }
+
+    /// The link a node of any value holds: an instance of a generic word, in its own pointee.
+    #[derive(Debug, PartialEq, Eq, Atom)]
+    struct GenericLink<T> {
+        /// The next node.
+        next: Option<NonNull<GenericNode<T>>>,
+        /// Whether the node that holds this link is deleted.
+        deleted: bool,
+    }
+
+    // By hand, so a link of any `T` is `Copy`, as a derive's bound on `T` would not make it.
+    impl<T> Clone for GenericLink<T> {
+        fn clone(&self) -> Self {
+            *self
+        }
+    }
+
+    impl<T> Copy for GenericLink<T> {}
+
+    /// A node holding `value`, each of its links to no node.
+    const fn linked(value: u64) -> Linked {
+        let version = RangedU8::new(0).expect("0 lies in 0 to 3");
+        Linked {
+            value,
+            next: Atomic::new(ListLink { next: None, deleted: false }),
+            below: Atomic::new(StackHead { top: None, version }),
+            chain: Atomic::new(ChainLink::End),
+            slot: Atomic::new(TableSlot::Empty),
+            guarded: Atomic::new(None),
+        }
+    }
+
+    /// A node of the generic list, holding `value`, linked to no node.
+    const fn generic_node(value: u64) -> GenericNode<u64> {
+        GenericNode { value, next: Atomic::new(GenericLink { next: None, deleted: false }) }
+    }
+
+    /// The nodes the shapes in their own pointee point to, which live as long as the tests.
+    static LINKED: [Linked; 4] = [linked(20), linked(21), linked(22), linked(23)];
+
+    /// The generic nodes a generic link points to, which live as long as the tests.
+    static GENERIC_NODES: [GenericNode<u64>; 4] =
+        [generic_node(30), generic_node(31), generic_node(32), generic_node(33)];
+
+    /// A pointer to each node, with the static's provenance.
+    fn nodes() -> impl Strategy<Value = NonNull<Node>> {
+        (0..NODES.len()).prop_map(|index| NonNull::from_ref(&NODES[index]))
+    }
+
+    /// The value of the node `node` points to, read through it: Miri refuses the read where the
+    /// pointer lost its provenance.
+    fn read(node: NonNull<Node>) -> u64 {
+        // SAFETY: each node is a static's, which lives as long as the tests.
+        #[expect(unsafe_code, reason = "reads through the pointer, so Miri checks its provenance")]
+        let node = unsafe { node.as_ref() };
+        node.value
+    }
+
+    /// A pointer to each node a link of each shape holds, with the static's provenance.
+    fn linked_nodes() -> impl Strategy<Value = NonNull<Linked>> {
+        (0..LINKED.len()).prop_map(|index| NonNull::from_ref(&LINKED[index]))
+    }
+
+    /// A pointer to each generic node, with the static's provenance.
+    fn generic_nodes() -> impl Strategy<Value = NonNull<GenericNode<u64>>> {
+        (0..GENERIC_NODES.len()).prop_map(|index| NonNull::from_ref(&GENERIC_NODES[index]))
+    }
+
+    /// The value of the node `node` points to, read through it as `read` reads a node.
+    fn read_linked(node: NonNull<Linked>) -> u64 {
+        // SAFETY: each node is a static's, which lives as long as the tests.
+        #[expect(unsafe_code, reason = "reads through the pointer, so Miri checks its provenance")]
+        let node = unsafe { node.as_ref() };
+        node.value
+    }
+
+    /// The value of the generic node `node` points to, read through it as `read` reads a node.
+    fn read_generic(node: NonNull<GenericNode<u64>>) -> u64 {
+        // SAFETY: each node is a static's, which lives as long as the tests.
+        #[expect(unsafe_code, reason = "reads through the pointer, so Miri checks its provenance")]
+        let node = unsafe { node.as_ref() };
+        node.value
+    }
+
+    /// List links to every node or none, marked or not.
+    fn list_links() -> impl Strategy<Value = ListLink> {
+        (option::of(linked_nodes()), any::<bool>())
+            .prop_map(|(next, deleted)| ListLink { next, deleted })
+    }
+
+    /// Stack heads of every node or none, and every version.
+    fn stack_heads() -> impl Strategy<Value = StackHead> {
+        let versions = (0_u8..=3)
+            .prop_map(|count| RangedU8::new(count).expect("a count of 0 to 3 lies in 0 to 3"));
+        (option::of(linked_nodes()), versions).prop_map(|(top, version)| StackHead { top, version })
+    }
+
+    /// Each kind of chain link.
+    fn chain_links() -> impl Strategy<Value = ChainLink> {
+        prop_oneof![Just(ChainLink::End), linked_nodes().prop_map(ChainLink::Node)]
+    }
+
+    /// Each kind of table slot, of every value and node.
+    fn table_slots() -> impl Strategy<Value = TableSlot> {
+        prop_oneof![
+            Just(TableSlot::Empty),
+            any::<u32>().prop_map(TableSlot::Inline),
+            linked_nodes().prop_map(TableSlot::Node),
+        ]
+    }
+
+    /// Locked links of every node, marked or not, locked or not.
+    fn guarded_links_to_linked() -> impl Strategy<Value = GuardedLink> {
+        (linked_nodes(), any::<bool>(), any::<bool>()).prop_map(|(next, deleted, locked)| {
+            GuardedLink { link: MarkedLink { next, deleted }, locked }
+        })
+    }
+
+    /// Generic links of every generic node or none, marked or not.
+    fn generic_links() -> impl Strategy<Value = GenericLink<u64>> {
+        (option::of(generic_nodes()), any::<bool>())
+            .prop_map(|(next, deleted)| GenericLink { next, deleted })
+    }
+
+    /// What the node a locked link points to holds, read through its pointer.
+    fn read_guarded(guarded: GuardedLink) -> u64 {
+        read_linked(guarded.link.next)
+    }
+
+    /// What the node a table slot holds reads, read through its pointer.
+    fn read_slot(slot: TableSlot) -> Option<u64> {
+        match slot {
+            TableSlot::Node(node) => Some(read_linked(node)),
+            TableSlot::Empty | TableSlot::Inline(_) => None,
+        }
+    }
+
+    /// Links to every node, marked or not.
+    fn links() -> impl Strategy<Value = Link> {
+        (nodes(), any::<bool>()).prop_map(|(next, marked)| Link { next, marked })
+    }
+
+    /// Guarded links of every link, locked or not.
+    fn guarded_links() -> impl Strategy<Value = Guarded> {
+        (links(), any::<bool>()).prop_map(|(link, locked)| Guarded { link, locked })
+    }
+
+    /// Each kind of bucket: of every node and tag, every index, and closed.
+    fn buckets() -> impl Strategy<Value = Bucket> {
+        prop_oneof![
+            (nodes(), any::<bool>(), sides()).prop_map(|(node, marked, side)| Bucket::Occupied {
+                node,
+                marked,
+                side
+            }),
+            (any::<u32>(), any::<u16>())
+                .prop_map(|(next, generation)| Bucket::Vacant { next, generation }),
+            Just(Bucket::Closed),
+        ]
+    }
+
+    /// Either pointer, to every node.
+    fn eithers() -> impl Strategy<Value = Either<NonNull<Node>, *mut Node>> {
+        prop_oneof![
+            nodes().prop_map(Either::Left),
+            nodes().prop_map(|node| Either::Right(node.as_ptr())),
+        ]
+    }
+
+    /// What the node an occupied bucket holds reads, read through its pointer.
+    fn read_bucket(bucket: Bucket) -> Option<u64> {
+        match bucket {
+            Bucket::Occupied { node, .. } => Some(read(node)),
+            Bucket::Vacant { .. } | Bucket::Closed => None,
+        }
+    }
+
+    /// What the node either pointer points to holds, read through it.
+    fn read_either(either: Either<NonNull<Node>, *mut Node>) -> u64 {
+        match either {
+            Either::Left(node) => read(node),
+            Either::Right(node) => read(NonNull::new(node).expect("each right node is a static's")),
+        }
+    }
+
     /// Each side.
     fn sides() -> impl Strategy<Value = Side> {
         select(&[Side::Bid, Side::Ask])
@@ -417,24 +790,30 @@ mod tests {
     where
         T: Atom + PartialEq + Debug,
         T::Validity: Promise,
-        T::Repr: ExactBits + PartialEq + Debug,
+        T::Repr: PartialEq + Debug,
     {
         decodes_as_promised::<_, T>(repr)?;
         T::from_repr(repr).map_or(Ok(()), round_trips)
     }
 
-    /// The laws for `value`, and for its repr's neighbours and the low bits of `bits` as reprs.
+    /// The laws for `value`, and for its repr's neighbours and the low bits of `bits` as reprs: a
+    /// pointer's neighbours keep its provenance, and its bits have none.
     fn value_obeys_the_laws<T>(value: T, bits: u128) -> Result<(), TestCaseError>
     where
         T: Atom + PartialEq + Debug,
         T::Validity: Promise,
-        T::Repr: ExactBits + PartialEq + Debug,
+        T::Repr: PartialEq + Debug,
     {
         round_trips(value)?;
-        let repr = value.to_repr().to_bits();
-        [repr.wrapping_sub(1), repr.wrapping_add(1), bits]
-            .into_iter()
-            .try_for_each(|bits| repr_obeys_the_laws::<T>(Primitive::from_bits(bits)))
+        let repr = value.to_repr();
+        let address = repr.packed_bits();
+        [
+            repr.with_packed_bits(address.wrapping_sub(1)),
+            repr.with_packed_bits(address.wrapping_add(1)),
+            Primitive::from_bits(bits),
+        ]
+        .into_iter()
+        .try_for_each(repr_obeys_the_laws::<T>)
     }
 
     /// Checks the laws on every repr of `T`, of 16 bits or fewer.
@@ -458,6 +837,12 @@ mod tests {
         repr_and_validity_are::<LockWord<Sign>, u16, ZeroValid>();
         repr_and_validity_are::<LockWord<NonZero<u8>>, u16, ZeroValid>();
         repr_and_validity_are::<Wrap<Swing>, u16, ZeroNiche>();
+        repr_and_validity_are::<ListLink, *mut Linked, Total>();
+        repr_and_validity_are::<StackHead, *mut Linked, Partial>();
+        repr_and_validity_are::<ChainLink, *mut (), ZeroValid>();
+        repr_and_validity_are::<TableSlot, *mut (), ZeroValid>();
+        repr_and_validity_are::<GuardedLink, *mut Linked, ZeroNiche>();
+        repr_and_validity_are::<GenericLink<u64>, *mut GenericNode<u64>, ZeroValid>();
         assert_eq!(Turn::REPRS, ReprRange::new(0, 0x1FF), "every repr up to the third's end");
         assert_eq!(Offer::Closed.to_repr(), 2, "and `Closed` above the side's 0 and 1");
     }
@@ -505,6 +890,9 @@ mod tests {
         none_laws!(LockWord<Sign>, LockWord<NonZero<u8>>);
         none_laws!(Wrap<Swing>, Lock<Swing>, LockWord<Swing>);
         none_laws!(Option<Sign>, Option<Step>, Option<Reading>, Option<Order>, Option<Slot>);
+        // A nullable head's and a niche's null decodes, so neither has an `Option`.
+        none_laws!(Link, Guarded, Bucket, Flagged<NonNull<Node>>, Either<NonNull<Node>, *mut Node>);
+        none_laws!(MarkedLink, GuardedLink);
     }
 
     proptest! {
@@ -605,6 +993,88 @@ mod tests {
             value_obeys_the_laws(ranged, bits)?;
             value_obeys_the_laws(zero_niche, bits)?;
             value_obeys_the_laws(stated, bits)?;
+        }
+
+        #[test]
+        fn pointer_words_obey_the_laws(
+            head in (option::of(nodes()), signs(), any::<bool>())
+                .prop_map(|(top, sign, marked)| Head { top, sign, marked }),
+            link in links(),
+            guarded in guarded_links(),
+            flagged in (nodes(), any::<bool>()).prop_map(|(pointer, flag)| Flagged { pointer, flag }),
+            bits in edge_or_random_bits(&[0xF, 0x10]),
+        ) {
+            value_obeys_the_laws(head, bits)?;
+            keeps_provenance(head, |head| head.top.map(read))?;
+            value_obeys_the_laws(link, bits)?;
+            keeps_provenance(link, |link| read(link.next))?;
+            value_obeys_the_laws(guarded, bits)?;
+            keeps_provenance(guarded, |guarded| read(guarded.link.next))?;
+            value_obeys_the_laws(flagged, bits)?;
+            keeps_provenance(flagged, |flagged| read(flagged.pointer))?;
+        }
+
+        #[test]
+        fn pointer_enums_obey_the_laws(
+            next in prop_oneof![Just(Next::End), nodes().prop_map(Next::Node)],
+            bucket in buckets(),
+            either in eithers(),
+            bits in edge_or_random_bits(&[0xF, 0x10]),
+        ) {
+            value_obeys_the_laws(next, bits)?;
+            keeps_provenance(next, |next| match next {
+                Next::End => None,
+                Next::Node(node) => Some(read(node)),
+            })?;
+            value_obeys_the_laws(bucket, bits)?;
+            keeps_provenance(bucket, read_bucket)?;
+            value_obeys_the_laws(either, bits)?;
+            keeps_provenance(either, read_either)?;
+        }
+
+        #[test]
+        fn pointer_shapes_in_their_own_pointee_obey_the_laws(
+            list in list_links(),
+            stack in stack_heads(),
+            chain in chain_links(),
+            slot in table_slots(),
+            guarded in option::of(guarded_links_to_linked()),
+            generic in generic_links(),
+            bits in edge_or_random_bits(&[0x7, 0x8]),
+        ) {
+            value_obeys_the_laws(list, bits)?;
+            keeps_provenance(list, |list| list.next.map(read_linked))?;
+            value_obeys_the_laws(stack, bits)?;
+            keeps_provenance(stack, |stack| stack.top.map(read_linked))?;
+            value_obeys_the_laws(chain, bits)?;
+            keeps_provenance(chain, |chain| match chain {
+                ChainLink::End => None,
+                ChainLink::Node(node) => Some(read_linked(node)),
+            })?;
+            value_obeys_the_laws(slot, bits)?;
+            keeps_provenance(slot, read_slot)?;
+            value_obeys_the_laws(guarded, bits)?;
+            keeps_provenance(guarded, |guarded| guarded.map(read_guarded))?;
+            value_obeys_the_laws(generic, bits)?;
+            keeps_provenance(generic, |generic| generic.next.map(read_generic))?;
+        }
+
+        #[test]
+        fn options_of_pointer_shapes_obey_the_laws(
+            link in option::of(links()),
+            guarded in option::of(guarded_links()),
+            bucket in option::of(buckets()),
+            either in option::of(eithers()),
+            bits in edge_or_random_bits(&[0xF, 0x10]),
+        ) {
+            value_obeys_the_laws(link, bits)?;
+            keeps_provenance(link, |link| link.map(|link| read(link.next)))?;
+            value_obeys_the_laws(guarded, bits)?;
+            keeps_provenance(guarded, |guarded| guarded.map(|guarded| read(guarded.link.next)))?;
+            value_obeys_the_laws(bucket, bits)?;
+            keeps_provenance(bucket, |bucket| bucket.and_then(read_bucket))?;
+            value_obeys_the_laws(either, bits)?;
+            keeps_provenance(either, |either| either.map(read_either))?;
         }
 
         #[test]

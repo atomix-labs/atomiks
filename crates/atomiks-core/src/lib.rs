@@ -8,6 +8,11 @@
 //! derived `Quote` with `lock or`, or `ldset`. [`Atomic::fields`] lends them, through the
 //! [`ProjectFields`] atomiks' derive implements for the struct.
 //!
+//! A pointer keeps small fields as tags in the low bits its pointee's alignment leaves clear, and
+//! keeps its provenance through every operation: `HEAD.fields().closed.test_and_set(AcqRel)`
+//! closes a derived Treiber stack's `Head` with `lock bts`, or `ldsetal`, on its top node's
+//! pointer. [`PtrAtom`] is any value stored as a pointer.
+//!
 //! # Examples
 //! ```
 //! use core::num::NonZero;
@@ -42,10 +47,12 @@
     associated_type_defaults,
     const_convert,
     const_destruct,
+    const_eval_select,
     const_index,
     const_option_ops,
     const_trait_impl,
     const_type_name,
+    core_intrinsics,
     doc_cfg,
     f16,
     generic_pattern_types,
@@ -53,6 +60,7 @@
     integer_casts,
     pattern_type_macro,
     pattern_types,
+    ptr_mask,
     step_trait,
     structural_match,
     transmute_neo
@@ -60,11 +68,11 @@
 #![cfg_attr(not(loom), feature(const_atomic))]
 #![cfg_attr(wide, feature(f128))]
 #![cfg_attr(core_atomic_u128, feature(integer_atomics))]
-#![cfg_attr(all(target_arch = "x86_64", wide_load_store, not(loom)), feature(core_intrinsics))]
 #![expect(
     internal_features,
-    reason = "a ranged integer's field is a pattern type, and with AVX the 16-byte load and store \
-              are core's atomic intrinsics"
+    reason = "a ranged integer's field is a pattern type, with AVX the 16-byte load and store are \
+              core's atomic intrinsics, and a pointer's address is read, and its tags cleared, \
+              in a constant through `const_eval_select`"
 )]
 #![expect(
     incomplete_features,
@@ -108,7 +116,7 @@ mod range;
 mod ranged;
 pub mod validity;
 
-pub use crate::atom::{Atom, AtomAdd, AtomBitwise, AtomOrd, FieldAdd, FieldBitwise};
+pub use crate::atom::{Atom, AtomAdd, AtomBitwise, AtomOrd, FieldAdd, FieldBitwise, PtrAtom};
 pub use crate::atomic::{
     Atomic, AtomicBool, AtomicField, AtomicI8, AtomicI16, AtomicI32, AtomicI64, AtomicIsize,
     AtomicPtr, AtomicU8, AtomicU16, AtomicU32, AtomicU64, AtomicUsize, Field, FieldPath, Join,

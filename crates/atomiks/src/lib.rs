@@ -15,12 +15,14 @@
 //!   struct of places it writes. A place's type names its [`FieldPath`]: a [`Field`], a [`Then`] of
 //!   a field's field, or [`Whole`], which [`Join`] extends; [`TopField`] marks the one that adds.
 //! - **Values.** [`Atom`] encodes a value as its repr and back, its [`ReprRange`] says which reprs
-//!   it takes and its [`validity`] which decode; [`AtomAdd`], [`AtomOrd`] and [`AtomBitwise`] add
-//!   the read-modify-writes that mean something for it, and [`FieldBitwise`] and [`FieldAdd`] those
-//!   of a field of it. With the `derive` feature, each derives: `Atom` for a struct or an enum, and
-//!   each capability for a newtype whose field has it. [`RangedU64<MIN, MAX>`](RangedU64) and its
-//!   siblings, `RangedU8` to `RangedIsize`, hold an integer from `MIN` to `MAX`, and [`RangeError`]
-//!   and [`ParseRangeError`] say why one refused an integer or a text.
+//!   it takes and its [`validity`] which decode, and [`PtrAtom`] is a value stored as a pointer;
+//!   [`AtomAdd`], [`AtomOrd`] and [`AtomBitwise`] add the read-modify-writes that mean something
+//!   for it, and [`FieldBitwise`] and [`FieldAdd`] those of a field of it. With the `derive`
+//!   feature, each derives: `Atom` for a struct or an enum, a pointer word or a pointer enum among
+//!   them, which keeps small fields as tags in its pointer's low bits and the pointer's provenance,
+//!   and each capability for a newtype whose field has it. [`RangedU64<MIN, MAX>`](RangedU64) and
+//!   its siblings, `RangedU8` to `RangedIsize`, hold an integer from `MIN` to `MAX`, and
+//!   [`RangeError`] and [`ParseRangeError`] say why one refused an integer or a text.
 //! - **Orderings.** The [`ordering`] types, each accepted only where it means something, and the
 //!   [`fence`](fn@fence) and [`compiler_fence`] they order.
 //! - **Primitives.** [`Primitive`], [`ExactBits`] where the bits are the whole value, and what the
@@ -88,6 +90,68 @@
 //! assert!(QUOTE.fields().live.test_and_clear(AcqRel), "this thread took it");
 //! let expected = Quote { quantity: 300, live: false, flags: POST_ONLY };
 //! assert_eq!(QUOTE.load(Acquire), expected, "the bit off, the flag on, the quantity as it was");
+//! # }
+//! ```
+//!
+//! ## Keeping Tags in a Pointer
+//! ```
+//! # #[cfg(feature = "derive")] {
+//! use core::ptr::NonNull;
+//!
+//! use atomiks::ordering::{AcqRel, Acquire, Relaxed};
+//! use atomiks::{Atom, Atomic, RangedU8};
+//!
+//! /// A node of a stack, which holds the head below it: aligned to 8, so a pointer to one leaves
+//! /// three low bits clear.
+//! #[repr(align(8))]
+//! struct Node {
+//!     value: u64,
+//!     next: Atomic<Head>,
+//! }
+//!
+//! /// A node that lives as long as the program, so the statics below may hold its pointer.
+//! static NODE: Node = Node { value: 7, next: Atomic::new(EMPTY) };
+//!
+//! /// A Treiber stack's head: the top node, then in its pointer's clear bits a version, which
+//! /// counts the head's changes, and whether the stack is closed. The version tells a top popped
+//! /// and pushed again from the one read.
+//! #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+//! struct Head {
+//!     top: Option<NonNull<Node>>,
+//!     version: RangedU8<0, 3>,
+//!     closed: bool,
+//! }
+//!
+//! /// A slot of a table: empty, a value held inline, or a node, by a tag of two bits.
+//! #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+//! enum Slot {
+//!     Empty,
+//!     Inline(u32),
+//!     Node(NonNull<Node>),
+//! }
+//!
+//! /// An open stack's empty head.
+//! const EMPTY: Head = Head { top: None, version: RangedU8::MIN, closed: false };
+//!
+//! // A constant reads no pointer's address but null's, so a static starts with a null top, or a
+//! // value held inline, and takes a node's pointer at run time.
+//! static HEAD: Atomic<Head> = Atomic::new(EMPTY);
+//! static SLOT: Atomic<Slot> = Atomic::new(Slot::Inline(42));
+//!
+//! let top = NonNull::from_ref(&NODE);
+//! let empty = HEAD.load(Acquire);
+//! NODE.next.store(empty, Relaxed);
+//! let version = empty.version.checked_add(1).unwrap_or(RangedU8::MIN);
+//! let pushed = Head { top: Some(top), version, ..empty };
+//! assert_eq!(HEAD.compare_exchange(empty, pushed, AcqRel, Acquire), Ok(empty), "pushed, counted");
+//! // `lock bts`, or `ldsetal`, on the pointer: the one thread that finds the stack open closes it.
+//! assert!(!HEAD.fields().closed.test_and_set(AcqRel), "this thread closed the stack");
+//! assert_eq!(HEAD.fields().top.load(Acquire), Some(top), "its top, read through the head");
+//!
+//! assert_eq!(SLOT.swap(Slot::Node(top), AcqRel), Slot::Inline(42), "the value held inline");
+//! // The value lies above the three bits a node's alignment clears, beside its tag, 1.
+//! assert_eq!(Slot::Inline(5).to_repr().addr(), 5 << 3 | 1, "the value and its tag in one word");
+//! assert_eq!(size_of_val(&SLOT), 8, "a node, a value or nothing, in one pointer");
 //! # }
 //! ```
 //!
@@ -187,6 +251,20 @@
 //! [`not`](Atomic::not), on an atomic or a field, and a `bool` field's [`set`](AtomicField::set),
 //! [`clear`](AtomicField::clear) and [`toggle`](AtomicField::toggle) discard it.
 //!
+//! A tagged pointer's store, swap or compare-exchange costs one test and branch, with no frame
+//! record on its path: a word nested in others tests its pointer once against every tag of each,
+//! an exchange tests both its pointers in one test, and a pointer enum's unit or data, or a pointer
+//! that fills a niche beside no tag field, tests nothing. The branch is to one cold refusal, a
+//! panic, where the pointer has a bit set that its tags take. A compare-exchange loop tests nothing
+//! its decode already cleared: an [`update`](Atomic::update) that keeps the pointer tests, calls
+//! and saves nothing, and a Treiber stack's pop tests only the next node's pointer, which it reads
+//! from the node, and saves the frame record its cold refusal needs. The one exception is a word
+//! that holds a pointer enum of several pointer variants: its update saves a frame record on
+//! `aarch64`, and on `x86_64` keeps a branch to the cold refusal that it never takes. A match of a
+//! pointer enum folds an arm's tag into the offset of the load through its pointer; where LLVM
+//! merges arms that read through pointers of several tags, one mask takes the tags off. A constant
+//! reads no pointer's address but null's, so it decodes only null, and tags only a null pointer.
+//!
 //! # Platforms
 //!
 //! atomiks builds for Linux and macOS, on `aarch64` and `x86_64`. What a target's default CPU
@@ -200,7 +278,8 @@
 //! | `x86_64` Linux  | `x86-64-v2`            | `x86-64-v3`, for AVX  | no                       |
 //!
 //! Every target has [`FetchAdd`] and [`MaskBitwise`] for each integer up to 64 bits, and
-//! [`BitTest`] from 16 bits on `x86_64`, whose `lock bts` takes no byte, and from 8 on `aarch64`.
+//! [`BitTest`] from 16 bits on `x86_64`, whose `lock bts` takes no byte, and from 8 on `aarch64`;
+//! and [`MaskBitwise`] and [`BitTest`] for a pointer, whose tags they change.
 //!
 //! On `aarch64` Linux, a read-modify-write is LSE's one instruction with `+lse` (Armv8.1); without
 //! it, an outline call runs that instruction where the CPU has LSE, and an LL/SC loop where it does
@@ -230,7 +309,7 @@
 //!
 //! | Feature         | Adds                                                                       |
 //! | --------------- | -------------------------------------------------------------------------- |
-//! | `derive`        | `#[derive(Atom)]`, projecting a packed struct; a newtype's capabilities    |
+//! | `derive`        | `#[derive(Atom)]`: projections, tagged pointers; a newtype's capabilities  |
 //! | `serde`         | serde's traits for an atomic, and a ranged integer, held to its range      |
 //! | `zerocopy-08`   | zerocopy's traits for an atomic, as its validity allows, never `Immutable` |
 //! | `bytemuck`      | `Zeroable` for an atomic, and the bit-pattern traits for a ranged integer  |
@@ -257,7 +336,7 @@ pub use atomiks_core::{
     Atom, AtomAdd, AtomBitwise, AtomOrd, Atomic, AtomicBool, AtomicField, AtomicI8, AtomicI16,
     AtomicI32, AtomicI64, AtomicIsize, AtomicPtr, AtomicU8, AtomicU16, AtomicU32, AtomicU64,
     AtomicUsize, BitTest, ExactBits, FetchAdd, FetchBitwise, Field, FieldAdd, FieldBitwise,
-    FieldPath, Join, Load, MaskBitwise, MinMax, ParseRangeError, Primitive, ProjectFields,
+    FieldPath, Join, Load, MaskBitwise, MinMax, ParseRangeError, Primitive, ProjectFields, PtrAtom,
     RangeError, RangedI8, RangedI16, RangedI32, RangedI64, RangedI128, RangedIsize, RangedU8,
     RangedU16, RangedU32, RangedU64, RangedU128, RangedUsize, ReprRange, Store, Swap, Then,
     TopField, Whole, compiler_fence, fence,

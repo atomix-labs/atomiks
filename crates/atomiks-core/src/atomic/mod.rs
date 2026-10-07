@@ -11,6 +11,7 @@ use zerocopy::{FromBytes, IntoBytes, KnownLayout, Unaligned};
 use crate::atom::Atom;
 use crate::ordering::{LoadOrdering, Relaxed, RmwOrdering, StoreOrdering};
 use crate::primitive::{CellAccess, CompareExchange, ExactBits, Load, Primitive, Store, Swap};
+use crate::range::{Tags, assert_aligned};
 use crate::validity::Validity;
 
 mod capability;
@@ -152,10 +153,27 @@ impl<T: Atom + UnwindSafe> UnwindSafe for Atomic<T> {}
 // leaves a whole repr.
 impl<T: Atom> RefUnwindSafe for Atomic<T> {}
 
+/// The reprs of an exchange's `current` and `new`, whose pointers, where `T` is a tagged pointer,
+/// are tested for their tags in one test, so one refusal stands on the exchange's path.
+///
+/// # Panics
+/// Where either's pointer has a bit set where its tags go.
+#[inline]
+#[track_caller]
+fn exchanged_reprs<T: Atom>(current: T, new: T) -> (T::Repr, T::Repr) {
+    let (current, current_misaligned) = current.to_tagged_repr(Tags::EMPTY);
+    let (new, new_misaligned) = new.to_tagged_repr(Tags::EMPTY);
+    assert_aligned::<T>(current_misaligned | new_misaligned);
+    (current, new)
+}
+
 impl<T: Atom> Atomic<T> {
     /// An atomic holding `value`.
     ///
     /// Needs a `const` [`Atom`] impl; any other impl builds with [`From`].
+    ///
+    /// # Panics
+    /// As [`store`](Self::store); in a constant, the build fails instead.
     #[cfg(not(loom))]
     #[inline]
     #[must_use]
@@ -170,6 +188,9 @@ impl<T: Atom> Atomic<T> {
     }
 
     /// An atomic holding `value`; not `const` under loom, whose cells are built at run time.
+    ///
+    /// # Panics
+    /// As [`store`](Self::store).
     #[cfg(loom)]
     #[inline]
     #[must_use]
@@ -225,6 +246,10 @@ impl<T: Atom> Atomic<T> {
     }
 
     /// Writes `value`.
+    ///
+    /// # Panics
+    /// Where `T` is a tagged pointer, a derived pointer word or pointer enum, and `value`'s pointer
+    /// has a bit set where its tags go.
     #[inline]
     pub fn store<O: StoreOrdering>(&self, value: T, order: O)
     where
@@ -235,6 +260,9 @@ impl<T: Atom> Atomic<T> {
     }
 
     /// Writes `value`, and returns the value before.
+    ///
+    /// # Panics
+    /// As [`store`](Self::store).
     #[expect(unsafe_code, reason = "decodes a repr read from the cell")]
     #[inline]
     pub fn swap<O: RmwOrdering>(&self, value: T, order: O) -> T
@@ -254,6 +282,10 @@ impl<T: Atom> Atomic<T> {
     /// # Errors
     /// The value the exchange read, when it is not `current`.
     ///
+    /// # Panics
+    /// Where `T` is a tagged pointer, a derived pointer word or pointer enum, and `current`'s or
+    /// `new`'s pointer has a bit set where its tags go.
+    ///
     /// # Examples
     /// ```
     /// # extern crate atomiks_core as atomiks;
@@ -267,12 +299,13 @@ impl<T: Atom> Atomic<T> {
     /// ```
     #[expect(unsafe_code, reason = "decodes a repr read from the cell")]
     #[inline]
+    #[track_caller]
     pub fn compare_exchange<S: RmwOrdering, F: LoadOrdering>(
         &self, current: T, new: T, success: S, failure: F,
     ) -> Result<T, T> {
         let _ = (success, failure);
-        let cell = self.primitive_cell();
-        match T::Repr::compare_exchange(cell, current.to_repr(), new.to_repr(), S::CORE, F::CORE) {
+        let (current, new) = exchanged_reprs(current, new);
+        match T::Repr::compare_exchange(self.primitive_cell(), current, new, S::CORE, F::CORE) {
             // SAFETY: by the field INVARIANT, the repr read from the cell decodes.
             Ok(before) => Ok(unsafe { T::from_repr_unchecked(before) }),
             // SAFETY: as above.
@@ -286,20 +319,19 @@ impl<T: Atom> Atomic<T> {
     ///
     /// # Errors
     /// The value the exchange read, when it is not `current` or the exchange failed spuriously.
+    ///
+    /// # Panics
+    /// As [`compare_exchange`](Self::compare_exchange).
     #[expect(unsafe_code, reason = "decodes a repr read from the cell")]
     #[inline]
+    #[track_caller]
     pub fn compare_exchange_weak<S: RmwOrdering, F: LoadOrdering>(
         &self, current: T, new: T, success: S, failure: F,
     ) -> Result<T, T> {
         let _ = (success, failure);
-        let cell = self.primitive_cell();
-        match T::Repr::compare_exchange_weak(
-            cell,
-            current.to_repr(),
-            new.to_repr(),
-            S::CORE,
-            F::CORE,
-        ) {
+        let (current, new) = exchanged_reprs(current, new);
+        match T::Repr::compare_exchange_weak(self.primitive_cell(), current, new, S::CORE, F::CORE)
+        {
             // SAFETY: by the field INVARIANT, the repr read from the cell decodes.
             Ok(before) => Ok(unsafe { T::from_repr_unchecked(before) }),
             // SAFETY: as above.
@@ -313,6 +345,10 @@ impl<T: Atom> Atomic<T> {
     /// is a load, or a compare-exchange where the repr has no [`Load`]. `set_order` orders the
     /// exchange that lands; `fetch_order` orders every read, the first and each failed exchange's,
     /// as [`compare_exchange`](Self::compare_exchange)'s `success` and `failure`.
+    ///
+    /// # Panics
+    /// Where `T` is a tagged pointer, a derived pointer word or pointer enum, and a value `f`
+    /// returns has a pointer with a bit set where its tags go.
     ///
     /// # Examples
     /// ```
@@ -348,6 +384,9 @@ impl<T: Atom> Atomic<T> {
     ///
     /// # Errors
     /// The value seen, when `f` declined it.
+    ///
+    /// # Panics
+    /// As [`update`](Self::update).
     ///
     /// # Examples
     /// ```
@@ -442,6 +481,9 @@ impl<T: Atom> Atomic<T> {
     }
 
     /// Writes `value` with a compare-exchange loop, for a primitive without [`Store`].
+    ///
+    /// # Panics
+    /// As [`store`](Self::store).
     #[inline]
     pub fn store_rmw<O: StoreOrdering>(&self, value: T, order: O) {
         // ORDERING: `order` on the exchange that lands, pairing as the caller's store would;

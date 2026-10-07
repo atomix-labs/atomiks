@@ -1,7 +1,8 @@
-error: `#[atom]` goes on the type, not on a field
+error: a field takes `#[atom(ptr)]` alone
  --> tests/compile_fail/derive_with_atom_on_a_field.rs:6:12
   |
 6 | struct Seq(#[atom(repr = u32)] u64);
   |            ^^^^^^^^^^^^^^^^^^^
   |
-  = note: a field's reprs are its type's
+  = note: a field's reprs are its type's: `#[atom]`'s other keys go on the type
+  = help: mark `#[atom(ptr)]` a pointer whose type shows none: an alias, a newtype, a parameter, a pointer word or a pointer enum

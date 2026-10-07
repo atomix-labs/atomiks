@@ -1,0 +1,13 @@
+error[E0277]: `u64` is not stored as a pointer, so no tag can share its bits
+ --> tests/compile_fail/derive_on_a_pointer_word_of_a_marked_field_stored_as_bits.rs:9:12
+  |
+9 |     count: u64,
+  |            ^^^ expected a value whose repr is a `*mut`
+  |
+  = help: the trait `PtrAtom` is not implemented for `u64`
+  = note: a pointer word's pointer field, or a pointer enum variant's, is a `NonNull`, an `Option` of one, a raw pointer, or a value stored as one, such as a newtype of one
+note: required by a bound in `atomiks::__private::assert_pointer`
+ --> $WORKSPACE/crates/atomiks-core/src/__private.rs
+  |
+  | pub const fn assert_pointer<F: PtrAtom>() {}
+  |                                ^^^^^^^ required by this bound in `assert_pointer`

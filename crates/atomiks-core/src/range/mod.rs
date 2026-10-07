@@ -1,7 +1,10 @@
 //! [`ReprRange`], the reprs a value takes, the math of a range of numbers of any width that wraps
-//! through zero, and how a packed value lays out its fields and an enum its variants.
+//! through zero, and how a packed value lays out its fields, an enum its variants, and a value
+//! stored as a pointer its tags.
 
 mod layout;
+mod pointer_enum;
+mod pointer_word;
 
 use core::any::type_name;
 use core::fmt;
@@ -9,6 +12,8 @@ use core::marker::PhantomData;
 
 pub(crate) use self::layout::FieldLayout;
 pub use self::layout::{EnumLayout, PackedField, PackedLayout};
+pub use self::pointer_enum::{PointerEnumLayout, PointerEnumVariant};
+pub use self::pointer_word::{PointeeAlignment, PointerWordLayout, Tags, assert_aligned};
 use crate::message::{Message, refuse};
 use crate::primitive::Primitive;
 

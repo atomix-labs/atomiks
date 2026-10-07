@@ -1,8 +1,13 @@
 //! The `Atom` laws every value obeys, built-in or derived, and the bits they run on: a value's repr
 //! lies in its range and decodes back to it; a repr that decodes re-encodes to itself, unchecked
 //! too; each validity's promise holds; an ordered value's reprs order as it does, and an integer
-//! held to a range decodes, as itself, exactly where its repr lies in it; and `None` takes a spare
-//! repr: zero where zero is the niche, else one outside its value's range.
+//! held to a range decodes, as itself, exactly where its repr lies in it; `None` takes a spare
+//! repr: zero where zero is the niche, else one outside its value's range; and a value of pointers
+//! decodes to pointers that read what its own do.
+//!
+//! A repr's bits are an integer's own, or a pointer's address, which the laws read without
+//! exposing its provenance: two pointer reprs compare by address, and a pointer decoded is read
+//! through, which Miri refuses where it lost its provenance.
 
 use core::any::type_name;
 use core::fmt::Debug;
@@ -34,9 +39,9 @@ pub(crate) fn edge_or_random_bits(extra: &[u128]) -> impl Strategy<Value = u128>
 /// The range and round-trip laws for `value`, and the repr laws for its repr.
 pub(crate) fn round_trips<T: Atom + PartialEq + Debug>(value: T) -> Result<(), TestCaseError>
 where
-    T::Repr: ExactBits + PartialEq + Debug,
+    T::Repr: PartialEq + Debug,
 {
-    let bits = value.to_repr().to_bits();
+    let bits = value.to_repr().packed_bits();
     prop_assert!(T::REPRS.contains(bits), "{value:?}'s repr {bits:#x} lies in {:?}", T::REPRS);
     prop_assert_eq!(T::from_repr(value.to_repr()), Some(value), "the value decodes back");
     canonical::<T>(value.to_repr())
@@ -167,11 +172,28 @@ where
 }
 
 /// The bits of `None`'s repr as an `Option<T>`.
-pub(crate) fn none_bits<T: Atom>() -> u128
+pub(crate) fn none_bits<T: Atom>() -> u128 {
+    None::<T>.to_repr().packed_bits()
+}
+
+/// The provenance law for `value`, which holds pointers: what `read` reads through the pointers
+/// of the value its repr decodes to, checked and unchecked, is what it reads through `value`'s.
+pub(crate) fn keeps_provenance<T, R, F>(value: T, read: F) -> Result<(), TestCaseError>
 where
-    T::Repr: ExactBits,
+    T: Atom + Debug,
+    R: PartialEq + Debug,
+    F: Fn(T) -> R,
 {
-    None::<T>.to_repr().to_bits()
+    let repr = value.to_repr();
+    let Some(decoded) = T::from_repr(repr) else {
+        return Err(TestCaseError::fail(format!("{value:?} decodes")));
+    };
+    prop_assert_eq!(read(decoded), read(value), "read through {:?}, decoded", decoded);
+    // SAFETY: `repr` is `value`'s own, which decodes.
+    #[expect(unsafe_code, reason = "the unchecked decode the `Atom` contract constrains")]
+    let unchecked = unsafe { T::from_repr_unchecked(repr) };
+    prop_assert_eq!(read(unchecked), read(value), "and decoded unchecked");
+    Ok(())
 }
 
 /// Panics with the broken law's message, where `laws` broke one.

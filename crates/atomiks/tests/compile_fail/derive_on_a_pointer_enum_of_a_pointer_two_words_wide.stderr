@@ -1,0 +1,8 @@
+error: a pointer to `[u8]` is two words, and a pointer enum is one
+  --> tests/compile_fail/derive_on_a_pointer_enum_of_a_pointer_two_words_wide.rs:11:19
+   |
+11 |     Bytes(NonNull<[u8]>),
+   |                   ^^^^
+   |
+   = note: a pointer to a trait object, a slice or a `str` holds its metadata beside its address, and atomiks does not yet hold pointers in two words
+   = help: point to a sized value that holds it, such as a `Box` of it

@@ -1,8 +1,8 @@
-//! A crate under the workspace's lints, `unsafe_code` and `dead_code` forbidden, derives `Atom` and
-//! the capabilities for documented newtypes, a pointer's among them, and `Atom` for fieldless
-//! enums, a marker, a struct of several fields, whose projection it changes a field through, a
-//! private one, whose projection it never uses, and enums with fields, and stores each in a static,
-//! with no feature gate.
+//! A crate under the workspace's lints, `unsafe_code` and `dead_code` forbidden, with no feature
+//! gate, derives `Atom` and the capabilities for documented newtypes, a pointer's among them, and
+//! `Atom` for fieldless enums, a marker, a struct of several fields, whose projection it changes a
+//! field through, a private one, whose projection it never uses, enums with fields, a pointer word,
+//! whose tag it sets through its projection, and a pointer enum, and stores each in a static.
 //!
 //! trybuild runs rustc alone, so the clippy lints here hold only where clippy builds the same code,
 //! as it does in `tests/derive_newtype.rs`.
@@ -182,6 +182,38 @@ pub static QUOTE: Atomic<Quote> =
 /// The spread on the book.
 static SPREAD: Atomic<Spread> = Atomic::new(Spread { bid: 99, ask: 101 });
 
+/// A node of a list, aligned to 8.
+#[derive(Debug)]
+#[repr(align(8))]
+pub struct Node {
+    /// What it holds.
+    pub value: u64,
+}
+
+/// A link to a node, and whether the node that holds it is deleted.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+pub struct Link {
+    /// The next node.
+    pub next: NonNull<Node>,
+    /// Whether it is deleted.
+    pub deleted: bool,
+}
+
+/// The next node, or the end of the list.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+pub enum Next {
+    /// The end.
+    End,
+    /// A node.
+    Node(NonNull<Node>),
+}
+
+/// The first link of a list, or `None` before the first.
+pub static FIRST: Atomic<Option<Link>> = Atomic::new(None);
+
+/// The next node of a list, its end before the first.
+pub static TAIL: Atomic<Next> = Atomic::new(Next::End);
+
 fn main() {
     assert_eq!(NEXT.fetch_add(1, Relaxed), Seq(0), "zero taken");
     assert_eq!(NEXT.load(Acquire), Seq(1), "one next");
@@ -207,4 +239,9 @@ fn main() {
     assert_eq!(fields.side.load(Acquire), Side::Bid, "and another as it was");
     let spread = SPREAD.load(Acquire);
     assert_eq!((spread.bid, spread.ask), (99, 101), "and a spread, read whole");
+    assert_eq!(FIRST.load(Acquire), None, "no first link");
+    let link = Atomic::new(Link { next: NonNull::dangling(), deleted: false });
+    link.fields().deleted.set(Relaxed);
+    assert!(link.load(Acquire).deleted, "a link deleted through its tag");
+    assert_eq!(TAIL.load(Acquire), Next::End, "and the end of a list");
 }

@@ -1,0 +1,9 @@
+error[E0080]: evaluation panicked: `$CRATE::Outer`: tag field `locked` needs 1 low bit, but `$CRATE::Inner` keeps 1 for its own tags and leaves 0 clear above them: shrink the tags, or raise its pointees' alignment to 4 bytes
+  --> tests/compile_fail/derive_on_a_pointer_word_over_a_word_whose_alignment_is_spent.rs:15:8
+   |
+14 | #[derive(Clone, Copy, Atom)]
+   |                       ---- in this derive macro expansion
+15 | struct Outer {
+   |        ^^^^^ evaluation of `_::_` failed here
+   |
+   = note: this error originates in the derive macro `Atom` (in Nightly builds, run with -Z macro-backtrace for more info)

@@ -7,7 +7,7 @@ error[E0277]: a field stored as `*mut u64` cannot be packed beside others
    |             required by a bound introduced by this call
    |
    = help: the trait `atomiks::__private::FieldRepr` is not implemented for `*mut u64`
-   = note: a pointer is stored alone: in a newtype, a struct of one field beside any `PhantomData` markers, or in an `Option`
+   = note: a pointer is stored alone, in a newtype or an `Option`, or as the one pointer field of a pointer word or of a pointer enum's variant, marked `#[atom(ptr)]` where its type shows no pointer
 help: the trait `Atom` is conditionally implemented for `Pair<A, B>`
   --> tests/compile_fail/derive_on_a_generic_instance_with_a_pointer_field.rs:10:23
    |
@@ -43,7 +43,7 @@ error[E0277]: a field stored as `*mut u64` cannot be packed beside others
    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ a pointer, whose bits do not hold its provenance
    |
    = help: the trait `atomiks::__private::FieldRepr` is not implemented for `*mut u64`
-   = note: a pointer is stored alone: in a newtype, a struct of one field beside any `PhantomData` markers, or in an `Option`
+   = note: a pointer is stored alone, in a newtype or an `Option`, or as the one pointer field of a pointer word or of a pointer enum's variant, marked `#[atom(ptr)]` where its type shows no pointer
 help: the trait `Atom` is conditionally implemented for `Pair<A, B>`
   --> tests/compile_fail/derive_on_a_generic_instance_with_a_pointer_field.rs:10:23
    |

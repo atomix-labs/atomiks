@@ -9,7 +9,7 @@ use quote::{ToTokens, format_ident, quote};
 use syn::Ident;
 
 use super::field::{PackedFields, build};
-use super::layout::LayoutCode;
+use super::layout::{AtomImpl, ImplRepr, LayoutCode};
 use super::respan;
 use crate::model::{EnumWithFields, Implementor, Variant};
 
@@ -56,14 +56,18 @@ pub(crate) fn enum_with_fields(
         })
         .collect();
     let integer = Ident::new("Discriminant", def_site);
-    let items = discriminants(&implementor.ident, enum_with_fields, &variants, &integer);
+    let items = discriminants(
+        &implementor.ident,
+        enum_with_fields,
+        variants.iter().map(|code| (code.variant, &code.discriminant)),
+        &integer,
+    );
     let names: Vec<&Ident> = variants.iter().map(|code| &code.discriminant).collect();
     let with_fields: Vec<(&Ident, &Ident)> = variants
         .iter()
         .filter_map(|code| code.fields.as_ref().map(|(_, name)| (&code.discriminant, name)))
         .collect();
-    let has_stated_discriminant =
-        enum_with_fields.variants.iter().any(|variant| variant.discriminant.is_some());
+    let has_stated_discriminant = enum_with_fields.has_stated_discriminant();
     let enum_layout = match with_fields.as_slice() {
         // Each variant's discriminant is its index: the units are numbered beside the payload.
         [(discriminant, fields)] if !has_stated_discriminant => {
@@ -98,36 +102,46 @@ pub(crate) fn enum_with_fields(
     // repr; and the value may cross threads, as the impl checks or bounds the type, unless a field
     // is written as a pointer, which `to_bits` refuses.
     let fields = enum_with_fields.variants.iter().flat_map(|variant| &variant.fields);
-    layout.implement(&items, fields, &validity, &conversions)
+    let reprs = {
+        let layout = layout.local(&name);
+        quote!(#layout.range())
+    };
+    let atom = AtomImpl {
+        items,
+        repr: ImplRepr::Integer,
+        validity,
+        reprs,
+        checks: Vec::new(),
+        conversions,
+    };
+    layout.implement(fields, atom)
 }
 
-/// The discriminants of `enumeration`, each a constant named by its variant's index, of the integer
-/// `integer` names, the enum's `#[repr]`'s or `isize`: each the expression its variant states,
-/// else one past the one before, else its index.
+/// The discriminants of `enumeration`, each a constant of the name `variants` gives its variant,
+/// of the integer `integer` names, the enum's `#[repr]`'s or `isize`: each the expression its
+/// variant states, else one past the one before, else its index.
 ///
 /// The user's expressions keep their spans, so each name resolves as it does in the enum, and
 /// none to the derive's locals, but `Self`, which names the enum there; reading them so lints
 /// nothing the user did not write, where a mirror enum of them would lint them again as an enum.
-fn discriminants(
-    enumeration: &Ident, enum_with_fields: &EnumWithFields, variants: &[VariantCode<'_>],
-    integer: &Ident,
+pub(super) fn discriminants<'a, I: IntoIterator<Item = (&'a Variant, &'a Ident)>>(
+    enumeration: &Ident, enum_with_fields: &EnumWithFields, variants: I, integer: &Ident,
 ) -> TokenStream {
     let integer_type = enum_with_fields.integer.as_ref().map_or_else(
         || quote!(::core::primitive::isize),
         |discriminant| quote!(::core::primitive::#discriminant),
     );
     let mut after_stated: Option<&Ident> = None;
-    let constants = (0..).zip(variants).map(|(index, code)| {
-        let value = match (&code.variant.discriminant, after_stated) {
+    let constants = (0..).zip(variants).map(|(index, (variant, name))| {
+        let value = match (&variant.discriminant, after_stated) {
             (Some(expression), _) => with_self_as(expression.to_token_stream(), enumeration),
             // Wrapping, so that an enum whose discriminant overflows raises rustc's error alone.
             (None, Some(before)) => quote!(#before.wrapping_add(1)),
             (None, None) => Literal::usize_unsuffixed(index).into_token_stream(),
         };
-        if code.variant.discriminant.is_some() || after_stated.is_some() {
-            after_stated = Some(&code.discriminant);
+        if variant.discriminant.is_some() || after_stated.is_some() {
+            after_stated = Some(name);
         }
-        let name = &code.discriminant;
         quote!(const #name: #integer = #value;)
     });
     quote! {
@@ -210,7 +224,7 @@ fn conversions(
         let ident = &variant.ident;
         let path = quote!(Self::#ident);
         if let Some((fields, variant_layout)) = fields {
-            let pattern = build(&path, fields.fields(), fields.values());
+            let pattern = build(&path, fields.fields().iter().copied(), fields.values());
             let packed = fields.encode(fields.values());
             encoded.push(quote!(#pattern => #name.repr(#discriminant, #packed),));
             let value = fields.decode(&bits, &path);

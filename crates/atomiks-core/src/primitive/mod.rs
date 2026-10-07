@@ -10,6 +10,8 @@ mod narrow;
 #[cfg(wide)]
 mod wide;
 
+pub(crate) use self::narrow::{address, subtract_tags};
+
 /// A primitive's cell, and every access to it that is not an atomic instruction.
 ///
 /// Const off loom, where `core`'s cells are; plain under loom, whose cells are not.
@@ -66,6 +68,27 @@ macro_rules! primitive {
             /// A pointer's address is unreadable in const, so only a null pointer and zero match.
             #[doc(hidden)]
             fn is_bits(self, bits: u128) -> bool;
+            /// The bits a packed value's fields lie in: an integer's unsigned bits, `bool`'s 0 or
+            /// 1, or a pointer's address, where a pointer word keeps its tags.
+            ///
+            /// A constant reads no pointer's address but null's.
+            #[doc(hidden)]
+            fn packed_bits(self) -> u128;
+            /// The value whose packed bits are `bits`: the integer of them, or this pointer at the
+            /// address `bits`, its provenance kept.
+            #[doc(hidden)]
+            #[must_use]
+            fn with_packed_bits(self, bits: u128) -> Self;
+            /// The value with the packed bits set in `mask` cleared: a pointer's, at run time,
+            /// through the pointer's `mask`, which tells LLVM they are clear.
+            ///
+            /// A constant reads no pointer's address but null's.
+            #[doc(hidden)]
+            #[inline]
+            #[must_use]
+            fn clear_packed_bits(self, mask: u128) -> Self {
+                self.with_packed_bits(self.packed_bits() & !mask)
+            }
         }
     };
 }
@@ -223,12 +246,16 @@ pub impl(crate) trait Bitwise: CompareExchange {
 /// through it, each with a mask its path confines to the field, and ask it of the container's repr,
 /// so generic code over a field states it, or [`BitTest`], which implies it.
 ///
+/// A pointer's mask is a `usize`, which changes its address and keeps its provenance, as
+/// [`AtomicPtr::fetch_or`](core::sync::atomic::AtomicPtr::fetch_or) does: a pointer word's tags
+/// change so.
+///
 /// # Examples
 /// [`#[derive(Atom)]`'s example][generic] states [`BitTest`], which implies it, in generic code
 /// over a field.
 ///
 /// [generic]: https://docs.rs/atomiks/latest/atomiks/derive.Atom.html#changing-a-field-through-generic-code
-// An integer is its own mask.
+// An integer is its own mask; a pointer's is its address's.
 #[diagnostic::on_unimplemented(
     message = "`{Self}` has no bitwise operation without a compare-exchange loop on this target",
     label = "this would be a compare-exchange loop",
@@ -236,15 +263,12 @@ pub impl(crate) trait Bitwise: CompareExchange {
     note = "to accept a compare-exchange loop, call `update`"
 )]
 pub impl(crate) trait MaskBitwise: CompareExchange {
-    /// The mask: the integer itself.
+    /// The mask: the integer itself, or a pointer's address.
     #[doc(hidden)]
     type Mask: ExactBits;
     /// The mask of the one bit at `position`, below `BITS`.
     #[doc(hidden)]
     fn bit(position: u32) -> Self::Mask;
-    /// The value's bits, as a mask.
-    #[doc(hidden)]
-    fn to_mask(self) -> Self::Mask;
     /// Turns on the bits of `mask`, and returns the value before.
     #[doc(hidden)]
     fn fetch_or_mask(cell: &Self::Cell, mask: Self::Mask, order: CoreOrdering) -> Self;
@@ -285,6 +309,9 @@ pub impl(crate) trait BitTest: MaskBitwise {}
 
 /// A primitive whose and, or, xor and not return the value before without a compare-exchange
 /// loop: `ldclr`, `ldset` and `ldeor` on `aarch64` (without LSE, an outline call or an LL/SC pair).
+///
+/// An integer's or a `bool`'s takes a value or a mask; a pointer's, through which a pointer word's
+/// tags change, a mask.
 // Above the target-neutral attribute, so the target's notes come before its fallback.
 #[cfg_attr(
     target_arch = "x86_64",
@@ -298,7 +325,7 @@ pub impl(crate) trait BitTest: MaskBitwise {}
     label = "this would be a compare-exchange loop",
     note = "to accept a compare-exchange loop, call `update`"
 )]
-pub impl(crate) trait FetchBitwise: Bitwise {}
+pub impl(crate) trait FetchBitwise: MaskBitwise {}
 
 /// A primitive whose maximum and minimum, in its own signed or unsigned order, need no
 /// compare-exchange loop: `ldsmax`, `ldumin` and the rest on `aarch64`

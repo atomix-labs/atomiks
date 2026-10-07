@@ -1,0 +1,13 @@
+error: a second pointer field in `Both`: a variant holds one pointer
+  --> tests/compile_fail/derive_on_a_pointer_enum_with_two_pointers_in_a_variant.rs:11:24
+   |
+11 |     Both(NonNull<u64>, NonNull<u64>),
+   |                        ^^^^^^^^^^^^
+   |
+note: the first is here
+  --> tests/compile_fail/derive_on_a_pointer_enum_with_two_pointers_in_a_variant.rs:11:10
+   |
+11 |     Both(NonNull<u64>, NonNull<u64>),
+   |          ^^^^^^^^^^^^
+   = note: two pointers take two words, and atomiks does not yet hold pointers in two
+   = help: store the second in an atomic of its own

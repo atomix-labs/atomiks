@@ -1,6 +1,7 @@
 //! A crate under the workspace's lints, `unsafe_code` forbidden, with `const_trait_impl`, derives
-//! `Atom` for generic types: a newtype, a struct of several fields, and enums with fields,
-//! niche-filling and tagged; and stores an instance of each in a static.
+//! `Atom` for generic types and stores an instance of each in a static: a newtype, a struct of
+//! several fields, enums with fields, niche-filling and tagged, a pointer word, and pointer enums,
+//! one with a variant of data.
 //!
 //! trybuild runs rustc alone, so the clippy lints here hold only where clippy builds the same code,
 //! as it does in `tests/derive_generic.rs`.
@@ -34,6 +35,7 @@
 )]
 
 use core::num::NonZero;
+use core::ptr::NonNull;
 
 use atomiks::ordering::{Acquire, Relaxed};
 use atomiks::{Atom, Atomic};
@@ -75,8 +77,41 @@ pub enum Slot<T> {
     Ready(T)   = 2,
 }
 
+/// A pointer to any `T` aligned to 2 or more, and a mark.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+pub struct Tagged<T> {
+    /// The pointer.
+    pub pointer: NonNull<T>,
+    /// The mark.
+    pub marked: bool,
+}
+
+/// One of two pointers, by one tag bit.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+pub enum Union<A, B> {
+    /// The first.
+    First(NonNull<A>),
+    /// The second.
+    Second(NonNull<B>),
+}
+
+/// A table's entry over any pointee: vacant, beside the next vacant entry's index, or occupied.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+pub enum Entry<T> {
+    /// Vacant, beside the next vacant entry's index.
+    Vacant(u32),
+    /// Occupied.
+    Occupied(NonNull<T>),
+}
+
 /// The next sequence number.
 pub static NEXT: Atomic<Wrap<u32>> = Atomic::new(Wrap(0));
+
+/// A marked pointer, or `None`.
+pub static MARKED: Atomic<Option<Tagged<u32>>> = Atomic::new(None);
+
+/// One of two pointers, or `None`.
+pub static EITHER: Atomic<Option<Union<u32, u64>>> = Atomic::new(None);
 
 /// The best price and whether it is live.
 pub static BEST: Atomic<Pair<u32, bool>> = Atomic::new(Pair { first: 0, second: false });
@@ -87,6 +122,9 @@ pub static LOCK: Atomic<Lock<NonZero<u32>>> = Atomic::new(Lock::Free);
 /// The last slot written, or `None` before the first.
 pub static SLOT: Atomic<Option<Slot<u32>>> = Atomic::new(None);
 
+/// An entry, vacant until it is filled.
+pub static ENTRY: Atomic<Entry<u64>> = Atomic::new(Entry::Vacant(0));
+
 fn main() {
     assert_eq!(NEXT.swap(Wrap(1), Relaxed), Wrap(0), "one taken");
     BEST.store(Pair { first: 7, second: true }, Relaxed);
@@ -94,5 +132,8 @@ fn main() {
     assert_eq!(LOCK.load(Acquire), Lock::Free, "free");
     assert_eq!(Lock::<NonZero<u32>>::Free.to_repr(), 0, "at zero, which no owner is");
     SLOT.store(Some(Slot::Writing(3)), Relaxed);
-    assert_eq!(SLOT.load(Acquire), Some(Slot::Writing(3)), "and a slot");
+    assert_eq!(SLOT.load(Acquire), Some(Slot::Writing(3)), "a slot");
+    assert_eq!(MARKED.load(Acquire), None, "no marked pointer");
+    assert_eq!(EITHER.load(Acquire), None, "and neither of two");
+    assert_eq!(ENTRY.load(Acquire), Entry::Vacant(0), "a vacant entry");
 }

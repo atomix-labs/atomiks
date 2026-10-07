@@ -13,11 +13,23 @@ pub(crate) enum Lowering {
     InOrder(&'static [&'static str]),
     /// These instructions and no others.
     Only(&'static [&'static str]),
-    /// As `InOrder`, plus one branch back to retry the compare-exchange: `update`'s loop.
+    /// As `InOrder`, plus branches back, each over a compare-exchange, which it retries:
+    /// `update`'s loop.
     Retry(&'static [&'static str]),
+    /// As `Only`, its branches back each over a compare-exchange, which it retries: a loop that
+    /// tests, calls and saves nothing it does not name.
+    RetryOnly(&'static [&'static str]),
+    /// As `InOrder` up to the return, with no branch there but those named and nothing pushed or
+    /// popped, `stp` and `ldp` included, then one cold block that calls [`REFUSAL`]: a tagged
+    /// pointer's encode, whose fast path saves no frame record.
+    Refuses(&'static [&'static str]),
 }
 
-use Lowering::{InOrder, Only, Retry};
+use Lowering::{InOrder, Only, Refuses, Retry, RetryOnly};
+
+/// The one function a lowering may call, by name: the cold refusal of a pointer misaligned for
+/// its tags, which an encode of a tagged pointer calls off its fast path.
+const REFUSAL: &str = "refuse_misaligned";
 
 /// `aarch64` Linux, whose floor has LSE but not LSE2.
 pub(crate) const AARCH64_LINUX: &str = "aarch64-unknown-linux-gnu";
@@ -133,8 +145,8 @@ enum Line {
     /// A branch target.
     Label(String),
     /// An instruction: its mnemonic, with a `lock` prefix or a barrier's domain kept, and where
-    /// it branches to, if it is a branch.
-    Instruction { mnemonic: String, branch: Option<String> },
+    /// it branches to, if it is a branch, or what it calls, if it is a call.
+    Instruction { mnemonic: String, branch: Option<String>, callee: Option<String> },
 }
 
 /// The labels and instructions of the function `name` in `target`'s assembly.
@@ -173,13 +185,24 @@ fn function(target: &str, assembly: &str, name: &str) -> Vec<Line> {
         } else {
             head.to_owned()
         };
-        let is_branch = mnemonic.starts_with('j')
-            || mnemonic.starts_with("b.")
-            || ["b", "br", "cbz", "cbnz", "tbz", "tbnz"].contains(&mnemonic.as_str());
-        let branch = line.rsplit([' ', '\t', ',']).next().filter(|_| is_branch).map(str::to_owned);
-        function.push(Line::Instruction { mnemonic, branch });
+        let operand = line.rsplit([' ', '\t', ',']).next().map(str::to_owned);
+        let branch = operand.clone().filter(|_| is_branch(&mnemonic));
+        let callee = operand.filter(|_| is_call(&mnemonic));
+        function.push(Line::Instruction { mnemonic, branch, callee });
     }
     function
+}
+
+/// Whether `mnemonic` is a branch: a jump on `x86_64`, `b` and its kin on `aarch64`.
+fn is_branch(mnemonic: &str) -> bool {
+    mnemonic.starts_with('j')
+        || mnemonic.starts_with("b.")
+        || ["b", "br", "cbz", "cbnz", "tbz", "tbnz"].contains(&mnemonic)
+}
+
+/// Whether `mnemonic` is a call: `call` on `x86_64`, `bl` or `blr` on `aarch64`.
+fn is_call(mnemonic: &str) -> bool {
+    mnemonic.starts_with("call") || ["bl", "blr"].contains(&mnemonic)
 }
 
 /// Whether `mnemonic` is a compare-exchange: `cmpxchg` on `x86_64`, `cas` on `aarch64`.
@@ -201,13 +224,17 @@ fn is_load_linked(mnemonic: &str) -> bool {
 
 /// Checks that `name` costs nothing its `lowering` does not name.
 ///
-/// That is no call, no load-linked, no backward branch but, for a `Retry`, the one that
-/// retries its compare-exchange, and no compare-exchange or barrier beyond those the lowering
-/// names. A call or a jump out of the function counts, since what it reaches, such as an
+/// That is no call but, for a `Refuses` or a lowering that names a call, the one to [`REFUSAL`], no
+/// load-linked, no backward branch but, for a `Retry` or a `RetryOnly`, at least one, each from
+/// past a compare-exchange to before it, and no compare-exchange or barrier beyond those the
+/// lowering names. A call or a jump out of the function counts, since what it reaches, such as an
 /// outline atomic, could loop.
 fn assert_no_unnamed_cost(target: &str, name: &str, lines: &[Line], lowering: &Lowering) {
-    let (InOrder(wanted) | Only(wanted) | Retry(wanted)) = *lowering;
-    let retries = matches!(lowering, Retry(_));
+    let (InOrder(wanted) | Only(wanted) | Retry(wanted) | RetryOnly(wanted) | Refuses(wanted)) =
+        *lowering;
+    let retries = matches!(lowering, Retry(_) | RetryOnly(_));
+    let refuses = matches!(lowering, Refuses(_)) || wanted.iter().any(|mnemonic| is_call(mnemonic));
+    let mut refusals = 0_usize;
     let local: Vec<&str> = lines
         .iter()
         .filter_map(|line| match line {
@@ -215,34 +242,54 @@ fn assert_no_unnamed_cost(target: &str, name: &str, lines: &[Line], lowering: &L
             Line::Instruction { .. } => None,
         })
         .collect();
+    // Each label above the line, with how many compare-exchanges lie above it.
     let mut labels = Vec::new();
+    let mut compare_exchanges = 0_usize;
     let mut mnemonics = Vec::new();
     let mut branches_back = 0_usize;
     for line in lines {
         match line {
-            Line::Label(label) => labels.push(label.as_str()),
-            Line::Instruction { mnemonic, branch } => {
+            Line::Label(label) => labels.push((label.as_str(), compare_exchanges)),
+            Line::Instruction { mnemonic, branch, callee } => {
                 let leaves = branch.as_deref().is_some_and(|to| !local.contains(&to));
+                let refusal = refuses && callee.as_deref().is_some_and(|to| to.contains(REFUSAL));
+                refusals = refusals.saturating_add(usize::from(refusal));
                 assert!(
-                    !leaves
-                        && !mnemonic.starts_with("call")
-                        && !["bl", "blr"].contains(&mnemonic.as_str()),
+                    !leaves && (!is_call(mnemonic) || refusal),
                     "{target}: `{name}` calls out: `{mnemonic}`"
                 );
                 assert!(
                     !is_load_linked(mnemonic),
                     "{target}: `{name}` has a load-linked loop: `{mnemonic}`"
                 );
-                let back = branch.as_deref().is_some_and(|to| labels.contains(&to));
-                assert!(retries || !back, "{target}: `{name}` branches back: `{mnemonic}`");
-                branches_back = branches_back.saturating_add(usize::from(back));
+                // Where the branch is back, whether a compare-exchange lies between its label and
+                // it.
+                let back = branch.as_deref().and_then(|to| {
+                    let (_, above) = labels.iter().find(|(label, _)| *label == to)?;
+                    Some(compare_exchanges > *above)
+                });
+                assert!(
+                    retries || back.is_none(),
+                    "{target}: `{name}` branches back: `{mnemonic}`"
+                );
+                assert!(
+                    back != Some(false),
+                    "{target}: `{name}` branches back over no compare-exchange: `{mnemonic}`"
+                );
+                branches_back = branches_back.saturating_add(usize::from(back.is_some()));
+                compare_exchanges =
+                    compare_exchanges.saturating_add(usize::from(is_compare_exchange(mnemonic)));
                 mnemonics.push(mnemonic.as_str());
             },
         }
     }
     assert!(
-        !retries || branches_back == 1,
-        "{target}: `{name}` branches back once, to retry its compare-exchange"
+        !retries || branches_back > 0,
+        "{target}: `{name}` branches back to retry its compare-exchange"
+    );
+    assert!(
+        !refuses || refusals == 1,
+        "{target}: `{name}` calls the refusal of a misaligned pointer once, off its fast path"
     );
     let count = |mnemonics: &[&str], is_kind: fn(&str) -> bool| {
         mnemonics.iter().filter(|mnemonic| is_kind(mnemonic)).count()
@@ -267,9 +314,11 @@ pub(crate) fn lowers_as_expected(
 ) {
     let assembly = assembly(target, cpu);
     let symbol_prefix = syntax(target).symbol_prefix;
+    // Each refusal a probe calls is a symbol too, but no probe.
     let mut found: Vec<&str> = assembly
         .lines()
         .filter_map(|line| line.trim().strip_prefix(".globl")?.trim().strip_prefix(symbol_prefix))
+        .filter(|symbol| !symbol.contains(REFUSAL))
         .collect();
     found.sort_unstable();
     let mut named: Vec<&str> = expected.iter().copied().flatten().map(|(name, _)| *name).collect();
@@ -292,8 +341,34 @@ pub(crate) fn lowers_as_expected(
                     "{target}: `{name}` lowers to {wanted:?} in order, among {mnemonics:?}"
                 );
             },
-            Only(wanted) => {
+            Only(wanted) | RetryOnly(wanted) => {
                 assert_eq!(&mnemonics, wanted, "{target}: `{name}` is these and nothing else");
+            },
+            Refuses(wanted) => {
+                let end = mnemonics.iter().position(|mnemonic| mnemonic.starts_with("ret"));
+                let fast_path =
+                    &mnemonics[..end.map_or(mnemonics.len(), |end| end.saturating_add(1))];
+                let mut rest = fast_path.iter();
+                assert!(
+                    wanted.iter().all(|expected| rest.any(|mnemonic| mnemonic == expected)),
+                    "{target}: `{name}`'s fast path is {wanted:?} in order, among {fast_path:?}"
+                );
+                let branches = |mnemonics: &[&str]| {
+                    mnemonics.iter().filter(|mnemonic| is_branch(mnemonic)).count()
+                };
+                assert_eq!(
+                    branches(fast_path),
+                    branches(wanted),
+                    "{target}: `{name}`'s fast path branches only as {wanted:?}, among {fast_path:?}"
+                );
+                assert!(
+                    !fast_path.iter().any(|mnemonic| {
+                        ["push", "pop", "stp", "ldp"]
+                            .iter()
+                            .any(|stack| mnemonic.starts_with(stack))
+                    }),
+                    "{target}: `{name}`'s fast path saves no frame record, among {fast_path:?}"
+                );
             },
         }
         assert_no_unnamed_cost(target, name, &lines, lowering);

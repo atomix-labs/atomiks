@@ -1,0 +1,58 @@
+error[E0080]: evaluation panicked: a constant reads no pointer's address but null's: build or read a pointer word or a pointer enum whose pointer is not null at run time
+  --> tests/compile_fail/derive_on_a_pointer_enum_tagged_pointer_built_in_a_constant.rs:31:30
+   |
+31 | static ROOT: Atomic<Child> = Atomic::new(Child::Leaf(NonNull::from_ref(&LEAF)));
+   |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `ROOT` failed inside this call
+   |
+note: inside `atomiks::Atomic::<Child>::new`
+  --> $WORKSPACE/crates/atomiks-core/src/atomic/mod.rs
+   |
+   |             cell: T::Validity::wrap::<T::Repr>(value.to_repr().into_cell()),
+   |                                                ^^^^^^^^^^^^^^^
+note: inside `_::<impl Atom for Child>::to_repr`
+  --> tests/compile_fail/derive_on_a_pointer_enum_tagged_pointer_built_in_a_constant.rs:15:23
+   |
+15 | #[derive(Clone, Copy, Atom)]
+   |                       ^^^^
+note: inside `atomiks::__private::to_tagged_repr::<Child>`
+  --> $WORKSPACE/crates/atomiks-core/src/__private.rs
+   |
+   |     value.to_tagged_repr(tags)
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: inside `_::<impl Atom for Child>::to_tagged_repr`
+  --> tests/compile_fail/derive_on_a_pointer_enum_tagged_pointer_built_in_a_constant.rs:15:23
+   |
+15 |   #[derive(Clone, Copy, Atom)]
+   |                         ^---
+   |                         |
+   |  _______________________in this derive macro expansion
+   | |
+16 | | enum Child {
+17 | |     Leaf(NonNull<Leaf>),
+   | |______________________^
+note: inside `atomiks::__private::to_tagged_pointer::<NonNull<Leaf>>`
+  --> $WORKSPACE/crates/atomiks-core/src/__private.rs
+   |
+   |     let (pointer, misaligned) = value.to_tagged_repr(tags);
+   |                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: inside `<NonNull<Leaf> as Atom>::to_tagged_repr`
+  --> $WORKSPACE/crates/atomiks-core/src/atom/mod.rs
+   |
+   |         tags.set_in(self.to_repr())
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: inside `atomiks::__private::Tags::set_in::<*mut Leaf>`
+  --> $WORKSPACE/crates/atomiks-core/src/range/pointer_word.rs
+   |
+   |         let address = repr.packed_bits();
+   |                       ^^^^^^^^^^^^^^^^^^
+note: inside `atomiks_core::primitive::narrow::<impl Primitive for *mut Leaf>::packed_bits`
+  --> $WORKSPACE/crates/atomiks-core/src/primitive/narrow.rs
+   |
+   |         address(self).wrapping_cast()
+   |         ^^^^^^^^^^^^^
+note: inside `atomiks_core::primitive::narrow::address::<Leaf>`
+  --> $WORKSPACE/crates/atomiks-core/src/primitive/narrow.rs
+   |
+   |     const_eval_select((pointer,), address_in_constant::<T>, address_at_run_time::<T>)
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the failure occurred here
+   = note: this error originates in the derive macro `Atom` (in Nightly builds, run with -Z macro-backtrace for more info)

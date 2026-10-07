@@ -1,5 +1,5 @@
 //! What a test checks of a value's `Atom` impl, built-in or derived: its repr and validity, the
-//! bits it takes as a field, and which reprs decode.
+//! bits it takes as a field, which reprs decode, and the low bits a pointer's tags take.
 
 use core::fmt::Debug;
 
@@ -9,6 +9,11 @@ use atomiks_core::{Atom, Primitive, ReprRange};
 
 /// Compiles only where `T`'s repr is `R` and its validity `V`.
 pub(crate) const fn repr_and_validity_are<T: Atom<Repr = R, Validity = V>, R, V: Validity>() {}
+
+/// How many low bits `T` keeps its tags in, and how many its pointees' alignment leaves clear.
+pub(crate) const fn low_bit_widths<T: Atom>() -> (u32, u32) {
+    (T::TAG_WIDTH, T::POINTEE_ALIGNMENT.width())
+}
 
 /// How many bits a packed value takes for a field of `reprs`.
 pub(crate) fn field_width<R: Primitive>(reprs: ReprRange<R>) -> u32 {

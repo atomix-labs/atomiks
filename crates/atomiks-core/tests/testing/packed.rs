@@ -93,13 +93,18 @@ macro_rules! packed {
             $(
                 // SAFETY: `to_repr` packs the field at this placement, each other at its own, and
                 // extends the bits above as `LAYOUT` does; `from_repr` decodes wherever each
-                // field's bits decode and the bits above extend it; and `reaches_top` selects
-                // `Reach<true>` only where the field ends at the repr's top bit.
+                // field's bits decode and the bits above extend it; `reaches_top` selects
+                // `Reach<true>` only where the field ends at the repr's top bit; and `field`
+                // returns the field.
                 #[expect(unsafe_code, reason = "the impl the derive writes, by hand")]
                 unsafe impl HasPackedField<$index, $ty> for $name {
                     const PLACEMENT: PackedField = PLACEMENTS[$index];
                     const LAYOUT: PackedLayout = LAYOUT;
                     type Reach = Reach<{ reaches_top::<$repr>(PLACEMENTS[$index]) }>;
+                    #[inline]
+                    fn field(self) -> $ty {
+                        self.$field
+                    }
                 }
             )+
 

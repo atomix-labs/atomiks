@@ -6,8 +6,8 @@ use quote::quote;
 use syn::Ident;
 
 use super::field::PackedFields;
-use super::layout::LayoutCode;
-use super::projection::ProjectionCode;
+use super::layout::{AtomImpl, ImplRepr, LayoutCode};
+use super::projection::{FieldSite, ProjectionCode};
 use crate::model::{Field, Implementor};
 
 /// `Atom` for the packed struct of `fields`, in a block beside its layout: constants where it has
@@ -55,14 +55,50 @@ pub(crate) fn packed(implementor: &Implementor, fields: &[Field], def_site: Span
     // a generic struct evaluate, refuses an instance wider than its repr, so no field's bits fall
     // past the repr's; and the value may cross threads, as the impl checks or bounds the type,
     // unless a field is written as a pointer, which `to_bits` refuses.
-    let implemented = layout.implement(
-        &projection.implementations(&packed, &layout),
-        fields,
-        &validity,
-        &conversions,
-    );
+    //
+    // Each `HasPackedField` keeps its promise: its type parameter is the field's type, and its
+    // placement is `PackedField::new` of that type's reprs, at the offset where the field before
+    // it ends, where `to_repr` packs the field, each field in bits of its own; the layout is the
+    // struct's, whose extension `to_repr` writes above the width; `from_repr` decodes each field
+    // alone and checks only the bits above the width, so a repr decodes wherever each field's bits
+    // decode and the bits above extend the layout; `Reach` is `Reach<true>` only where
+    // `reaches_top` finds the field ending at the repr's top bit, and never for a generic struct;
+    // and `field` returns the field.
+    let atom = AtomImpl {
+        items: projection.implementations(field_sites(&packed, &layout)),
+        repr: ImplRepr::Integer,
+        validity,
+        reprs: {
+            let layout = layout.local(&name);
+            quote!(#layout.range())
+        },
+        checks: Vec::new(),
+        conversions,
+    };
+    let implemented = layout.implement(fields, atom);
     let structure = projection.structure();
     quote!(#implemented #structure)
+}
+
+/// Where each of `packed`'s fields lies, as its `HasPackedField` says.
+///
+/// A concrete struct's placements and layout are constants, and a field that ends at the repr's
+/// top bit reaches it; a generic struct's are what each instance lays out, which no constant knows,
+/// so no field reaches the top.
+fn field_sites<'a>(
+    packed: &'a PackedFields<'_>, layout: &'a LayoutCode<'_>,
+) -> impl Iterator<Item = FieldSite> + 'a {
+    let atomiks = packed.atomiks();
+    let (name, alias) = (layout.name(), layout.repr_alias());
+    packed.placements().iter().map(move |placement| {
+        let reach = if layout.is_generic() {
+            quote!(#atomiks::__private::Reach<false>)
+        } else {
+            let reaches_top = quote!(#atomiks::__private::reaches_top::<#alias>(#placement));
+            quote!(#atomiks::__private::Reach<{ #reaches_top }>)
+        };
+        FieldSite { placement: layout.local(placement), layout: layout.local(name), reach }
+    })
 }
 
 /// `to_repr`, `from_repr` and `from_repr_unchecked` of the struct, through its `layout`.

@@ -18,7 +18,8 @@ use proc_macro::{Diagnostic, Level, Span, TokenStream};
 ///
 /// The impl is `const`, so a `static` of the type builds, and a type without parameters needs no
 /// feature gate. `#[atom(…)]` on the type takes two keys: `repr`, below, and `crate = path`, which
-/// names atomiks where `::atomiks` does not.
+/// names atomiks where `::atomiks` does not. On a field, `#[atom(ptr)]` marks a pointer its type
+/// does not show: an alias, a parameter, a newtype of one, a pointer word or a pointer enum.
 ///
 /// # Shapes
 /// - **Newtype**, a struct of one field beside any `PhantomData` markers: the field's repr, range,
@@ -33,6 +34,20 @@ use proc_macro::{Diagnostic, Level, Span, TokenStream};
 ///   discriminant. Where one variant alone has fields and none states a discriminant, niche-filling
 ///   instead, unless that is wider: the unit variants take the reprs beside that variant's range,
 ///   as `Option`'s `None` takes one.
+/// - **Pointer word**, a struct of several fields, one a pointer, written as a `NonNull`, an
+///   `Option` of one or a raw pointer, or marked: the pointer's repr, each other field a tag packed
+///   above the pointer's own tags into the low bits its pointee's alignment leaves clear, which the
+///   build checks, a generic word's in each instance. Its `to_repr` panics on a pointer with a bit
+///   set where the tags go.
+/// - **Pointer enum**, one variant or more holding a pointer: a `*mut ()`, each variant's tag its
+///   discriminant, above its pointers' own tags; a pointer variant's tag fields above the tag, a
+///   data variant's fields above the bits every pointer's alignment leaves clear; one unit beside
+///   one pointer that is never null takes null, and no tag, unless a variant states its
+///   discriminant. Its `to_repr` panics as a pointer word's does.
+///
+/// A pointer word's or a pointer enum's layout reads its pointers' tags but not their pointees'
+/// alignment, which the build checks once the pointees are laid out, so a node may hold an atomic
+/// of the word that points to it, as a list's node holds the link to the next.
 ///
 /// `from_repr` refuses each repr no value encodes to, so each value has one repr.
 ///
@@ -44,7 +59,9 @@ use proc_macro::{Diagnostic, Level, Span, TokenStream};
 /// own visibility and docs, so each field is a place of its own, changed alone, and a private
 /// field's place stays in its module. Each place's type names its field's path, as `Field<Quote,
 /// 2, bool>`, which is a type alone. A tuple struct's projection is a tuple struct. A type named
-/// `QuoteFields` beside `Quote` clashes with the projection.
+/// `QuoteFields` beside `Quote` clashes with the projection. A pointer word projects so too: each
+/// tag is a place, and its pointer a place whose `load` reads it through the word, and whose own
+/// `fields` reach an inner word's tags.
 ///
 /// Generic code takes a place as `&AtomicField<P>`, and states what each operation asks of the
 /// container's repr: [`BitTest`], [`MaskBitwise`] or [`FetchAdd`].
@@ -54,10 +71,11 @@ use proc_macro::{Diagnostic, Level, Span, TokenStream};
 /// [`MaskBitwise`]: https://docs.rs/atomiks/latest/atomiks/trait.MaskBitwise.html
 ///
 /// # Repr
-/// A newtype's is its field's, and a fieldless enum's the integer its `#[repr]` names, or C's `int`
-/// under `#[repr(C)]`, which must hold each discriminant; any other is the narrowest unsigned
-/// integer that holds the layout. No repr is wider than 128 bits, or 64 on `x86_64` without
-/// `cmpxchg16b`: a value that needs more is refused.
+/// A newtype's is its field's, a fieldless enum's the integer its `#[repr]` names, or C's `int`
+/// under `#[repr(C)]`, which must hold each discriminant, and a pointer word's or a pointer
+/// enum's its pointer's, which `repr = u64` or `usize` alone may state; any other is the narrowest
+/// unsigned integer that holds the layout. No repr is wider than 128 bits, or 64 on
+/// `x86_64` without `cmpxchg16b`: a value that needs more is refused.
 ///
 /// `#[atom(repr = u64)]` states the repr, any integer primitive, so the build refuses a type that
 /// outgrows it: a newtype's field must have it, a fieldless enum's `#[repr]`, where it has one,
@@ -72,6 +90,10 @@ use proc_macro::{Diagnostic, Level, Span, TokenStream};
 ///   promise of zero. With parameters, a packed struct is `ZeroValid` where each field's zero
 ///   decodes, an enum with fields where it states its discriminants and a unit variant's is 0,
 ///   stated or implied; else `Partial`.
+/// - A pointer word is what its fields promise, its pointer among them, and a pointer enum what the
+///   variant its zero repr holds promises of zero; with parameters, a pointer word is `ZeroValid`
+///   where each field's zero decodes, and a pointer enum where its first variant is a unit and none
+///   states a discriminant; else `Partial`.
 ///
 /// # Generic Types
 /// A crate enables `#![feature(const_trait_impl)]` where the impl converts a field that names one
@@ -82,16 +104,18 @@ use proc_macro::{Diagnostic, Level, Span, TokenStream};
 /// zero-width struct, or a type whose `const` parameter no field names needs no gate.
 ///
 /// A newtype takes its field's layout in each instance; a packed struct or an enum with fields that
-/// has parameters states its repr, which each instance is checked against as it is built. A
-/// fieldless enum takes no parameters.
+/// has parameters states its repr, which each instance is checked against as it is built, but a
+/// pointer word or a pointer enum, whose repr is its pointer's, need not state one. A fieldless
+/// enum takes no parameters.
 ///
 /// # Threads
 /// An `Atomic` may cross threads, so the type must be `Send` and `Sync`: checked beside the impl,
 /// or bounded where it has parameters, so `Wrap<*mut u8>` has no impl, nor a type whose negative
 /// impl says it is neither. A newtype whose field is written as a raw pointer, a `NonNull` or an
 /// `Option` of one is neither, yet may cross, as a pointer's `Atom` impl promises: its markers
-/// alone are checked. A packed struct or an enum with fields refuses a pointer field, whose bits
-/// would lose its provenance.
+/// alone are checked, and a pointer word's or a variant's pointer field is exempt alike. A packed
+/// struct refuses a field stored as a pointer that its type does not show, an alias or a parameter
+/// left unmarked, whose bits would lose its provenance.
 ///
 /// # Examples
 /// ## Wrapping a Value
@@ -292,6 +316,94 @@ use proc_macro::{Diagnostic, Level, Span, TokenStream};
 /// let owner = OwnerId(NonZero::new(7).expect("7 is not zero"));
 /// assert_eq!(Lock::Held(owner).to_repr(), 7, "an owner's id as it is");
 /// assert_eq!(Lock::Free.to_repr(), 0, "and `Free` zero");
+/// ```
+///
+/// ## Tagging a Pointer
+/// ```
+/// # extern crate atomiks_core as atomiks;
+/// # use atomiks_derive::Atom;
+/// use core::ptr::{self, NonNull};
+///
+/// use atomiks::ordering::{AcqRel, Acquire, Release};
+/// use atomiks::{Atom, Atomic};
+///
+/// /// A node of a list, which holds the link to the next node, or none: aligned to 8, so a
+/// /// pointer to one leaves three low bits clear.
+/// #[repr(align(8))]
+/// struct Node {
+///     value: u64,
+///     next: Atomic<Option<Link>>,
+/// }
+///
+/// /// A Harris list's link: the next node, and whether the node that holds the link is deleted.
+/// #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+/// struct Link {
+///     next: NonNull<Node>,
+///     deleted: bool,
+/// }
+///
+/// /// A link and a lock its writer takes: a word holding another, its tag above the link's.
+/// #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+/// struct Guarded {
+///     #[atom(ptr)]
+///     link: Link,
+///     locked: bool,
+/// }
+///
+/// let node = Node { value: 7, next: Atomic::new(None) };
+/// let next = NonNull::from(&node);
+/// let deleted = Link { next, deleted: true };
+/// assert_eq!(deleted.to_repr().addr(), next.as_ptr().addr() | 1, "the mark in bit 0");
+/// assert_eq!(None::<Link>.to_repr(), ptr::null_mut(), "`None` null, which no link is");
+///
+/// let guarded = Atomic::new(Guarded { link: Link { next, deleted: false }, locked: false });
+/// guarded.fields().locked.set(Release);
+/// // A field of a field, in bit 0 below the lock: one `lock bts`, or `ldsetal`.
+/// assert!(!guarded.fields().link.fields().deleted.test_and_set(AcqRel), "this thread deleted it");
+/// assert_eq!(guarded.fields().link.load(Acquire), deleted, "the link, read through the word");
+/// assert_eq!(guarded.load(Acquire).to_repr().addr(), next.as_ptr().addr() | 0b11, "both tags");
+/// ```
+///
+/// ## Storing a Pointer Enum
+/// ```
+/// # extern crate atomiks_core as atomiks;
+/// # use atomiks_derive::Atom;
+/// use core::ptr::{self, NonNull};
+///
+/// use atomiks::{Atom, Atomic};
+///
+/// /// A leaf of a tree, aligned to 8.
+/// #[repr(align(8))]
+/// struct Leaf {
+///     value: u64,
+/// }
+///
+/// /// A branch of a tree, aligned to 8.
+/// #[repr(align(8))]
+/// struct Branch {
+///     left: u64,
+///     right: u64,
+/// }
+///
+/// /// A child of a tree: a leaf or a branch, its tag in bit 0, which both alignments leave clear.
+/// #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+/// enum Child {
+///     Leaf(NonNull<Leaf>),
+///     Branch(NonNull<Branch>),
+/// }
+///
+/// /// The next leaf of a list, or its end, which takes null: `Option<NonNull<Leaf>>`'s layout.
+/// #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+/// enum Next {
+///     End,
+///     Leaf(NonNull<Leaf>),
+/// }
+///
+/// let subtree = Branch { left: 1, right: 2 };
+/// let branch = NonNull::from(&subtree);
+/// assert_eq!(Child::Branch(branch).to_repr().addr(), branch.as_ptr().addr() | 1, "tagged 1");
+/// assert_eq!(Next::End.to_repr(), ptr::null_mut(), "the end null, with no tag");
+/// assert_eq!(size_of::<Atomic<Option<Child>>>(), 8, "and `None` null, which no child is");
 /// ```
 ///
 /// ## Deriving for a Generic Type

@@ -7,8 +7,8 @@ error[E0080]: evaluation panicked: `ReprRange::<i8>::from_signed(-1, 128)`: the 
 note: erroneous constant encountered
  --> src/atom/option.rs
   |
-  |     let Some(spare) = T::REPRS.spare_for_none() else {
-  |                       ^^^^^^^^
+  |         if T::REPRS.contains(0) {
+  |            ^^^^^^^^
 
 note: erroneous constant encountered
  --> src/atom/option.rs

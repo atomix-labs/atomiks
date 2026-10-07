@@ -1,24 +1,32 @@
-//! A packed struct's projection: each field's `HasPackedField`, which makes its path a
-//! `FieldPath`; `QuoteFields<'a, P>`, a struct of one field place per field, each of the field's
-//! own visibility; and `ProjectFields`, through which `fields()` lends it.
+//! A packed struct's projection, or a pointer word's: each field's `HasPackedField`, which makes
+//! its path a `FieldPath`; `QuoteFields<'a, P>`, a struct of one field place per field, each of
+//! the field's own visibility; and `ProjectFields`, through which `fields()` lends it.
 
 use proc_macro2::{Delimiter, Literal, Punct, Spacing, Span, TokenStream, TokenTree};
 use quote::{ToTokens, format_ident, quote};
 use syn::ext::IdentExt;
 use syn::{GenericParam, Ident, Lifetime, Member, Type};
 
-use super::bound::{own_where_clause, thread_bounds, where_clause};
-use super::field::PackedFields;
-use super::layout::LayoutCode;
+use super::bound::{BoundSite, field_bounds, own_where_clause, thread_bounds, where_clause};
 use crate::model::{Field, Implementor};
 
-/// The code of a packed struct's projection, which names its parameters, `'a` and `P`, and its
-/// locals at the derive's definition site.
+/// Where a field the projection lends lies, as its `HasPackedField` says.
+pub(super) struct FieldSite {
+    /// The field's `PLACEMENT`, a `PackedField`.
+    pub(super) placement: TokenStream,
+    /// The struct's `LAYOUT`, a `PackedLayout`.
+    pub(super) layout: TokenStream,
+    /// The field's `Reach`: `Reach<false>`, or `Reach<true>` where it ends at the repr's top bit.
+    pub(super) reach: TokenStream,
+}
+
+/// The code of a packed struct's projection, or a pointer word's, which names its parameters, `'a`
+/// and `P`, and its locals at the derive's definition site.
 pub(super) struct ProjectionCode<'a> {
     /// The struct projected.
     implementor: &'a Implementor,
     /// Its fields, in declaration order.
-    fields: &'a [Field],
+    fields: Vec<&'a Field>,
     /// The projection's name, `QuoteFields`, beside the struct's.
     name: Ident,
     /// The lifetime of the field places it holds: `'a`, or the first letter after it the struct
@@ -32,12 +40,14 @@ pub(super) struct ProjectionCode<'a> {
 }
 
 impl<'a> ProjectionCode<'a> {
-    /// The projection of `implementor`, a packed struct of `fields`, naming its parameters at
-    /// `def_site`.
+    /// The projection of `implementor`, a packed struct or a pointer word of `fields`, naming its
+    /// parameters at `def_site`.
     ///
     /// The parameters take names the struct's own do not, though hygiene keeps them apart, so a
     /// page rustdoc writes tells them apart too.
-    pub(super) fn new(implementor: &'a Implementor, fields: &'a [Field], def_site: Span) -> Self {
+    pub(super) fn new<F: IntoIterator<Item = &'a Field>>(
+        implementor: &'a Implementor, fields: F, def_site: Span,
+    ) -> Self {
         let ident = &implementor.ident;
         let params = &implementor.generics.params;
         let is_taken = |name: &str| {
@@ -51,7 +61,7 @@ impl<'a> ProjectionCode<'a> {
         let path = first_untaken('P'..='Z', is_taken).unwrap_or('P');
         Self {
             implementor,
-            fields,
+            fields: fields.into_iter().collect(),
             name: format_ident!("{ident}Fields", span = ident.span()),
             lifetime: Lifetime::new(&format!("'{lifetime}"), def_site),
             path: Ident::new(&path.to_string(), def_site),
@@ -59,39 +69,17 @@ impl<'a> ProjectionCode<'a> {
         }
     }
 
-    /// Each field's `HasPackedField`, where `packed` places it and `layout` lays the struct out,
-    /// the struct's `ProjectFields` and the projection's `Debug`: the impls in the block beside
-    /// its `Atom`.
-    ///
-    /// A concrete struct's placements and layout are constants, and a field that ends at the
-    /// repr's top bit reaches it; a generic struct's are what each instance lays out, which no
-    /// constant knows, so no field reaches the top.
-    pub(super) fn implementations(
-        &self, packed: &PackedFields<'_>, layout: &LayoutCode<'_>,
+    /// Each field's `HasPackedField`, of its `sites`, in declaration order, the struct's
+    /// `ProjectFields` and the projection's `Debug`: the impls in the block beside its `Atom`.
+    pub(super) fn implementations<I: IntoIterator<Item = FieldSite>>(
+        &self, sites: I,
     ) -> TokenStream {
         let Implementor { generics, atomiks, .. } = self.implementor;
         let (impl_generics, _, _) = generics.split_for_impl();
         let instance = self.instance();
         let where_clause = self.where_clause();
-        let (name, alias) = (layout.name(), layout.repr_alias());
-        let is_generic = layout.instance_repr().is_some();
-        let field_implementations = self.fields.iter().zip(packed.placements()).enumerate().map(
-            |(index, (Field { ty, .. }, placement))| {
-                let (placement, layout, reach) = if is_generic {
-                    (
-                        layout.instance_local(placement),
-                        layout.instance_local(name),
-                        quote!(#atomiks::__private::Reach<false>),
-                    )
-                } else {
-                    let reaches_top =
-                        quote!(#atomiks::__private::reaches_top::<#alias>(#placement));
-                    (
-                        quote!(#placement),
-                        quote!(#name),
-                        quote!(#atomiks::__private::Reach<{ #reaches_top }>),
-                    )
-                };
+        let field_implementations = self.fields.iter().zip(sites).enumerate().map(
+            |(index, (Field { ty, member, .. }, FieldSite { placement, layout, reach }))| {
                 let index = field_index(index);
                 quote! {
                     #[automatically_derived]
@@ -101,22 +89,19 @@ impl<'a> ProjectionCode<'a> {
                         const PLACEMENT: #atomiks::__private::PackedField = #placement;
                         const LAYOUT: #atomiks::__private::PackedLayout = #layout;
                         type Reach = #reach;
+                        #[inline]
+                        fn field(self) -> #ty {
+                            self.#member
+                        }
                     }
                 }
             },
         );
         let (project_fields, debug) =
             (self.project_fields_implementation(), self.debug_implementation());
-        // Each `HasPackedField` keeps its promise: its type parameter is the field's type, and its
-        // placement is `PackedField::new` of that type's reprs, at the offset where the field
-        // before it ends, where `to_repr` packs the field, each field in bits of its own; the
-        // layout is the struct's, whose extension `to_repr` writes above the width; `from_repr`
-        // decodes each field alone and checks only the bits above the width, so a repr decodes
-        // wherever each field's bits decode and the bits above extend the layout; and `Reach` is
-        // `Reach<true>` only where `reaches_top` finds the field ending at the repr's top bit, and
-        // never for a generic struct. `ProjectFields` keeps its own: `project` lends the place of
-        // each field, at its path from `place`, into the projection's field of that field's
-        // visibility, and no other place.
+        // `ProjectFields` keeps its promise: `project` lends the place of each field, at its path
+        // from `place`, into the projection's field of that field's visibility, and no other
+        // place. Each `HasPackedField` keeps its own as the caller's sites say.
         quote!(#(#field_implementations)* #project_fields #debug)
     }
 
@@ -271,10 +256,9 @@ impl<'a> ProjectionCode<'a> {
     /// it, so the struct is an `Atom` wherever the impl applies.
     fn where_clause(&self) -> Option<TokenStream> {
         let atomiks = &self.implementor.atomiks;
-        let field_bounds = self.fields.iter().filter(|field| field.is_generic).map(
-            |Field { ty, .. }| quote!(#ty: #atomiks::Atom<Repr: #atomiks::__private::FieldRepr>),
-        );
-        let thread_bounds = thread_bounds(self.implementor, self.fields);
+        let field_bounds =
+            field_bounds(atomiks, self.fields.iter().copied(), BoundSite::Projection);
+        let thread_bounds = thread_bounds(self.implementor, self.fields.iter().copied());
         where_clause(self.implementor, field_bounds.chain(thread_bounds))
     }
 
@@ -340,7 +324,7 @@ impl<'a> ProjectionCode<'a> {
 
     /// Whether the struct's fields are unnamed, so that its projection's are too.
     const fn is_tuple(&self) -> bool {
-        matches!(self.fields.first(), Some(Field { member: Member::Unnamed(_), .. }))
+        matches!(self.fields.as_slice().first(), Some(Field { member: Member::Unnamed(_), .. }))
     }
 }
 
@@ -356,8 +340,9 @@ fn field_index(index: usize) -> Literal {
     Literal::u32_unsuffixed(u32::try_from(index).unwrap_or(u32::MAX))
 }
 
-/// A field's name, or its index in a tuple struct, as a doc shows it: `type` for `r#type`.
-fn member_shown(member: &Member) -> String {
+/// A field's name, or its index in a tuple struct, as a doc or a message shows it: `type` for
+/// `r#type`.
+pub(super) fn member_shown(member: &Member) -> String {
     match member {
         Member::Named(named) => named.unraw().to_string(),
         Member::Unnamed(unnamed) => unnamed.index.to_string(),

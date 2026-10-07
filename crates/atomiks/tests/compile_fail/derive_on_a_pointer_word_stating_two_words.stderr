@@ -1,0 +1,13 @@
+error: `repr = u128` states two words, and a pointer word is one
+  --> tests/compile_fail/derive_on_a_pointer_word_stating_two_words.rs:9:15
+   |
+ 9 | #[atom(repr = u128)]
+   |               ^^^^
+   |
+note: its repr is this pointer's
+  --> tests/compile_fail/derive_on_a_pointer_word_stating_two_words.rs:11:11
+   |
+11 |     next: NonNull<u64>,
+   |           ^^^^^^^^^^^^
+   = note: atomiks does not yet hold pointers in two words
+   = help: state `repr = u64` or `usize`, the one word it is, or leave it out

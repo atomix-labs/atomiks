@@ -21,8 +21,11 @@ integers, plain or held to a range, `NonZero`s, `char`s, floats, pointers,
 `#[derive(Atom)]` packs into one word, with orderings checked at compile time
 and every operation the instruction its name promises. One instruction on the
 whole word changes one field of a packed struct alone:
-`QUOTE.fields().live.set(Release)` is a `lock or`, or an `ldset`. It works with
-serde, zerocopy, bytemuck, arbitrary, arbitrary-int and deranged, each behind a
+`QUOTE.fields().live.set(Release)` is a `lock or`, or an `ldset`. A pointer
+keeps small fields as tags in the low bits its pointee's alignment leaves clear,
+and keeps its provenance: `HEAD.fields().closed.test_and_set(AcqRel)` closes a
+Treiber stack's head with a `lock bts`, or an `ldsetal`. It works with serde,
+zerocopy, bytemuck, arbitrary, arbitrary-int and deranged, each behind a
 feature. `atomiks-core` holds the typed atomic, `atomiks-derive` the derive, and
 `atomiks` re-exports both, the derive under its `derive` feature; all build for
 Linux and macOS, on aarch64 and x86_64. atomiks is in early development, and no

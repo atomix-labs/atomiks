@@ -1,0 +1,27 @@
+error[E0277]: `*mut Node` is not a primitive whose bits are its whole value
+  --> tests/compile_fail/field_update_on_a_pointer_place.rs:26:24
+   |
+26 |     link.fields().next.update(AcqRel, Acquire, |next| next);
+   |                        ^^^^^^ expected `bool` or an integer
+   |
+   = help: the trait `ExactBits` is not implemented for `*mut Node`
+   = note: a pointer's bits do not hold its provenance: for a pure-read load of a pointer, call `load`
+   = help: the following other types implement trait `ExactBits`:
+             bool
+             i128
+             i16
+             i32
+             i64
+             i8
+             isize
+             u128
+           and $N others
+note: required by a bound in `AtomicField::<P>::update`
+  --> src/atomic/field/mod.rs
+   |
+   | impl<P: FieldPath> AtomicField<P> {
+...
+   |     pub fn update<S: RmwOrdering, F: LoadOrdering, U: FnMut(P::Value) -> P::Value>(
+...
+   |         <P::Value as Atom>::Repr: ExactBits,
+   |                                   ^^^^^^^^^ required by this bound in `AtomicField::<P>::update`

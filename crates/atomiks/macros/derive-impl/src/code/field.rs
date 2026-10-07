@@ -18,25 +18,39 @@ pub(super) struct PackedFields<'a> {
     /// The path to atomiks.
     atomiks: &'a Path,
     /// The fields, in declaration order.
-    fields: &'a [Field],
+    fields: Vec<&'a Field>,
     /// Each field's placement.
     placements: Vec<Ident>,
     /// Each field's value, bound where it is matched or read back.
     values: Vec<Ident>,
+    /// Where the first field lies: bit 0, or above a pointer's own tags.
+    start: TokenStream,
 }
 
 impl<'a> PackedFields<'a> {
     /// The code of `fields`, of a value that names atomiks `atomiks`, naming each placement after
     /// `prefix` and its locals at `def_site`.
-    pub(super) fn new(
-        atomiks: &'a Path, fields: &'a [Field], prefix: &str, def_site: Span,
+    pub(super) fn new<F: IntoIterator<Item = &'a Field>>(
+        atomiks: &'a Path, fields: F, prefix: &str, def_site: Span,
     ) -> Self {
+        let fields: Vec<&'a Field> = fields.into_iter().collect();
+        let count = fields.len();
         let names = |noun: &str| -> Vec<Ident> {
-            (0..fields.len())
-                .map(|index| format_ident!("{noun}_{index}", span = def_site))
-                .collect()
+            (0..count).map(|index| format_ident!("{noun}_{index}", span = def_site)).collect()
         };
-        Self { atomiks, fields, placements: names(prefix), values: names("value") }
+        Self {
+            atomiks,
+            placements: names(prefix),
+            values: names("value"),
+            fields,
+            start: quote!(0),
+        }
+    }
+
+    /// The fields placed from `start`, a constant expression, rather than from bit 0: a pointer
+    /// word's tags, above its pointer's own.
+    pub(super) fn starting_at(self, start: TokenStream) -> Self {
+        Self { start, ..self }
     }
 
     /// The path to atomiks.
@@ -45,8 +59,8 @@ impl<'a> PackedFields<'a> {
     }
 
     /// Each field, in declaration order.
-    pub(super) const fn fields(&self) -> &'a [Field] {
-        self.fields
+    pub(super) fn fields(&self) -> &[&'a Field] {
+        &self.fields
     }
 
     /// Each field's placement, in declaration order.
@@ -61,14 +75,14 @@ impl<'a> PackedFields<'a> {
 
     /// Each field beside its placement.
     fn iter(&self) -> impl Iterator<Item = (&'a Field, &Ident)> {
-        self.fields.iter().zip(&self.placements)
+        self.fields.iter().copied().zip(&self.placements)
     }
 
-    /// Each placement beside what it is: a `PackedField` of its field's reprs, at bit 0 for the
+    /// Each placement beside what it is: a `PackedField` of its field's reprs, at the start for the
     /// first field and where the one before it ends for each other.
     pub(super) fn placed(&self) -> impl Iterator<Item = (&Ident, TokenStream)> {
         let atomiks = self.atomiks;
-        let offsets = iter::once(quote!(0))
+        let offsets = iter::once(self.start.clone())
             .chain(self.placements.iter().map(|before| quote!(#before.next_offset())));
         self.iter().zip(offsets).map(move |((Field { ty, .. }, placement), offset)| {
             let placed = quote! {
@@ -94,8 +108,11 @@ impl<'a> PackedFields<'a> {
         quote!(#atomiks::__private::PackedValidity::EMPTY #(#fields)*)
     }
 
-    /// The bits of `values`, the fields', each in its place.
+    /// The bits of `values`, the fields', each in its place: zero where there are none.
     pub(super) fn encode<I: IntoIterator<Item: ToTokens>>(&self, values: I) -> TokenStream {
+        if self.fields.is_empty() {
+            return quote!(0);
+        }
         let packed = self.iter().zip(values).map(|((field, placement), value)| {
             let bits = self.field_bits(field, &value);
             quote!(#placement.pack(#bits))
@@ -113,7 +130,7 @@ impl<'a> PackedFields<'a> {
             })
             .collect();
         let values = &self.values;
-        let built = build(constructor, self.fields, values);
+        let built = build(constructor, self.fields.iter().copied(), values);
         let (some, none) =
             (quote!(::core::option::Option::Some), quote!(::core::option::Option::None));
         // One field's decode is matched alone; several, as a tuple of each.
@@ -142,7 +159,7 @@ impl<'a> PackedFields<'a> {
                 self.field_value(field, &unpacked, "from_bits_unchecked", "from_repr_unchecked");
             quote!(unsafe { #decoded })
         });
-        build(constructor, self.fields, decoded)
+        build(constructor, self.fields.iter().copied(), decoded)
     }
 
     /// The bits of `value`, `field`'s, as its repr's.
@@ -164,7 +181,7 @@ impl<'a> PackedFields<'a> {
     /// The value of `field` whose repr's bits are `bits`: `__private`'s `codec` where it is
     /// concrete, else `Atom`'s `method` of the repr they are, as [`field_bits`](Self::field_bits)
     /// says.
-    fn field_value(
+    pub(super) fn field_value(
         &self, field: &Field, bits: &TokenStream, codec: &str, method: &str,
     ) -> TokenStream {
         let (atomiks, ty) = (self.atomiks, &field.ty);
@@ -192,6 +209,100 @@ pub(super) fn built_with_markers(
         .chain(value)
         .chain(markers_after.iter().map(|_| &marker));
     build(&quote!(Self), fields, values)
+}
+
+/// The codec of `field`: `__private`'s `codec`, or `Atom`'s `method`.
+///
+/// `codec` where its type names no parameter, located at the type, where a refusal of its bound
+/// points: its bound is `const`, so the crate that derives needs no `const_trait_impl`. Else
+/// `method`, which keeps the impl's `[const]` bound.
+pub(super) fn codec(atomiks: &Path, field: &Field, codec: &str, method: &str) -> TokenStream {
+    let ty = &field.ty;
+    if field.is_generic {
+        let method = Ident::new(method, Span::call_site());
+        quote!(<#ty as #atomiks::Atom>::#method)
+    } else {
+        private_codec(atomiks, field, codec)
+    }
+}
+
+/// `__private`'s `codec` of `field`, whose type names no parameter, located at the type.
+pub(super) fn private_codec(atomiks: &Path, field: &Field, codec: &str) -> TokenStream {
+    let (ty, codec) = (&field.ty, Ident::new(codec, Span::call_site()));
+    located_at(quote!(#atomiks::__private::#codec::<#ty>), ty.span())
+}
+
+/// A pointer beside its tags, a pointer word's fields or a pointer enum's variant's, decoded from
+/// the pointer field's repr and the tags' bits, as a layout's `split` gives them.
+pub(super) struct PointerWithTags<'a, 'f> {
+    /// Each field, the pointer among the tags, in declaration order.
+    pub(super) fields: Vec<&'a Field>,
+    /// The pointer's index among them.
+    pub(super) pointer_index: usize,
+    /// The tag fields' code.
+    pub(super) tag_fields: &'f PackedFields<'a>,
+}
+
+impl PointerWithTags<'_, '_> {
+    /// What `constructor` builds of the pointer `decode` gives of `pointer`, and each tag read back
+    /// from `bits`: `Some` where each decodes, else `None`.
+    pub(super) fn decode(
+        &self, constructor: &TokenStream, decode: &TokenStream, pointer: &TokenStream,
+        bits: &Ident, def_site: Span,
+    ) -> TokenStream {
+        let tags = self.tag_fields.iter().map(|(tag, placement)| {
+            self.tag_fields.field_value(
+                tag,
+                &quote!(#placement.unpack(#bits)),
+                "from_bits",
+                "from_repr",
+            )
+        });
+        let decoded = pointer_among_tags(self.pointer_index, quote!(#decode(#pointer)), tags);
+        let values: Vec<Ident> = (0..decoded.len())
+            .map(|index| format_ident!("value_{index}", span = def_site))
+            .collect();
+        let built = build(constructor, self.fields.iter().copied(), &values);
+        let (some, none) =
+            (quote!(::core::option::Option::Some), quote!(::core::option::Option::None));
+        quote! {
+            match (#(#decoded,)*) {
+                (#(#some(#values),)*) => #some(#built),
+                _ => #none,
+            }
+        }
+    }
+
+    /// What `constructor` builds of the pointer `decode_unchecked` gives of `pointer`, and each
+    /// tag read back from `bits`, each unchecked: the fields of a repr that decodes.
+    pub(super) fn decode_unchecked(
+        &self, constructor: &TokenStream, decode_unchecked: &TokenStream, pointer: &TokenStream,
+        bits: &Ident,
+    ) -> TokenStream {
+        let tags = self.tag_fields.iter().map(|(tag, placement)| {
+            let unpacked = quote!(#placement.unpack(#bits));
+            let value = self.tag_fields.field_value(
+                tag,
+                &unpacked,
+                "from_bits_unchecked",
+                "from_repr_unchecked",
+            );
+            quote!(unsafe { #value })
+        });
+        let pointer = quote!(unsafe { #decode_unchecked(#pointer) });
+        let decoded = pointer_among_tags(self.pointer_index, pointer, tags);
+        build(constructor, self.fields.iter().copied(), decoded)
+    }
+}
+
+/// Each part of a struct or a variant of one pointer field beside tags, in declaration order:
+/// `tags`, each tag's, with `pointer`'s put at `pointer_index`.
+pub(super) fn pointer_among_tags<T, I: IntoIterator<Item = T>>(
+    pointer_index: usize, pointer: T, tags: I,
+) -> Vec<T> {
+    let mut parts: Vec<T> = tags.into_iter().collect();
+    parts.insert(pointer_index, pointer);
+    parts
 }
 
 /// What `constructor` builds of `values`, one for each of `fields` in declaration order: by name,
