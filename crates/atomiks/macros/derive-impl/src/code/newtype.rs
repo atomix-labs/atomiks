@@ -120,7 +120,8 @@ fn built(newtype: &Newtype, value: &TokenStream) -> TokenStream {
 
 /// The checks of the newtype, each a constant beside the impl: that it may cross threads, as
 /// `thread_checks` says, that its concrete value's repr is the one stated, and that a concrete
-/// value written or marked as a pointer, whose markers alone the thread checks read, is one.
+/// value written or marked as a thin pointer, whose markers alone the thread checks read, is one.
+/// A wide pointer, two words, is written as one, so no check asks.
 fn checks(implementor: &Implementor, newtype: &Newtype) -> TokenStream {
     let atomiks = &implementor.atomiks;
     let threads = thread_checks(implementor, newtype.fields());
@@ -129,7 +130,7 @@ fn checks(implementor: &Implementor, newtype: &Newtype) -> TokenStream {
     let repr = implementor.repr.as_ref().filter(|_| !value.is_generic).map(|repr| {
         quote!(const _: () = #atomiks::__private::assert_repr::<#ty, ::core::primitive::#repr>();)
     });
-    let pointer = (value.is_pointer && !value.is_generic).then(|| {
+    let pointer = (value.is_pointer && !value.is_wide_pointer && !value.is_generic).then(|| {
         located_at(quote!(const _: () = #atomiks::__private::assert_pointer::<#ty>();), ty.span())
     });
     quote!(#threads #repr #pointer)
@@ -137,7 +138,7 @@ fn checks(implementor: &Implementor, newtype: &Newtype) -> TokenStream {
 
 /// The newtype's bounds in an impl's where clause: `bound`, with the repr stated, on the
 /// value's field where it names a parameter, `PtrAtom` too where it is written or marked as
-/// a pointer, and those `thread_bounds` says.
+/// a thin pointer, and those `thread_bounds` says.
 fn bounds<'a>(
     implementor: &Implementor, newtype: &'a Newtype, bound: &TokenStream,
 ) -> impl Iterator<Item = TokenStream> + use<'a> {
@@ -152,9 +153,10 @@ fn bounds<'a>(
         let ty = &value.ty;
         quote!(#ty: #bound #repr)
     });
-    let pointer_bound = (value.is_generic && value.is_pointer).then(|| {
-        let ty = &value.ty;
-        quote!(#ty: #atomiks::PtrAtom)
-    });
+    let pointer_bound =
+        (value.is_generic && value.is_pointer && !value.is_wide_pointer).then(|| {
+            let ty = &value.ty;
+            quote!(#ty: #atomiks::PtrAtom)
+        });
     value_bound.into_iter().chain(pointer_bound).chain(thread_bounds(implementor, newtype.fields()))
 }

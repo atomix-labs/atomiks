@@ -1,0 +1,9 @@
+error[E0080]: evaluation panicked: `$CRATE::Head`: tag fields `version`, `marked` need 65 bits, but the word beside its pointer holds 64, and no third word holds the rest: narrow the tags, or move one to an atomic of its own
+ --> tests/compile_fail/derive_on_a_pointer_word_with_tags_past_its_integer_word.rs:9:8
+  |
+8 | #[derive(Clone, Copy, Atom)]
+  |                       ---- in this derive macro expansion
+9 | struct Head {
+  |        ^^^^ evaluation of `_::_` failed here
+  |
+  = note: this error originates in the derive macro `Atom` (in Nightly builds, run with -Z macro-backtrace for more info)

@@ -4,6 +4,10 @@ version = "0.0.0"
 edition = "2024"
 publish = false
 
+[features]
+default        = []
+x86-64-refused = []
+
 [dependencies]
 # internal
 atomiks = { path = "../..", features = ["derive"] }

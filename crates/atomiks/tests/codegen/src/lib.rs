@@ -3,12 +3,18 @@
 //! operation through a packed struct's projection, a pointer word's tag operations, the load of a
 //! word through its pointer's place, a word's store and exchange, the store of a word over a word
 //! or a pointer enum, the load and match of each pointer enum and the store of each of its kinds of
-//! variant, and an update of a pointer enum that keeps its pointer, and of a word over one.
+//! variant, an update of a pointer enum that keeps its pointer, and of a word over one; and, where
+//! the target has a 16-byte atomic, a struct of two words' load, exchange and counter's update,
+//! and a pair of pointers' store and exchange. The `x86-64-refused` feature adds each shape of two
+//! words, for the test that `x86_64` without `cmpxchg16b` refuses each once.
 //!
 //! The empty `[workspace]` in its manifest makes it a workspace of its own: the repository's does
 //! not list it, and the test builds it alone.
 
 #![no_std]
+
+#[cfg(feature = "x86-64-refused")]
+pub mod without_cmpxchg16b;
 
 use core::ptr::NonNull;
 
@@ -445,4 +451,67 @@ pub fn guarded_test_and_set_marked(atomic: &Atomic<Guarded>) -> bool {
 pub unsafe fn guarded_load_inner(atomic: &Atomic<Guarded>) -> u64 {
     // SAFETY: the caller's node is live.
     unsafe { atomic.fields().inner.load(Acquire).node.as_ref().value }
+}
+
+/// A Treiber stack's head: the top node, or none, beside a counter no alignment holds, in a word
+/// of its own.
+#[cfg(any(target_arch = "aarch64", target_feature = "cmpxchg16b"))]
+#[derive(Clone, Copy, Atom)]
+pub struct CountedHead {
+    /// The top node.
+    pub top: Option<NonNull<Node>>,
+    /// How many times the head changed.
+    pub version: u64,
+}
+
+/// Two nodes, and a mark in the first one's low bits.
+#[cfg(any(target_arch = "aarch64", target_feature = "cmpxchg16b"))]
+#[derive(Clone, Copy, Atom)]
+pub struct MarkedPair {
+    /// A node.
+    pub first: NonNull<Node>,
+    /// Its partner.
+    pub second: NonNull<Node>,
+    /// Whether the pair is deleted.
+    pub marked: bool,
+}
+
+#[cfg(any(target_feature = "avx", target_feature = "lse2"))]
+#[unsafe(no_mangle)]
+pub fn counted_head_load(atomic: &Atomic<CountedHead>) -> CountedHead {
+    atomic.load(Acquire)
+}
+
+#[cfg(any(target_arch = "aarch64", target_feature = "cmpxchg16b"))]
+#[unsafe(no_mangle)]
+pub fn counted_head_load_rmw(atomic: &Atomic<CountedHead>) -> CountedHead {
+    atomic.load_rmw(Acquire)
+}
+
+#[cfg(any(target_arch = "aarch64", target_feature = "cmpxchg16b"))]
+#[unsafe(no_mangle)]
+pub fn counted_head_compare_exchange(
+    atomic: &Atomic<CountedHead>, current: CountedHead, new: CountedHead,
+) -> Result<CountedHead, CountedHead> {
+    atomic.compare_exchange(current, new, AcqRel, Acquire)
+}
+
+#[cfg(any(target_arch = "aarch64", target_feature = "cmpxchg16b"))]
+#[unsafe(no_mangle)]
+pub fn counted_head_update_version(atomic: &Atomic<CountedHead>) -> CountedHead {
+    atomic.fields().version.update(AcqRel, Acquire, |version| version.wrapping_add(1))
+}
+
+#[cfg(any(target_feature = "avx", target_feature = "lse2"))]
+#[unsafe(no_mangle)]
+pub fn marked_pair_store(atomic: &Atomic<MarkedPair>, value: MarkedPair) {
+    atomic.store(value, Release);
+}
+
+#[cfg(any(target_arch = "aarch64", target_feature = "cmpxchg16b"))]
+#[unsafe(no_mangle)]
+pub fn marked_pair_compare_exchange(
+    atomic: &Atomic<MarkedPair>, current: MarkedPair, new: MarkedPair,
+) -> Result<MarkedPair, MarkedPair> {
+    atomic.compare_exchange(current, new, AcqRel, Acquire)
 }

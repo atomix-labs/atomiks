@@ -4,5 +4,5 @@ error: a pointer to `[u8]` is two words, and a pointer enum is one
 11 |     Bytes(NonNull<[u8]>),
    |                   ^^^^
    |
-   = note: a pointer to a trait object, a slice or a `str` holds its metadata beside its address, and atomiks does not yet hold pointers in two words
+   = note: a pointer to a trait object, a slice or a `str` holds its metadata beside its address
    = help: point to a sized value that holds it, such as a `Box` of it

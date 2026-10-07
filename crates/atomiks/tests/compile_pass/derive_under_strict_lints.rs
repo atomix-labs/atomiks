@@ -2,7 +2,9 @@
 //! gate, derives `Atom` and the capabilities for documented newtypes, a pointer's among them, and
 //! `Atom` for fieldless enums, a marker, a struct of several fields, whose projection it changes a
 //! field through, a private one, whose projection it never uses, enums with fields, a pointer word,
-//! whose tag it sets through its projection, and a pointer enum, and stores each in a static.
+//! whose tag it sets through its projection, a pointer enum, and structs of two words: a pointer
+//! beside a counter, a link beside the integer word `repr = u128` states, two pointers, a slice's
+//! pointer beside a tag, and a newtype of a trait object's pointer; and stores each in a static.
 //!
 //! trybuild runs rustc alone, so the clippy lints here hold only where clippy builds the same code,
 //! as it does in `tests/derive_newtype.rs`.
@@ -214,7 +216,75 @@ pub static FIRST: Atomic<Option<Link>> = Atomic::new(None);
 /// The next node of a list, its end before the first.
 pub static TAIL: Atomic<Next> = Atomic::new(Next::End);
 
+/// A stack's head: its top node beside a counter no alignment holds, in two words.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+pub struct Counted {
+    /// The top node.
+    pub top: Option<NonNull<Node>>,
+    /// How many times the head changed.
+    pub version: u64,
+}
+
+/// A link and a count beside it, in the integer word `repr = u128` states.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+#[atom(repr = u128)]
+pub struct StatedLink {
+    /// The next node.
+    pub next: NonNull<Node>,
+    /// A count.
+    pub count: u16,
+}
+
+/// Two nodes, and a mark in the first one's low bits.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+pub struct Pair {
+    /// A node.
+    pub first: NonNull<Node>,
+    /// Its partner.
+    pub second: NonNull<Node>,
+    /// Whether the pair is marked.
+    pub marked: bool,
+}
+
+/// A slice of words, and a seal in its data pointer's low bits.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+pub struct Chunk {
+    /// The words.
+    pub words: NonNull<[u64]>,
+    /// Whether the chunk is sealed.
+    pub sealed: bool,
+}
+
+/// A callback, a trait object's pointer.
+#[derive(Clone, Copy, Debug, Atom)]
+pub struct Callback(pub NonNull<dyn Fn() + Send + Sync>);
+
+/// A stack's head, empty.
+pub static COUNTED: Atomic<Counted> = Atomic::new(Counted { top: None, version: 0 });
+
+/// A link and its count, or `None`.
+pub static STATED: Atomic<Option<StatedLink>> = Atomic::new(None);
+
+/// A pair of nodes, or `None`.
+pub static PAIR: Atomic<Option<Pair>> = Atomic::new(None);
+
+/// A chunk, or `None`.
+pub static CHUNK: Atomic<Option<Chunk>> = Atomic::new(None);
+
+/// A callback, or `None`.
+pub static CALLBACK: Atomic<Option<Callback>> = Atomic::new(None);
+
 fn main() {
+    let empty = Counted { top: None, version: 0 };
+    assert_eq!(
+        COUNTED.update(Relaxed, Relaxed, |head| Counted { version: 1, ..head }),
+        empty,
+        "a head"
+    );
+    assert_eq!(STATED.load_rmw(Acquire), None, "no link");
+    assert_eq!(PAIR.load_rmw(Acquire), None, "no pair");
+    assert_eq!(CHUNK.load_rmw(Acquire), None, "no chunk");
+    assert!(CALLBACK.load_rmw(Acquire).is_none(), "no callback");
     assert_eq!(NEXT.fetch_add(1, Relaxed), Seq(0), "zero taken");
     assert_eq!(NEXT.load(Acquire), Seq(1), "one next");
     assert_eq!(LAST.load(Acquire).value, 0, "and no id yet");

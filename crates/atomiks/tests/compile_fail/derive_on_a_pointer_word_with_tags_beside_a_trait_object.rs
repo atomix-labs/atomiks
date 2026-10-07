@@ -1,5 +1,5 @@
-//! A pointer to a trait object holds its vtable beside its address, two words: a pointer word of
-//! one is refused at the pointee.
+//! No tag can share the low bits of a pointer to a trait object, whose alignment is known only at
+//! run time: a tag beside one is refused at the tag.
 
 use core::ptr::NonNull;
 

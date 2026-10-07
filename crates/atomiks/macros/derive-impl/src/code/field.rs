@@ -9,7 +9,7 @@ use syn::spanned::Spanned;
 use syn::{Ident, Member, Path};
 
 use super::repr::located_at;
-use crate::model::Field;
+use crate::model::{Field, pointers_among_tags};
 
 /// The code of a packed value's fields, which names each field's placement, a `PackedField`,
 /// `<prefix>_<index>`, and its value `value_<index>`, both at the derive's definition site: the
@@ -232,52 +232,65 @@ pub(super) fn private_codec(atomiks: &Path, field: &Field, codec: &str) -> Token
     located_at(quote!(#atomiks::__private::#codec::<#ty>), ty.span())
 }
 
-/// A pointer beside its tags, a pointer word's fields or a pointer enum's variant's, decoded from
-/// the pointer field's repr and the tags' bits, as a layout's `split` gives them.
-pub(super) struct PointerWithTags<'a, 'f> {
-    /// Each field, the pointer among the tags, in declaration order.
+/// One pointer or two beside their tags, a pointer word's fields or a pointer enum's variant's,
+/// decoded from the pointers' repr and the tags' bits, as a layout's `split` or `split_words` gives
+/// them: two together, as a pair, from a double word.
+pub(super) struct PointersWithTags<'a, 'f> {
+    /// Each field, the pointers among the tags, in declaration order.
     pub(super) fields: Vec<&'a Field>,
-    /// The pointer's index among them.
-    pub(super) pointer_index: usize,
+    /// The pointers' indices among them, ascending: one, or two decoded as a pair.
+    pub(super) pointer_indices: &'f [usize],
     /// The tag fields' code.
     pub(super) tag_fields: &'f PackedFields<'a>,
 }
 
-impl PointerWithTags<'_, '_> {
-    /// What `constructor` builds of the pointer `decode` gives of `pointer`, and each tag read back
-    /// from `bits`: `Some` where each decodes, else `None`.
+impl PointersWithTags<'_, '_> {
+    /// What `constructor` builds of the pointers `decode` gives of `pointer`, and each tag read
+    /// back from `bits`: `Some` where each decodes, else `None`.
+    ///
+    /// Each is decoded in declaration order, the pointers where the first lies.
     pub(super) fn decode(
         &self, constructor: &TokenStream, decode: &TokenStream, pointer: &TokenStream,
         bits: &Ident, def_site: Span,
     ) -> TokenStream {
-        let tags = self.tag_fields.iter().map(|(tag, placement)| {
-            self.tag_fields.field_value(
-                tag,
-                &quote!(#placement.unpack(#bits)),
-                "from_bits",
-                "from_repr",
-            )
-        });
-        let decoded = pointer_among_tags(self.pointer_index, quote!(#decode(#pointer)), tags);
-        let values: Vec<Ident> = (0..decoded.len())
-            .map(|index| format_ident!("value_{index}", span = def_site))
-            .collect();
-        let built = build(constructor, self.fields.iter().copied(), &values);
-        let (some, none) =
-            (quote!(::core::option::Option::Some), quote!(::core::option::Option::None));
+        let some = quote!(::core::option::Option::Some);
+        let value = |index| format_ident!("value_{index}", span = def_site);
+        let pointer_values = self.pointer_indices.iter().copied().map(value);
+        let pointers = if let [_] = self.pointer_indices {
+            quote!(#some(#(#pointer_values)*))
+        } else {
+            quote!(#some((#(#pointer_values),*)))
+        };
+        let tags =
+            self.tag_fields.iter().zip(self.tag_indices()).map(|((tag, placement), index)| {
+                let decoded = self.tag_fields.field_value(
+                    tag,
+                    &quote!(#placement.unpack(#bits)),
+                    "from_bits",
+                    "from_repr",
+                );
+                let value = value(index);
+                (decoded, quote!(#some(#value)))
+            });
+        let first = self.pointer_indices.iter().take(1);
+        let pointers = first.map(|index| (*index, (quote!(#decode(#pointer)), pointers.clone())));
+        let (decoded, patterns): (Vec<TokenStream>, Vec<TokenStream>) =
+            pointers_among_tags(pointers, tags).into_iter().unzip();
+        let values = (0..self.fields.len()).map(value);
+        let built = build(constructor, self.fields.iter().copied(), values);
         quote! {
             match (#(#decoded,)*) {
-                (#(#some(#values),)*) => #some(#built),
-                _ => #none,
+                (#(#patterns,)*) => #some(#built),
+                _ => ::core::option::Option::None,
             }
         }
     }
 
-    /// What `constructor` builds of the pointer `decode_unchecked` gives of `pointer`, and each
+    /// What `constructor` builds of the pointers `decode_unchecked` gives of `pointer`, and each
     /// tag read back from `bits`, each unchecked: the fields of a repr that decodes.
     pub(super) fn decode_unchecked(
         &self, constructor: &TokenStream, decode_unchecked: &TokenStream, pointer: &TokenStream,
-        bits: &Ident,
+        bits: &Ident, def_site: Span,
     ) -> TokenStream {
         let tags = self.tag_fields.iter().map(|(tag, placement)| {
             let unpacked = quote!(#placement.unpack(#bits));
@@ -289,20 +302,30 @@ impl PointerWithTags<'_, '_> {
             );
             quote!(unsafe { #value })
         });
-        let pointer = quote!(unsafe { #decode_unchecked(#pointer) });
-        let decoded = pointer_among_tags(self.pointer_index, pointer, tags);
-        build(constructor, self.fields.iter().copied(), decoded)
+        let decoded_pointers = quote!(unsafe { #decode_unchecked(#pointer) });
+        if let [index] = self.pointer_indices {
+            let decoded = pointers_among_tags([(*index, decoded_pointers)], tags);
+            return build(constructor, self.fields.iter().copied(), decoded);
+        }
+        let values: Vec<Ident> = self
+            .pointer_indices
+            .iter()
+            .map(|index| format_ident!("value_{index}", span = def_site))
+            .collect();
+        let pointers =
+            self.pointer_indices.iter().copied().zip(values.iter().map(ToTokens::to_token_stream));
+        let decoded = pointers_among_tags(pointers, tags);
+        let built = build(constructor, self.fields.iter().copied(), decoded);
+        quote! {{
+            let (#(#values),*) = #decoded_pointers;
+            #built
+        }}
     }
-}
 
-/// Each part of a struct or a variant of one pointer field beside tags, in declaration order:
-/// `tags`, each tag's, with `pointer`'s put at `pointer_index`.
-pub(super) fn pointer_among_tags<T, I: IntoIterator<Item = T>>(
-    pointer_index: usize, pointer: T, tags: I,
-) -> Vec<T> {
-    let mut parts: Vec<T> = tags.into_iter().collect();
-    parts.insert(pointer_index, pointer);
-    parts
+    /// The tags' indices among the fields, ascending.
+    fn tag_indices(&self) -> impl Iterator<Item = usize> {
+        (0..self.fields.len()).filter(|index| !self.pointer_indices.contains(index))
+    }
 }
 
 /// What `constructor` builds of `values`, one for each of `fields` in declaration order: by name,

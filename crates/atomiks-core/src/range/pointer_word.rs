@@ -1,6 +1,6 @@
 //! [`PointeeAlignment`], the low bits a value stored as a pointer leaves clear for tags, and
-//! [`PointerWordLayout`], how a struct of one pointer lays out its tags there: above the pointer's
-//! own, below its address, whose provenance the word keeps.
+//! [`PointerWordLayout`], how a struct of pointers lays out its tags there, above the first
+//! pointer's own and below its address, whose provenance the word keeps, or in a word of their own.
 
 use core::any::type_name;
 
@@ -376,7 +376,12 @@ impl PointerWordLayout {
             assert_atomic_holds_two_words::<T>();
             assert_tags_fit_integer_word::<T>(self.tag_field_width(), what);
         } else {
-            assert_low_bits::<T, F>(self.tag_field_width(), what);
+            let second_word = if <F::Repr as Primitive>::BITS == usize::BITS {
+                SecondWord::Allowed
+            } else {
+                SecondWord::RuledOut
+            };
+            assert_low_bits::<T, F>(self.tag_field_width(), what, second_word);
         }
     }
 }
@@ -450,6 +455,31 @@ const fn refuse_misaligned<T: ?Sized>() -> ! {
 /// The low bits Rust's largest alignment, 2^29 bytes, leaves clear.
 const MAX_ALIGNMENT_WIDTH: u32 = 29;
 
+/// Whether a value whose tags its pointer's low bits cannot hold may take a second word for them,
+/// which its refusal then names: `#[atom(repr = u128)]`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum SecondWord {
+    /// A word of one thin pointer, one word wide.
+    Allowed,
+    /// A word whose pointers fill two words already, or a pointer enum, which is one word.
+    RuledOut,
+}
+
+/// `advice`, a refusal's last words, then `#[atom(repr = u128)]` where `second_word` is allowed,
+/// and the CPU it needs where no atomic on this target holds two words.
+const fn with_widening_advice(advice: Message, second_word: SecondWord) -> Message {
+    match second_word {
+        SecondWord::Allowed if cfg!(wide) => {
+            advice.text(", or state `#[atom(repr = u128)]` for a word of their own")
+        },
+        SecondWord::Allowed => advice.text(concat!(
+            ", or build with `-C target-cpu=x86-64-v2` or newer and state ",
+            "`#[atom(repr = u128)]` for a word of their own"
+        )),
+        SecondWord::RuledOut => advice,
+    }
+}
+
 /// Refuses the build of `T`, a value two words wide, where no atomic on this target holds two
 /// words: `T`'s repr is then its pointer's alone, which `SelectPointerWordRepr` falls back to so
 /// that the selection never fails.
@@ -488,12 +518,15 @@ const fn assert_tags_fit_integer_word<T: ?Sized>(required: u32, what: &str) {
 /// it holds, where `F` leaves fewer clear; `what` names what needs them: "tag fields `version`,
 /// `marked` need".
 ///
-/// A plain pointer's refusal names its pointee's alignment; a word's, the bits it leaves clear. An
-/// `F` stored as bits is no pointer, which `__private::assert_pointer` refuses, so this refuses
-/// nothing of it, and the build fails once.
+/// A plain pointer's refusal names its pointee's alignment; a word's, the bits it leaves clear;
+/// and, where `second_word` is allowed, either names `#[atom(repr = u128)]` too. An `F` stored as
+/// bits is no pointer, which `__private::assert_pointer` refuses, so this refuses nothing of it,
+/// and the build fails once.
 #[inline]
 #[track_caller]
-pub(super) const fn assert_low_bits<T: ?Sized, F: Atom>(required: u32, what: &str) {
+pub(super) const fn assert_low_bits<T: ?Sized, F: Atom>(
+    required: u32, what: &str, second_word: SecondWord,
+) {
     let (tag_width, alignment) = (F::TAG_WIDTH, F::POINTEE_ALIGNMENT);
     let free = alignment.width.saturating_sub(tag_width);
     if required <= free || <F::Repr as Primitive>::IS_BITS_EXACT {
@@ -510,13 +543,15 @@ pub(super) const fn assert_low_bits<T: ?Sized, F: Atom>(required: u32, what: &st
             .number(u128::from(free))
             .text(if free == 1 { " free bit)" } else { " free bits)" });
         let tail = if can_raise {
-            tail.text(": shrink the tags, or raise the pointee's alignment with `#[repr(align(")
+            tail.text(": shrink the tags, ")
+                .text(if matches!(second_word, SecondWord::Allowed) { "" } else { "or " })
+                .text("raise the pointee's alignment with `#[repr(align(")
                 .number(1_u128.unbounded_shl(required_alignment_width))
                 .text("))]`")
         } else {
             tail.text(": shrink the tags, which no alignment holds")
         };
-        (pointee, tail)
+        (pointee, with_widening_advice(tail, second_word))
     } else {
         let tail = Message::new()
             .text("` keeps ")
@@ -525,13 +560,15 @@ pub(super) const fn assert_low_bits<T: ?Sized, F: Atom>(required: u32, what: &st
             .number(u128::from(free))
             .text(" clear above them");
         let tail = if can_raise {
-            tail.text(": shrink the tags, or raise its pointees' alignment to ")
+            tail.text(": shrink the tags, ")
+                .text(if matches!(second_word, SecondWord::Allowed) { "" } else { "or " })
+                .text("raise its pointees' alignment to ")
                 .number(1_u128.unbounded_shl(required_alignment_width))
                 .text(" bytes")
         } else {
             tail.text(": shrink the tags, which no alignment holds")
         };
-        (type_name::<F>(), tail)
+        (type_name::<F>(), with_widening_advice(tail, second_word))
     };
     let tail = tail.as_str();
     let head = Message::new()
@@ -716,21 +753,24 @@ mod tests {
         above.assert_tags_fit::<(), Tagged<Sixteen>>("tags need");
     }
 
+    #[cfg(wide)]
     #[test]
     #[should_panic(
         expected = "`()`: tag fields `flag`, `count` need 3 low bits, but `u32` is 4-byte aligned \
-                    (2 free bits): shrink the tags, or raise the pointee's alignment with \
-                    `#[repr(align(8))]`"
+                    (2 free bits): shrink the tags, raise the pointee's alignment with \
+                    `#[repr(align(8))]`, or state `#[atom(repr = u128)]` for a word of their own"
     )]
     fn tags_past_the_pointees_alignment_are_refused() {
         let word = three_bits(0);
         word.assert_tags_fit::<(), *mut u32>("tag fields `flag`, `count` need");
     }
 
+    #[cfg(wide)]
     #[test]
     #[should_panic(expected = "`()`: tag field `wide` needs 32 low bits, but \
                     `atomiks_core::range::pointer_word::tests::Eight` is 8-byte aligned (3 free \
-                    bits): shrink the tags, which no alignment holds")]
+                    bits): shrink the tags, which no alignment holds, or state \
+                    `#[atom(repr = u128)]` for a word of their own")]
     fn tags_past_every_alignment_are_refused_without_one() {
         let wide = PackedField::new(ReprRange::<u32>::FULL, 0);
         let word = PointerWordLayout::new(0, PackedLayout::new(&[wide]));
@@ -743,11 +783,13 @@ mod tests {
         three_bits(0).assert_tags_fit::<(), *mut u16>("tags need");
     }
 
+    #[cfg(wide)]
     #[test]
     #[should_panic(expected = "`()`: tags need 3 low bits, but \
                     `atomiks_core::range::pointer_word::tests::Tagged<atomiks_core::range::\
                     pointer_word::tests::Eight>` keeps 1 for its own tags and leaves 2 clear \
-                    above them: shrink the tags, or raise its pointees' alignment to 16 bytes")]
+                    above them: shrink the tags, raise its pointees' alignment to 16 bytes, or \
+                    state `#[atom(repr = u128)]` for a word of their own")]
     fn tags_past_what_a_tagged_pointer_leaves_are_refused() {
         let above = three_bits(<Tagged<Eight> as Atom>::TAG_WIDTH);
         above.assert_tags_fit::<(), Tagged<Eight>>("tags need");
@@ -816,6 +858,17 @@ mod tests {
             2,
             "a second pointer's own tags, at bit 64"
         );
+    }
+
+    #[cfg(not(wide))]
+    #[test]
+    #[should_panic(expected = "`()`: tag fields `flag`, `count` need 3 low bits, but `u32` is \
+                    4-byte aligned (2 free bits): shrink the tags, raise the pointee's alignment \
+                    with `#[repr(align(8))]`, or build with `-C target-cpu=x86-64-v2` or newer \
+                    and state `#[atom(repr = u128)]` for a word of their own")]
+    fn tags_past_the_pointees_alignment_name_the_cpu_two_words_need() {
+        let word = three_bits(0);
+        word.assert_tags_fit::<(), *mut u32>("tag fields `flag`, `count` need");
     }
 
     #[cfg(not(wide))]

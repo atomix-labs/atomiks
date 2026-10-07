@@ -9,5 +9,4 @@ note: its repr is this pointer's
    |
 11 |     Node(NonNull<u64>),
    |          ^^^^^^^^^^^^
-   = note: atomiks does not yet hold pointers in two words
    = help: state `repr = u64` or `usize`, the one word it is, or leave it out

@@ -1,9 +1,9 @@
-error[E0080]: evaluation panicked: `$CRATE::Node`: tag field `tag` needs 8 low bits, but `u64` is 8-byte aligned (3 free bits): shrink the tags, or raise the pointee's alignment with `#[repr(align(256))]`
- --> tests/compile_fail/derive_on_a_pointer_word_with_tags_past_its_pointees_alignment.rs:9:8
-  |
-8 | #[derive(Clone, Copy, Atom)]
-  |                       ---- in this derive macro expansion
-9 | struct Node {
-  |        ^^^^ evaluation of `_::_` failed here
-  |
-  = note: this error originates in the derive macro `Atom` (in Nightly builds, run with -Z macro-backtrace for more info)
+error[E0080]: evaluation panicked: `$CRATE::Node`: tag field `tag` needs 8 low bits, but `u64` is 8-byte aligned (3 free bits): shrink the tags, raise the pointee's alignment with `#[repr(align(256))]`, or state `#[atom(repr = u128)]` for a word of their own
+  --> tests/compile_fail/derive_on_a_pointer_word_with_tags_past_its_pointees_alignment.rs:10:8
+   |
+ 9 | #[derive(Clone, Copy, Atom)]
+   |                       ---- in this derive macro expansion
+10 | struct Node {
+   |        ^^^^ evaluation of `_::_` failed here
+   |
+   = note: this error originates in the derive macro `Atom` (in Nightly builds, run with -Z macro-backtrace for more info)

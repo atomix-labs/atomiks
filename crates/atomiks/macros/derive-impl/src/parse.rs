@@ -15,7 +15,7 @@ use syn::{
 use crate::errors::DeriveError;
 use crate::model::{
     EnumRepr, EnumWithFields, Field, Fieldless, Implementor, Input, Newtype, PointerWord, Shape,
-    Variant, ZeroWidth,
+    Variant, WordRepr, ZeroWidth,
 };
 
 /// The integer primitives `repr = …` may state.
@@ -168,17 +168,16 @@ fn shape(
             let Shape::Packed(fields) = shape else {
                 return Some(shape);
             };
-            match fields.iter().position(|field| field.is_pointer) {
-                Some(pointer_index) => {
-                    Some(pointer_word_shape(fields, pointer_index, repr, errors))
-                },
-                None => repr_stated_where_generic(
+            if fields.iter().any(|field| field.is_pointer) {
+                Some(pointer_word_shape(fields, generics, repr, errors))
+            } else {
+                repr_stated_where_generic(
                     Shape::Packed(fields),
                     generics,
                     repr,
                     "a struct of several fields",
                     errors,
-                ),
+                )
             }
         },
         Data::Enum(data) => enum_shape(ident, generics, attrs, repr, data, errors),
@@ -239,7 +238,7 @@ fn struct_shape(fields: Vec<Field>, is_unit: bool) -> Shape {
             ZeroWidth::Markers(markers_before)
         });
     };
-    Shape::Newtype(Newtype { markers_before, value, markers_after: fields.collect() })
+    Shape::Newtype(Box::new(Newtype { markers_before, value, markers_after: fields.collect() }))
 }
 
 /// An enum's shape: fieldless where each variant is a unit, else with fields; `None` where it has
@@ -369,9 +368,18 @@ fn fields(fields: Fields, generics: &Generics, errors: &mut Vec<DeriveError>) ->
             let is_generic = names_a_parameter(field.ty.to_token_stream(), generics);
             let is_marked = field.attrs.iter().any(is_pointer_mark);
             let is_pointer = is_marked || is_pointer(&field.ty);
+            let is_wide_pointer = pointee(&field.ty).is_some_and(is_unsized);
             let docs =
                 field.attrs.iter().filter(|attr| attr.path().is_ident("doc")).cloned().collect();
-            Field { member, vis: field.vis, docs, ty: field.ty, is_generic, is_pointer }
+            Field {
+                member,
+                vis: field.vis,
+                docs,
+                ty: field.ty,
+                is_generic,
+                is_pointer,
+                is_wide_pointer,
+            }
         })
         .collect()
 }
@@ -398,115 +406,218 @@ fn refuse_atom_other_than_ptr(field: &FieldDefinition, errors: &mut Vec<DeriveEr
     }));
 }
 
-/// The shape of a struct of `fields`, whose first pointer is the field at `pointer_index`, which
-/// `#[atom]` states `repr` of: a pointer word, every other field a tag. A second pointer, a pointer
-/// two words wide and a repr other than a word each add an error.
+/// The shape of a struct of `fields`, at least one a pointer, and `generics`, which `#[atom]`
+/// states `repr` of: a pointer word of one word or two, every field but its pointers a tag.
+///
+/// Its pointers take two words at most, a word for each thin one and both for a wide one. Its
+/// width is read from its own fields: two words for two pointers or a wide one, which
+/// `repr = u128` or `i128` may state; and for one pointer, two where either states them, one where
+/// `u64` or `usize` does or the struct has parameters, and otherwise as many as its tags need,
+/// which a constant counts. Each refusal adds an error: a pointer past two words, tags beside a
+/// trait object's pointer, one word stated of two words' pointers, and any other repr.
 fn pointer_word_shape(
-    mut fields: Vec<Field>, pointer_index: usize, repr: Option<&Ident>,
-    errors: &mut Vec<DeriveError>,
+    fields: Vec<Field>, generics: &Generics, repr: Option<&Ident>, errors: &mut Vec<DeriveError>,
 ) -> Shape {
-    let noun = "a pointer word";
-    let pointer = fields.remove(pointer_index);
-    for second in fields.iter().filter(|field| field.is_pointer) {
-        let member = second.member.to_token_stream();
-        let message = format!("a second pointer field, `{member}`: {noun} holds one pointer");
-        refuse_second_pointer(&pointer, second, message, errors);
+    let (pointers, tag_fields) =
+        fields.into_iter().enumerate().partition::<Vec<_>, _>(|(_, field)| field.is_pointer);
+    let tag_fields: Vec<Field> = tag_fields.into_iter().map(|(_, field)| field).collect();
+    let mut word_count = 0_usize;
+    for (_, pointer) in &pointers {
+        word_count = word_count.saturating_add(if pointer.is_wide_pointer { 2 } else { 1 });
+        if word_count > 2 {
+            refuse_third_word(&pointers, pointer, errors);
+        }
     }
-    refuse_unsized_pointee(&pointer.ty, noun, errors);
-    refuse_repr_other_than_a_word(repr, &pointer.ty, noun, errors);
-    Shape::PointerWord(PointerWord { pointer, pointer_index, tag_fields: fields })
+    let trait_object = pointers.iter().find_map(|(_, pointer)| {
+        pointee(&pointer.ty).filter(|pointee| matches!(ungrouped(pointee), Type::TraitObject(_)))
+    });
+    if let (Some(pointee), Some(tag)) = (trait_object, tag_fields.first()) {
+        refuse_tags_beside_a_trait_object(pointee, tag, errors);
+    }
+    let word_repr = match (repr, word_count) {
+        (Some(repr), _) if !is_one_word_repr(repr) && !is_two_words_repr(repr) => {
+            refuse_repr_of_neither_width(repr, errors);
+            WordRepr::One
+        },
+        (Some(repr), 2) if is_one_word_repr(repr) => {
+            refuse_one_word_repr_of_two_words(repr, &pointers, errors);
+            WordRepr::One
+        },
+        (Some(repr), 1) if is_two_words_repr(repr) => WordRepr::IntegerWord,
+        (Some(repr), 1) if is_one_word_repr(repr) => WordRepr::One,
+        (_, 1) if !generics.params.is_empty() => WordRepr::One,
+        (_, 1) => WordRepr::Selected,
+        _ => WordRepr::Pointers,
+    };
+    Shape::PointerWord(PointerWord { pointers, tag_fields, repr: word_repr })
+}
+
+/// Whether `repr`, as `#[atom]` states it, is one word, `u64` or `usize`, as a pointer word may
+/// be.
+fn is_one_word_repr(repr: &Ident) -> bool {
+    repr == "u64" || repr == "usize"
+}
+
+/// Whether `repr`, as `#[atom]` states it, is two words, `u128` or `i128`.
+fn is_two_words_repr(repr: &Ident) -> bool {
+    repr == "u128" || repr == "i128"
+}
+
+/// Adds an error for `pointer`, one of `pointers`, which takes a word past the two a pointer word
+/// holds.
+fn refuse_third_word(pointers: &[(usize, Field)], pointer: &Field, errors: &mut Vec<DeriveError>) {
+    let member = pointer.member.to_token_stream();
+    let mut error = DeriveError::new(
+        pointer.ty.span(),
+        format!("a pointer field, `{member}`, past the two words a pointer word holds"),
+    );
+    for (_, before) in pointers.iter().take_while(|(_, before)| before.member != pointer.member) {
+        let words = if before.is_wide_pointer { "two words" } else { "a word" };
+        error = error.note(Some(before.ty.span()), format!("this pointer takes {words}"));
+    }
+    errors.push(
+        error
+            .note(
+                None,
+                "two pointers, or one to a slice, a `str` or a trait object, fill two words, the widest atomic".to_owned(),
+            )
+            .help("store the rest in an atomic of its own".to_owned()),
+    );
+}
+
+/// Adds an error for `tag`, a tag field beside a pointer to `pointee`, a trait object, whose
+/// alignment no constant knows.
+fn refuse_tags_beside_a_trait_object(pointee: &Type, tag: &Field, errors: &mut Vec<DeriveError>) {
+    let member = tag.member.to_token_stream();
+    errors.push(
+        DeriveError::new(
+            tag.ty.span(),
+            format!(
+                "a tag field, `{member}`, beside a pointer to `{}`, whose low bits it cannot share",
+                pointee.to_token_stream()
+            ),
+        )
+        .note(Some(pointee.span()), "a trait object's alignment is known only at run time".to_owned())
+        .help("point to a sized value that holds it, such as a `Box` of it, or store the tags in an atomic of their own".to_owned()),
+    );
+}
+
+/// Adds an error for `repr`, as `#[atom]` states it, one word, beside `pointers`, which take two.
+fn refuse_one_word_repr_of_two_words(
+    repr: &Ident, pointers: &[(usize, Field)], errors: &mut Vec<DeriveError>,
+) {
+    let error = DeriveError::new(
+        repr.span(),
+        format!("`repr = {repr}` states one word, and its pointers take two"),
+    );
+    let error = pointers.iter().fold(error, |error, (_, pointer)| {
+        let words = if pointer.is_wide_pointer { "two words" } else { "a word" };
+        error.note(Some(pointer.ty.span()), format!("this pointer takes {words}"))
+    });
+    errors.push(error.help("state `repr = u128`, the two words it is, or leave it out".to_owned()));
+}
+
+/// Adds an error for `repr`, as `#[atom]` states it, neither one word nor two, of a pointer word.
+fn refuse_repr_of_neither_width(repr: &Ident, errors: &mut Vec<DeriveError>) {
+    errors.push(
+        DeriveError::new(
+            repr.span(),
+            format!("`repr = {repr}` names no repr of a pointer word, which is one word or two"),
+        )
+        .help(
+            "state `repr = u64` or `usize` for one word, `u128` for two, or leave it out"
+                .to_owned(),
+        ),
+    );
 }
 
 /// The shape of `enum_with_fields`, an enum one of whose variants or more holds a pointer, which
-/// `#[atom]` states `repr` of: a pointer enum. A variant's second pointer, a pointer two words wide
-/// and a repr other than a word each add an error.
+/// `#[atom]` states `repr` of: a pointer enum, one word. A variant's second pointer, a pointer two
+/// words wide and a repr other than a word each add an error.
 fn pointer_enum_shape(
     enum_with_fields: EnumWithFields, repr: Option<&Ident>, errors: &mut Vec<DeriveError>,
 ) -> Shape {
-    let noun = "a pointer enum";
     let mut pointers = enum_with_fields
         .variants
         .iter()
         .flat_map(|variant| &variant.fields)
         .filter(|field| field.is_pointer);
     if let Some(pointer) = pointers.next() {
-        refuse_repr_other_than_a_word(repr, &pointer.ty, noun, errors);
+        refuse_enum_repr_other_than_a_word(repr, &pointer.ty, errors);
     }
     for variant in &enum_with_fields.variants {
         let mut pointers = variant.fields.iter().filter(|field| field.is_pointer);
         let Some(first) = pointers.next() else { continue };
         for second in pointers {
-            let message = format!(
-                "a second pointer field in `{}`: a variant holds one pointer",
-                variant.ident
-            );
-            refuse_second_pointer(first, second, message, errors);
+            refuse_second_pointer_in_a_variant(&variant.ident, first, second, errors);
         }
-        refuse_unsized_pointee(&first.ty, noun, errors);
+        refuse_wide_pointer_in_a_variant(&first.ty, errors);
     }
     Shape::PointerEnum(enum_with_fields)
 }
 
-/// Adds an error, of `message`, for `second`, a pointer field beside `first`.
-fn refuse_second_pointer(
-    first: &Field, second: &Field, message: String, errors: &mut Vec<DeriveError>,
+/// Adds an error for `second`, a pointer field beside `first` in the variant `variant`.
+fn refuse_second_pointer_in_a_variant(
+    variant: &Ident, first: &Field, second: &Field, errors: &mut Vec<DeriveError>,
 ) {
     errors.push(
-        DeriveError::new(second.ty.span(), message)
-            .note(Some(first.ty.span()), "the first is here".to_owned())
-            .note(
-                None,
-                "two pointers take two words, and atomiks does not yet hold pointers in two"
-                    .to_owned(),
-            )
-            .help("store the second in an atomic of its own".to_owned()),
+        DeriveError::new(
+            second.ty.span(),
+            format!("a second pointer field in `{variant}`: a variant holds one pointer"),
+        )
+        .note(Some(first.ty.span()), "the first is here".to_owned())
+        .note(
+            None,
+            "a pointer enum is one word, each variant's pointer with its tag in the low bits"
+                .to_owned(),
+        )
+        .help(
+            "store the second in an atomic of its own, or point to a struct that holds both"
+                .to_owned(),
+        ),
     );
 }
 
-/// Adds an error where `ty`, a pointer field's type, points to a value of no size known at
-/// compile time, whose pointer is two words; `noun` names the shape it is a field of.
-fn refuse_unsized_pointee(ty: &Type, noun: &str, errors: &mut Vec<DeriveError>) {
+/// Adds an error where `ty`, a variant's pointer field's type, points to a value of no size known
+/// at compile time, whose pointer is two words.
+fn refuse_wide_pointer_in_a_variant(ty: &Type, errors: &mut Vec<DeriveError>) {
     let Some(pointee) = pointee(ty).filter(|pointee| is_unsized(pointee)) else {
         return;
     };
     errors.push(
         DeriveError::new(
             pointee.span(),
-            format!("a pointer to `{}` is two words, and {noun} is one", pointee.to_token_stream()),
+            format!(
+                "a pointer to `{}` is two words, and a pointer enum is one",
+                pointee.to_token_stream()
+            ),
         )
         .note(
             None,
-            "a pointer to a trait object, a slice or a `str` holds its metadata beside its address, and atomiks does not yet hold pointers in two words"
+            "a pointer to a trait object, a slice or a `str` holds its metadata beside its address"
                 .to_owned(),
         )
         .help("point to a sized value that holds it, such as a `Box` of it".to_owned()),
     );
 }
 
-/// Adds an error where `repr`, the repr `#[atom]` states of `noun`, a shape stored as the pointer
-/// `ty`, is other than `u64` or `usize`, which state the one word it is: `u128` or `i128` states
-/// two, in which atomiks does not yet hold a pointer, and any other names no pointer's repr.
-fn refuse_repr_other_than_a_word(
-    repr: Option<&Ident>, ty: &Type, noun: &str, errors: &mut Vec<DeriveError>,
+/// Adds an error where `repr`, the repr `#[atom]` states of a pointer enum stored as the pointer
+/// `ty`, is other than `u64` or `usize`, which state the one word it is.
+fn refuse_enum_repr_other_than_a_word(
+    repr: Option<&Ident>, ty: &Type, errors: &mut Vec<DeriveError>,
 ) {
-    let Some(repr) = repr.filter(|repr| *repr != "u64" && *repr != "usize") else {
+    let Some(repr) = repr.filter(|repr| !is_one_word_repr(repr)) else {
         return;
     };
-    let is_two_words = *repr == "u128" || *repr == "i128";
-    let message = if is_two_words {
-        format!("`repr = {repr}` states two words, and {noun} is one")
+    let message = if is_two_words_repr(repr) {
+        format!("`repr = {repr}` states two words, and a pointer enum is one")
     } else {
-        format!("`repr = {repr}` names no repr of {noun}, which is its pointer's, one word")
-    };
-    let error = DeriveError::new(repr.span(), message)
-        .note(Some(ty.span()), "its repr is this pointer's".to_owned());
-    let error = if is_two_words {
-        error.note(None, "atomiks does not yet hold pointers in two words".to_owned())
-    } else {
-        error
+        format!("`repr = {repr}` names no repr of a pointer enum, which is its pointer's, one word")
     };
     errors.push(
-        error.help("state `repr = u64` or `usize`, the one word it is, or leave it out".to_owned()),
+        DeriveError::new(repr.span(), message)
+            .note(Some(ty.span()), "its repr is this pointer's".to_owned())
+            .help("state `repr = u64` or `usize`, the one word it is, or leave it out".to_owned()),
     );
 }
 
@@ -639,7 +750,8 @@ mod tests {
 
     use super::input;
     use crate::model::{
-        EnumRepr, EnumWithFields, Field, Fieldless, Input, Newtype, PointerWord, Shape, ZeroWidth,
+        EnumRepr, EnumWithFields, Field, Fieldless, Input, Newtype, PointerWord, Shape, WordRepr,
+        ZeroWidth,
     };
 
     /// What `definition` reads as, which parses.
@@ -650,7 +762,7 @@ mod tests {
     /// The newtype `definition` reads as.
     fn newtype(definition: TokenStream) -> Newtype {
         match read(definition).shape {
-            Ok(Shape::Newtype(newtype)) => newtype,
+            Ok(Shape::Newtype(newtype)) => *newtype,
             Ok(shape) => panic!("a newtype, not {}", noun(&shape)),
             Err(errors) => panic!("a newtype, not refused: {errors:?}"),
         }
@@ -1078,61 +1190,102 @@ mod tests {
         }
     }
 
+    /// The members of `word`'s pointers, each beside its index, and of its tags.
+    fn members(word: &PointerWord) -> (Vec<(usize, String)>, Vec<String>) {
+        let pointers =
+            word.pointers.iter().map(|(index, pointer)| (*index, text(&pointer.member))).collect();
+        (pointers, word.tag_fields.iter().map(|tag| text(&tag.member)).collect())
+    }
+
     #[test]
     fn a_struct_of_one_pointer_beside_tags_is_a_pointer_word() {
         let head = pointer_word(
             quote! { struct Head { version: u2, top: Option<NonNull<Node>>, marked: bool } },
         );
-        let pointer = (head.pointer_index, text(&head.pointer.member));
-        assert_eq!(pointer, (1, "top".to_owned()), "the pointer");
-        let tags: Vec<String> = head.tag_fields.iter().map(|tag| text(&tag.member)).collect();
-        assert_eq!(tags, ["version", "marked"], "beside its tags, in order");
-        let members: Vec<String> = head.fields().map(|field| text(&field.member)).collect();
-        assert_eq!(members, ["version", "top", "marked"], "every field, in declaration order");
+        let expected =
+            (vec![(1, "top".to_owned())], vec!["version".to_owned(), "marked".to_owned()]);
+        assert_eq!(members(&head), expected, "the pointer, beside its tags, in order");
+        let fields: Vec<String> = head.fields().map(|field| text(&field.member)).collect();
+        assert_eq!(fields, ["version", "top", "marked"], "every field, in declaration order");
+        assert_eq!(head.repr, WordRepr::Selected, "as wide as its tags need");
         let link =
             pointer_word(quote! { struct Link { #[atom(ptr)] next: NodePointer, deleted: bool } });
-        assert_eq!(text(&link.pointer.member), "next", "or a field marked one");
+        assert_eq!(members(&link).0, [(0, "next".to_owned())], "or a field marked one");
         let tagged = pointer_word(quote! { struct Tagged<T> { pointer: NonNull<T>, tag: u2 } });
-        assert!(tagged.pointer.is_generic, "and one with parameters, with no repr stated");
+        let (_, pointer) = &tagged.pointers[0];
+        assert!(pointer.is_generic, "and one with parameters, with no repr stated");
+        assert_eq!(tagged.repr, WordRepr::One, "one word, which no constant of `T` could widen");
         for repr in [quote!(u64), quote!(usize)] {
             let pinned = quote! { #[atom(repr = #repr)] struct Link { next: *mut u8, bit: bool } };
-            assert_eq!(noun_of(pinned), "a pointer word", "`repr = {repr}` pins one word");
+            assert_eq!(pointer_word(pinned).repr, WordRepr::One, "`repr = {repr}` pins one word");
+        }
+        for repr in [quote!(u128), quote!(i128)] {
+            let pinned =
+                quote! { #[atom(repr = #repr)] struct Link<T> { next: *mut T, bit: bool } };
+            let word_repr = pointer_word(pinned).repr;
+            assert_eq!(
+                word_repr,
+                WordRepr::IntegerWord,
+                "`repr = {repr}` states two, its tags in an integer word"
+            );
         }
     }
 
     #[test]
-    fn a_second_pointer_a_pointer_two_words_wide_and_a_repr_other_than_a_word_are_refused() {
+    fn two_pointers_or_one_two_words_wide_take_two_words() {
+        let pair = pointer_word(quote! { struct Pair { a: *mut u8, b: NonNull<u8>, c: bool } });
+        let expected = (vec![(0, "a".to_owned()), (1, "b".to_owned())], vec!["c".to_owned()]);
+        assert_eq!(members(&pair), expected, "both pointers, beside the tag");
+        assert_eq!(pair.repr, WordRepr::Pointers, "in two words");
+        let stated = quote! { #[atom(repr = u128)] struct Pair { a: *mut u8, b: NonNull<u8> } };
+        assert_eq!(pointer_word(stated).repr, WordRepr::Pointers, "as `repr = u128` states");
+        for pointer in
+            [quote! { NonNull<dyn Fn()> }, quote! { *const [u8] }, quote! { Option<NonNull<str>> }]
+        {
+            assert!(value(&pointer).is_wide_pointer, "`{pointer}` is two words wide");
+        }
+        assert!(
+            !value(&quote! { NonNull<[u8; 4]> }).is_wide_pointer,
+            "and an array's pointer, one"
+        );
+        let chunk = pointer_word(quote! { struct Chunk { words: NonNull<[u64]>, sealed: bool } });
+        assert_eq!(chunk.repr, WordRepr::Pointers, "a slice's, with a tag beside");
+    }
+
+    #[test]
+    fn a_third_word_tags_beside_a_trait_object_and_a_repr_of_neither_width_are_refused() {
         assert_eq!(
-            refusals(quote! { struct Pair { a: *mut u8, b: NonNull<u8>, c: bool } }),
-            ["a second pointer field, `b`: a pointer word holds one pointer"],
-            "two pointers"
+            refusals(quote! { struct Three { a: *mut u8, b: *mut u8, c: NonNull<u8> } }),
+            ["a pointer field, `c`, past the two words a pointer word holds"],
+            "a third pointer"
         );
         assert_eq!(
-            refusals(quote! { #[atom(repr = u128)] struct Link { next: *mut u8, c: bool } }),
-            ["`repr = u128` states two words, and a pointer word is one"],
-            "two words"
+            refusals(quote! { struct Wide { a: NonNull<[u8]>, b: *mut u8 } }),
+            ["a pointer field, `b`, past the two words a pointer word holds"],
+            "or one beside a wide one"
+        );
+        assert_eq!(
+            refusals(quote! { struct Callback { call: NonNull<dyn Fn()>, armed: bool } }),
+            [
+                "a tag field, `armed`, beside a pointer to `dyn Fn ()`, whose low bits it cannot share"
+            ],
+            "tags beside a trait object"
+        );
+        assert_eq!(
+            refusals(quote! { #[atom(repr = u64)] struct Pair { a: *mut u8, b: *mut u8 } }),
+            ["`repr = u64` states one word, and its pointers take two"],
+            "one word of two words' pointers"
         );
         assert_eq!(
             refusals(quote! { #[atom(repr = u32)] struct Link { next: *mut u8, c: bool } }),
-            ["`repr = u32` names no repr of a pointer word, which is its pointer's, one word"],
+            ["`repr = u32` names no repr of a pointer word, which is one word or two"],
             "less than a word"
         );
         assert_eq!(
             refusals(quote! { #[atom(repr = isize)] struct Link { next: *mut u8, c: bool } }),
-            ["`repr = isize` names no repr of a pointer word, which is its pointer's, one word"],
+            ["`repr = isize` names no repr of a pointer word, which is one word or two"],
             "or a signed one"
         );
-        for (pointer, pointee) in [
-            (quote! { NonNull<dyn Fn()> }, "dyn Fn ()"),
-            (quote! { *const [u8] }, "[u8]"),
-            (quote! { Option<NonNull<str>> }, "str"),
-        ] {
-            assert_eq!(
-                refusals(quote! { struct Word { pointer: #pointer, flag: bool } }),
-                [format!("a pointer to `{pointee}` is two words, and a pointer word is one")],
-                "`{pointer}`"
-            );
-        }
     }
 
     #[test]

@@ -1,0 +1,12 @@
+error: a tag field, `armed`, beside a pointer to `dyn Fn()`, whose low bits it cannot share
+  --> tests/compile_fail/derive_on_a_pointer_word_with_tags_beside_a_trait_object.rs:11:12
+   |
+11 |     armed: bool,
+   |            ^^^^
+   |
+note: a trait object's alignment is known only at run time
+  --> tests/compile_fail/derive_on_a_pointer_word_with_tags_beside_a_trait_object.rs:10:19
+   |
+10 |     call: NonNull<dyn Fn()>,
+   |                   ^^^^^^^^
+   = help: point to a sized value that holds it, such as a `Box` of it, or store the tags in an atomic of their own

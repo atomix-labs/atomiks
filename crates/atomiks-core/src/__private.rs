@@ -91,7 +91,7 @@ pub const unsafe fn from_pointer_unchecked<F: const PtrAtom>(pointer: *mut ()) -
 #[diagnostic::on_unimplemented(
     message = "a field stored as `{Self}` cannot be packed beside others",
     label = "a pointer, whose bits do not hold its provenance",
-    note = "a pointer is stored alone, in a newtype or an `Option`, or as the one pointer field of a pointer word or of a pointer enum's variant, marked `#[atom(ptr)]` where its type shows no pointer"
+    note = "a pointer is stored alone, in a newtype or an `Option`, or as a pointer field of a pointer word or the one of a pointer enum's variant, marked `#[atom(ptr)]` where its type shows no pointer"
 )]
 pub impl(crate) const trait FieldRepr: [const] ExactBits {}
 

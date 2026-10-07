@@ -10,7 +10,8 @@
 //! and is compared by its address; a value's own keeps its pointer's, which Miri checks as the
 //! node is read through it.
 
-// The derives on the generic `Wrap`, `Pair`, `Lock`, `LockWord` and `GenericLink` need it.
+// The derives on the generic `Wrap`, `Pair`, `Lock`, `LockWord`, `GenericLink`, `GenericPair`,
+// `GenericHead` and `GenericChunk` need it.
 #![feature(const_trait_impl)]
 #![cfg(feature = "derive")]
 // Loom's `Atomic::new` is not `const`, so no static of a node that holds one builds under it.
@@ -1093,6 +1094,281 @@ mod tests {
             value_obeys_the_laws(order, bits)?;
             value_obeys_the_laws(slot, bits)?;
             value_obeys_the_laws(lock, bits)?;
+        }
+    }
+
+    /// Derived values two words wide, which hold pointers, beside nodes of their own: a pointer
+    /// beside tags no alignment holds, or beside the integer word `repr = u128` states, two
+    /// pointers, a slice's pointer, and each shape in its own pointee.
+    #[cfg(any(
+        target_arch = "aarch64",
+        all(target_arch = "x86_64", target_feature = "cmpxchg16b")
+    ))]
+    mod double_words {
+        use core::ptr::NonNull;
+
+        use atomiks::validity::{Partial, Total, ZeroNiche, ZeroValid};
+        use atomiks::{Atom, Atomic, DoubleWord};
+        use proptest::prelude::{Strategy, any};
+        use proptest::{option, proptest};
+
+        use super::{NODES, Node, Sign, read, signs, value_obeys_the_laws};
+        use crate::testing::atom::repr_and_validity_are;
+        use crate::testing::law::{edge_or_random_bits, keeps_provenance, none_laws};
+
+        /// A Treiber stack's head: the top node or none, and a counter no alignment holds.
+        #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+        struct CountedHead {
+            /// The top node.
+            top: Option<NonNull<Node>>,
+            /// How many times the head changed, wrapping.
+            version: u64,
+        }
+
+        /// A link and a sign beside it, in the integer word `repr = u128` states: two bits that
+        /// wrap through zero, so the word above them copies their sign.
+        #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+        #[atom(repr = u128)]
+        struct StatedLink {
+            /// The next node, or none.
+            next: Option<NonNull<Node>>,
+            /// Which way the link last moved.
+            sign: Sign,
+        }
+
+        /// Two pointers, and a mark in the first one's low bits.
+        #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+        struct MarkedPair {
+            /// A node.
+            first: NonNull<Node>,
+            /// Its partner, or none.
+            second: Option<NonNull<Node>>,
+            /// Whether the pair is logically deleted.
+            marked: bool,
+        }
+
+        /// A slice of words, and a seal in its data pointer's low bits.
+        #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+        struct SealedChunk {
+            /// The words.
+            words: NonNull<[u64]>,
+            /// Whether the chunk is sealed.
+            sealed: bool,
+        }
+
+        /// Two pointers, and no tag.
+        #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+        struct BarePair {
+            /// A node.
+            first: NonNull<Node>,
+            /// Its partner, or none.
+            second: Option<NonNull<Node>>,
+        }
+
+        /// A newtype of a slice's pointer, which takes its repr whole.
+        #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+        struct Words(NonNull<[u64]>);
+
+        /// Two pointers of any two types, and a mark in the first one's low bits.
+        #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+        struct GenericPair<A, B> {
+            /// The first.
+            first: NonNull<A>,
+            /// The second, or none.
+            second: Option<NonNull<B>>,
+            /// The mark.
+            marked: bool,
+        }
+
+        /// A pointer to any `T` and a count, in the integer word `repr = u128` states.
+        #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+        #[atom(repr = u128)]
+        struct GenericHead<T> {
+            /// The top, or none.
+            top: Option<NonNull<T>>,
+            /// The count.
+            count: u16,
+        }
+
+        /// A slice of any element, and a seal in its data pointer's low bits.
+        #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+        struct GenericChunk<T> {
+            /// The elements.
+            elements: NonNull<[T]>,
+            /// Whether the chunk is sealed.
+            sealed: bool,
+        }
+
+        /// A node that holds an atomic of each two-word shape that points to a node like it.
+        #[expect(
+            dead_code,
+            reason = "the links are there for their types; the laws read the value"
+        )]
+        struct Linked {
+            /// What it holds.
+            value: u64,
+            /// The next node, and a counter.
+            counted: Atomic<CountedLink>,
+            /// Two nodes, or none.
+            pair: Atomic<Option<LinkedPair>>,
+        }
+
+        /// A link to the next node, beside a counter no alignment holds.
+        #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+        struct CountedLink {
+            /// The next node, or none.
+            next: Option<NonNull<Linked>>,
+            /// How many times the link changed.
+            version: u64,
+        }
+
+        /// Two links to nodes, and a mark.
+        #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+        struct LinkedPair {
+            /// A node.
+            first: NonNull<Linked>,
+            /// Another.
+            second: NonNull<Linked>,
+            /// Whether the pair is marked.
+            marked: bool,
+        }
+
+        /// A node holding `value`, each of its links to no node.
+        const fn linked(value: u64) -> Linked {
+            Linked {
+                value,
+                counted: Atomic::new(CountedLink { next: None, version: 0 }),
+                pair: Atomic::new(None),
+            }
+        }
+
+        /// The nodes the two-word shapes in their own pointee point to.
+        static LINKED: [Linked; 3] = [linked(40), linked(41), linked(42)];
+
+        /// The words the slices and the generic shapes point into.
+        static WORDS: [u64; 4] = [50, 51, 52, 53];
+
+        /// A pointer to each node, with the static's provenance.
+        fn nodes() -> impl Strategy<Value = NonNull<Node>> {
+            (0..NODES.len()).prop_map(|index| NonNull::from_ref(&NODES[index]))
+        }
+
+        /// A pointer to each linked node, with the static's provenance.
+        fn linked_nodes() -> impl Strategy<Value = NonNull<Linked>> {
+            (0..LINKED.len()).prop_map(|index| NonNull::from_ref(&LINKED[index]))
+        }
+
+        /// A pointer to each word, with the static's provenance.
+        fn words() -> impl Strategy<Value = NonNull<u64>> {
+            (0..WORDS.len()).prop_map(|index| NonNull::from_ref(&WORDS[index]))
+        }
+
+        /// The word `word` points to, read through it.
+        fn read_word(word: NonNull<u64>) -> u64 {
+            // SAFETY: each word is a static's, which lives as long as the tests.
+            #[expect(unsafe_code, reason = "reads through it, so Miri checks its provenance")]
+            let word = unsafe { word.read() };
+            word
+        }
+
+        /// The value of the linked node `node` points to, read through it.
+        fn read_linked(node: NonNull<Linked>) -> u64 {
+            // SAFETY: each node is a static's, which lives as long as the tests.
+            #[expect(unsafe_code, reason = "reads through it, so Miri checks its provenance")]
+            let node = unsafe { node.as_ref() };
+            node.value
+        }
+
+        /// The words a chunk's slice holds, read through it.
+        fn read_words(words: NonNull<[u64]>) -> Vec<u64> {
+            // SAFETY: each slice is of a static's, which lives as long as the tests.
+            #[expect(unsafe_code, reason = "reads through it, so Miri checks its provenance")]
+            let words = unsafe { words.as_ref() };
+            words.to_vec()
+        }
+
+        #[test]
+        fn each_two_word_shape_has_the_validity_its_fields_promise() {
+            repr_and_validity_are::<CountedHead, DoubleWord<*mut Node, usize>, Total>();
+            repr_and_validity_are::<StatedLink, DoubleWord<*mut Node, usize>, ZeroValid>();
+            repr_and_validity_are::<MarkedPair, DoubleWord<*mut Node, *mut Node>, ZeroNiche>();
+            repr_and_validity_are::<SealedChunk, DoubleWord<*mut (), usize>, ZeroNiche>();
+            repr_and_validity_are::<CountedLink, DoubleWord<*mut Linked, usize>, Total>();
+            repr_and_validity_are::<LinkedPair, DoubleWord<*mut Linked, *mut Linked>, ZeroNiche>();
+            repr_and_validity_are::<BarePair, DoubleWord<*mut Node, *mut Node>, ZeroNiche>();
+            repr_and_validity_are::<Words, DoubleWord<*mut (), usize>, ZeroNiche>();
+            repr_and_validity_are::<GenericPair<u64, u64>, DoubleWord<*mut u64, *mut u64>, Partial>(
+            );
+            repr_and_validity_are::<GenericHead<u64>, DoubleWord<*mut u64, usize>, ZeroValid>();
+            repr_and_validity_are::<GenericChunk<u64>, DoubleWord<*mut (), usize>, Partial>();
+            let down = StatedLink { next: None, sign: Sign::Minus }.to_repr();
+            assert_eq!(down.second, usize::MAX, "a sign below zero, extended over the word");
+            let unextended = DoubleWord { first: down.first, second: 0b11 };
+            assert_eq!(StatedLink::from_repr(unextended), None, "its bits alone, refused");
+            none_laws!(
+                MarkedPair,
+                SealedChunk,
+                LinkedPair,
+                BarePair,
+                Words,
+                GenericPair<u64, u64>,
+                GenericChunk<u64>,
+            );
+        }
+
+        proptest! {
+            #[test]
+            fn two_word_shapes_obey_the_laws(
+                head in (option::of(nodes()), any::<u64>())
+                    .prop_map(|(top, version)| CountedHead { top, version }),
+                stated in (option::of(nodes()), signs())
+                    .prop_map(|(next, sign)| StatedLink { next, sign }),
+                pair in (nodes(), option::of(nodes()), any::<bool>())
+                    .prop_map(|(first, second, marked)| MarkedPair { first, second, marked }),
+                chunk in (0..=WORDS.len(), any::<bool>()).prop_map(|(length, sealed)| {
+                    SealedChunk { words: NonNull::from_ref(&WORDS[..length]), sealed }
+                }),
+                counted in (option::of(linked_nodes()), any::<u64>())
+                    .prop_map(|(next, version)| CountedLink { next, version }),
+                linked in option::of((linked_nodes(), linked_nodes(), any::<bool>())
+                    .prop_map(|(first, second, marked)| LinkedPair { first, second, marked })),
+                bare in (nodes(), option::of(nodes()))
+                    .prop_map(|(first, second)| BarePair { first, second }),
+                words in (0..=WORDS.len()).prop_map(|length| Words(NonNull::from_ref(&WORDS[..length]))),
+                generic_pair in (words(), option::of(words()), any::<bool>())
+                    .prop_map(|(first, second, marked)| GenericPair { first, second, marked }),
+                generic_head in (option::of(words()), any::<u16>())
+                    .prop_map(|(top, count)| GenericHead { top, count }),
+                generic_chunk in (0..=WORDS.len(), any::<bool>()).prop_map(|(length, sealed)| {
+                    GenericChunk { elements: NonNull::from_ref(&WORDS[..length]), sealed }
+                }),
+                bits in edge_or_random_bits(&[1 << 64, 0xFF << 64, 0b11 << 64, u128::MAX << 64]),
+            ) {
+                value_obeys_the_laws(head, bits)?;
+                keeps_provenance(head, |head| head.top.map(read))?;
+                value_obeys_the_laws(stated, bits)?;
+                keeps_provenance(stated, |stated| stated.next.map(read))?;
+                value_obeys_the_laws(pair, bits)?;
+                keeps_provenance(pair, |pair| (read(pair.first), pair.second.map(read)))?;
+                value_obeys_the_laws(chunk, bits)?;
+                keeps_provenance(chunk, |chunk| read_words(chunk.words))?;
+                value_obeys_the_laws(counted, bits)?;
+                keeps_provenance(counted, |counted| counted.next.map(read_linked))?;
+                value_obeys_the_laws(linked, bits)?;
+                keeps_provenance(linked, |linked| {
+                    linked.map(|linked| (read_linked(linked.first), read_linked(linked.second)))
+                })?;
+                value_obeys_the_laws(bare, bits)?;
+                keeps_provenance(bare, |bare| (read(bare.first), bare.second.map(read)))?;
+                value_obeys_the_laws(words, bits)?;
+                keeps_provenance(words, |words| read_words(words.0))?;
+                value_obeys_the_laws(generic_pair, bits)?;
+                keeps_provenance(generic_pair, |pair| (read_word(pair.first), pair.second.map(read_word)))?;
+                value_obeys_the_laws(generic_head, bits)?;
+                keeps_provenance(generic_head, |head| head.top.map(read_word))?;
+                value_obeys_the_laws(generic_chunk, bits)?;
+                keeps_provenance(generic_chunk, |chunk| read_words(chunk.elements))?;
+            }
         }
     }
 }

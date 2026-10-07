@@ -24,6 +24,10 @@ mod trybuild {
         // post-monomorphization errors show.
         cases.pass("tests/compile_pass/*.rs");
         cases.compile_fail("tests/compile_fail/*.rs");
+        // A refusal whose notes `x86_64` adds to, which `aarch64`'s message alone pins.
+        if cfg!(target_arch = "aarch64") {
+            cases.compile_fail("tests/compile_fail/aarch64/*.rs");
+        }
     }
 }
 
@@ -48,16 +52,23 @@ mod codegen {
     //! off the fast path. An update that keeps a pointer enum's pointer writes back the word it
     //! read, and tests, calls and saves nothing; but a word's over an enum of several pointer
     //! variants saves a frame record on `aarch64`, and on `x86_64` keeps a branch to the cold
-    //! refusal that it never takes.
+    //! refusal that it never takes. A struct of two words lowers as a double word does: a pointer
+    //! beside an integer word of its tags tests nothing, its exchange `u128`'s exactly on `x86_64`,
+    //! and two pointers, a mark in the first's low bits, are tested in one test before their one
+    //! exchange or store. Where `x86_64` has no `cmpxchg16b`, each shape of two words is refused
+    //! once, at its derive.
 
-    use crate::testing::codegen::Lowering::{self, InOrder, Only, Refuses, RetryOnly};
+    use crate::testing::codegen::Lowering::{self, InOrder, Only, Refuses, Retry, RetryOnly};
     use crate::testing::codegen::{
-        AARCH64_LINUX, AARCH64_MACOS, X86_64_LINUX, X86_64_MACOS, lowers_as_expected,
+        AARCH64_LINUX, AARCH64_MACOS, X86_64_LINUX, X86_64_MACOS, lowers_as_expected, refused,
     };
 
     /// Each store, exchange and field operation on `aarch64`, the same at the floor, with LSE2 and
     /// on macOS: a field operation is one LSE instruction, then a shift for a bit or a count.
     const AARCH64: &[(&str, Lowering)] = &[
+        ("counted_head_load_rmw", Only(&["mov", "mov", "caspa", "mov", "mov", "ret"])),
+        ("counted_head_compare_exchange", InOrder(&["caspal", "cmp", "ccmp", "cset"])),
+        ("marked_pair_compare_exchange", InOrder(&["orr", "tbnz", "caspal", "bl"])),
         ("field_set", Only(&["mov", "ldsetl", "ret"])),
         ("field_clear", Only(&["mov", "ldclrl", "ret"])),
         ("field_test_and_set", Only(&["mov", "ldsetal", "ubfx", "ret"])),
@@ -80,6 +91,7 @@ mod codegen {
 
     /// Each load and update on `aarch64` with the `+lse` floor, which reads with `ldar`.
     const AARCH64_FLOOR: &[(&str, Lowering)] = &[
+        ("counted_head_update_version", Retry(&["caspa", "add", "caspal"])),
         ("packed_struct_load", Only(&["ldar", "lsr", "and", "bfi", "ret"])),
         ("fieldless_enum_load", Only(&["ldarb", "ret"])),
         ("niche_filling_enum_load", InOrder(&["ldarb"])),
@@ -128,6 +140,9 @@ mod codegen {
     /// Each load and update on `aarch64` with LSE2, `neoverse-v1` on Linux and macOS's floor,
     /// `apple-m1`, which reads with `ldapr`.
     const AARCH64_LSE2: &[(&str, Lowering)] = &[
+        ("counted_head_load", Only(&["ldp", "dmb ishld", "ret"])),
+        ("counted_head_update_version", Retry(&["ldp", "dmb ishld", "add", "caspal"])),
+        ("marked_pair_store", InOrder(&["tbnz", "add", "dmb ish", "stp", "bl"])),
         ("packed_struct_load", Only(&["ldapr", "lsr", "and", "bfi", "ret"])),
         ("fieldless_enum_load", Only(&["ldaprb", "ret"])),
         ("niche_filling_enum_load", InOrder(&["ldaprb"])),
@@ -201,6 +216,36 @@ mod codegen {
     /// masks with `bzhi`, and each field read-modify-write: one `lock` instruction, `lock bts` for
     /// a bit's test.
     const X86_64: &[(&str, Lowering)] = &[
+        ("counted_head_load", Only(&["vmovdqa", "vmovq", "vpextrq", "retq"])),
+        (
+            "counted_head_load_rmw",
+            Only(&["pushq", "xorl", "xorl", "xorl", "xorl", "lock cmpxchg16b", "popq", "retq"]),
+        ),
+        (
+            "counted_head_compare_exchange",
+            Only(&[
+                "pushq",
+                "movq",
+                "xorl",
+                "movq",
+                "movq",
+                "movq",
+                "lock cmpxchg16b",
+                "setne",
+                "movq",
+                "movq",
+                "movq",
+                "movq",
+                "popq",
+                "retq",
+            ]),
+        ),
+        ("counted_head_update_version", Retry(&["vmovdqa", "leaq", "lock cmpxchg16b"])),
+        ("marked_pair_store", Refuses(&["testb", "jne", "addq", "vmovdqa", "retq"])),
+        (
+            "marked_pair_compare_exchange",
+            InOrder(&["orl", "testb", "jne", "lock cmpxchg16b", "callq"]),
+        ),
         (
             "packed_struct_load",
             Only(&["movq", "movb", "bzhiq", "shlq", "movabsq", "andq", "orq", "retq"]),
@@ -424,5 +469,29 @@ mod codegen {
     #[test]
     fn x86_64_macos_lowers_each_derived_operation_to_its_instructions() {
         lowers_as_expected(X86_64_MACOS, None, &[X86_64, X86_64_MACOS_FRAME]);
+    }
+
+    #[test]
+    fn x86_64_without_cmpxchg16b_refuses_each_shape_of_two_words_once() {
+        let stderr = refused(X86_64_LINUX, Some("x86-64"), "x86-64-refused");
+        let errors: Vec<&str> = stderr.lines().filter(|line| line.starts_with("error")).collect();
+        let refusal = |name: &str| {
+            format!(
+                "`atomiks_codegen::without_cmpxchg16b::{name}` needs two words, but an atomic holds \
+                 at most one: build with `-C target-cpu=x86-64-v2` or newer for two"
+            )
+        };
+        assert_eq!(
+            errors,
+            [
+                format!("error: {}", refusal("StatedLink")),
+                format!("error: {}", refusal("MarkedPair")),
+                format!("error: {}", refusal("Chunk")),
+                format!("error[E0080]: evaluation panicked: {}", refusal("Head")),
+                "error: could not compile `atomiks-codegen` (lib) due to 4 previous errors"
+                    .to_owned(),
+            ],
+            "each shape refused once, at its derive, naming the CPU it needs:\n{stderr}"
+        );
     }
 }

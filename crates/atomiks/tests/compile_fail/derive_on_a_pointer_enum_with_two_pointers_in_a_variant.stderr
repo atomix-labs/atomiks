@@ -9,5 +9,5 @@ note: the first is here
    |
 11 |     Both(NonNull<u64>, NonNull<u64>),
    |          ^^^^^^^^^^^^
-   = note: two pointers take two words, and atomiks does not yet hold pointers in two
-   = help: store the second in an atomic of its own
+   = note: a pointer enum is one word, each variant's pointer with its tag in the low bits
+   = help: store the second in an atomic of its own, or point to a struct that holds both

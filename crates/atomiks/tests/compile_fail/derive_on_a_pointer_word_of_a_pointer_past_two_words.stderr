@@ -1,0 +1,13 @@
+error: a pointer field, `owner`, past the two words a pointer word holds
+  --> tests/compile_fail/derive_on_a_pointer_word_of_a_pointer_past_two_words.rs:11:12
+   |
+11 |     owner: NonNull<u64>,
+   |            ^^^^^^^^^^^^
+   |
+note: this pointer takes two words
+  --> tests/compile_fail/derive_on_a_pointer_word_of_a_pointer_past_two_words.rs:10:12
+   |
+10 |     bytes: NonNull<[u8]>,
+   |            ^^^^^^^^^^^^^
+   = note: two pointers, or one to a slice, a `str` or a trait object, fill two words, the widest atomic
+   = help: store the rest in an atomic of its own

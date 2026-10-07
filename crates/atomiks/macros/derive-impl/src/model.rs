@@ -35,13 +35,13 @@ pub(crate) struct Implementor {
 /// How the type holds its value, which decides how its impl lays it out.
 pub(crate) enum Shape {
     /// A newtype: one field holds the value, beside any `PhantomData` markers.
-    Newtype(Newtype),
+    Newtype(Box<Newtype>),
     /// A unit struct, or one of markers alone.
     ZeroWidth(ZeroWidth),
     /// Several fields that hold a value, each in declaration order, as a struct packs them.
     Packed(Vec<Field>),
-    /// Several fields, one a pointer, the others its tags, packed into the low bits the
-    /// pointer's alignment leaves clear.
+    /// Several fields, one or two of them pointers, the others their tags, packed into the low bits
+    /// the first pointer's alignment leaves clear, or into an integer word beside it.
     PointerWord(PointerWord),
     /// Unit variants alone, each stored as its discriminant.
     Fieldless(Fieldless),
@@ -146,22 +146,61 @@ pub(crate) enum EnumRepr {
     Selected,
 }
 
-/// A pointer word's fields: its pointer, and its tags, every other field.
+/// A pointer word's fields: its pointers, and its tags, every other field, and how many words it
+/// takes.
 pub(crate) struct PointerWord {
-    /// The pointer field.
-    pub(crate) pointer: Field,
-    /// The pointer's index among the fields, in declaration order.
-    pub(crate) pointer_index: usize,
+    /// The pointer fields, one, or two thin ones, each beside its index among the fields, in
+    /// declaration order.
+    pub(crate) pointers: Vec<(usize, Field)>,
     /// The tag fields, in declaration order.
     pub(crate) tag_fields: Vec<Field>,
+    /// Which repr its impl stores it as: how many words it takes, and where its tags lie.
+    pub(crate) repr: WordRepr,
 }
 
 impl PointerWord {
     /// Every field, in declaration order.
     pub(crate) fn fields(&self) -> impl Iterator<Item = &Field> + Clone {
-        let (before, after) = self.tag_fields.split_at(self.pointer_index);
-        before.iter().chain(iter::once(&self.pointer)).chain(after)
+        let pointers = self.pointers.iter().map(|(index, pointer)| (*index, pointer));
+        pointers_among_tags(pointers, &self.tag_fields).into_iter()
     }
+
+    /// The pointer fields, in declaration order.
+    pub(crate) fn pointer_fields(&self) -> impl Iterator<Item = &Field> + Clone {
+        self.pointers.iter().map(|(_, pointer)| pointer)
+    }
+}
+
+/// Each part of a struct or a variant of pointer fields beside tags, in declaration order: `tags`,
+/// each tag's, with each pointer's part of `pointers` put at its index, which ascend.
+pub(crate) fn pointers_among_tags<T, P, I>(pointers: P, tags: I) -> Vec<T>
+where
+    P: IntoIterator<Item = (usize, T)>,
+    I: IntoIterator<Item = T>,
+{
+    let mut parts: Vec<T> = tags.into_iter().collect();
+    for (index, pointer) in pointers {
+        parts.insert(index, pointer);
+    }
+    parts
+}
+
+/// Which repr a pointer word's impl stores it as: how many words it takes, and where its tags lie.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum WordRepr {
+    /// One, its tags in its pointer's low bits: where `repr = u64` or `usize` states it, or the
+    /// struct has parameters and states no repr.
+    One,
+    /// Two, of pointers, a second one or a wide one's metadata, its tags in the first pointer's
+    /// low bits.
+    Pointers,
+    /// Two, its tags in an integer word beside its one pointer: where `repr = u128` or `i128`
+    /// states it.
+    IntegerWord,
+    /// One where its tags and its pointer's take no more bits than an alignment leaves clear, else
+    /// two, its tags in an integer word: a struct of one pointer and no parameters that states no
+    /// repr.
+    Selected,
 }
 
 /// A field, as an impl reads and builds it.
@@ -181,4 +220,7 @@ pub(crate) struct Field {
     /// marked `#[atom(ptr)]`, which need not be `Send` or `Sync`: `Atom` promises such a
     /// value may cross threads.
     pub(crate) is_pointer: bool,
+    /// Whether it is written as a pointer to a value of no size known at compile time, a slice, a
+    /// `str` or a trait object, whose pointer holds its metadata beside its address: two words.
+    pub(crate) is_wide_pointer: bool,
 }

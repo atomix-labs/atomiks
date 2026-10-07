@@ -1,7 +1,8 @@
 //! A crate under the workspace's lints, `unsafe_code` forbidden, with `const_trait_impl`, derives
 //! `Atom` for generic types and stores an instance of each in a static: a newtype, a struct of
-//! several fields, enums with fields, niche-filling and tagged, a pointer word, and pointer enums,
-//! one with a variant of data.
+//! several fields, enums with fields, niche-filling and tagged, a pointer word, pointer enums, one
+//! with a variant of data, and structs of two words: two pointers, a pointer beside the integer
+//! word `repr = u128` states, and a slice's pointer beside a tag.
 //!
 //! trybuild runs rustc alone, so the clippy lints here hold only where clippy builds the same code,
 //! as it does in `tests/derive_generic.rs`.
@@ -70,11 +71,11 @@ pub enum Lock<O> {
 #[repr(u8)]
 pub enum Slot<T> {
     /// Nothing written.
-    Empty      = 0,
+    Empty   = 0,
     /// Being written.
     Writing(T) = 1,
     /// Written.
-    Ready(T)   = 2,
+    Ready(T) = 2,
 }
 
 /// A pointer to any `T` aligned to 2 or more, and a mark.
@@ -104,6 +105,45 @@ pub enum Entry<T> {
     Occupied(NonNull<T>),
 }
 
+/// Two pointers of any two types, and a mark in the first one's low bits.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+pub struct PointerPair<A, B> {
+    /// The first.
+    pub first: NonNull<A>,
+    /// The second.
+    pub second: NonNull<B>,
+    /// The mark.
+    pub marked: bool,
+}
+
+/// A pointer to any `T` beside a counter, in two words, as stated.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+#[atom(repr = u128)]
+pub struct Counted<T> {
+    /// The top.
+    pub top: Option<NonNull<T>>,
+    /// The counter.
+    pub version: u64,
+}
+
+/// A slice of any element, and a seal in its data pointer's low bits.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+pub struct Chunk<T> {
+    /// The elements.
+    pub elements: NonNull<[T]>,
+    /// Whether the chunk is sealed.
+    pub sealed: bool,
+}
+
+/// Two pointers, or `None`.
+pub static PAIR: Atomic<Option<PointerPair<u32, u64>>> = Atomic::new(None);
+
+/// A head, empty.
+pub static COUNTED: Atomic<Counted<u64>> = Atomic::new(Counted { top: None, version: 0 });
+
+/// A chunk, or `None`.
+pub static CHUNK: Atomic<Option<Chunk<u32>>> = Atomic::new(None);
+
 /// The next sequence number.
 pub static NEXT: Atomic<Wrap<u32>> = Atomic::new(Wrap(0));
 
@@ -126,6 +166,9 @@ pub static SLOT: Atomic<Option<Slot<u32>>> = Atomic::new(None);
 pub static ENTRY: Atomic<Entry<u64>> = Atomic::new(Entry::Vacant(0));
 
 fn main() {
+    assert_eq!(PAIR.load_rmw(Acquire), None, "no pair");
+    assert_eq!(COUNTED.load_rmw(Acquire), Counted { top: None, version: 0 }, "an empty head");
+    assert_eq!(CHUNK.load_rmw(Acquire), None, "no chunk");
     assert_eq!(NEXT.swap(Wrap(1), Relaxed), Wrap(0), "one taken");
     BEST.store(Pair { first: 7, second: true }, Relaxed);
     assert_eq!(BEST.load(Acquire), Pair { first: 7, second: true }, "the best price");

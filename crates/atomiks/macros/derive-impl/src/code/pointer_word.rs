@@ -1,30 +1,38 @@
 //! A pointer word's `Atom`: its tag fields packed, as a packed struct's fields are, into the low
-//! bits its pointer's alignment leaves clear, above the pointer's own tags, and its repr the
-//! pointer's, whose provenance it keeps; and its projection onto every field, whose pointer's place
-//! reads the pointer through the word.
+//! bits its pointer's alignment leaves clear, above the pointer's own tags, or into an integer word
+//! of their own beside it; its repr the pointer's, whose provenance it keeps, two pointers' or the
+//! pointer's beside that word; and its projection onto every field, whose pointer's place reads
+//! the pointer through the word.
 
 use proc_macro2::{Span, TokenStream};
 use quote::{ToTokens, quote};
-use syn::Ident;
 use syn::spanned::Spanned;
+use syn::{Ident, Type, parse_quote};
 
-use super::field::{PackedFields, PointerWithTags, codec, pointer_among_tags};
+use super::field::{PackedFields, PointersWithTags, codec};
 use super::layout::{AtomImpl, ImplRepr, LayoutCode};
 use super::projection::{FieldSite, ProjectionCode, member_shown};
 use super::repr::located_at;
-use crate::model::{Field, Implementor, PointerWord};
+use super::stub::stub;
+use crate::model::{Field, Implementor, PointerWord, WordRepr, pointers_among_tags};
 
-/// The code of a pointer word: its tags' code, and its layout's locals, each tag's placement,
-/// `placement_<index>`, then the word's layout, `layout`, a `PointerWordLayout`.
+/// The code of a pointer word: its tags' code, and its layout's locals, its width, `word_count`,
+/// where a constant counts it, each tag's placement, `placement_<index>`, then the word's layout,
+/// `layout`, a `PointerWordLayout`.
 struct WordCode<'a> {
     /// The word.
     implementor: &'a Implementor,
     /// Its fields.
     word: &'a PointerWord,
+    /// The type its pointers are stored as, together: its one pointer field's, or the pair of its
+    /// two.
+    pointer_type: Type,
     /// Its tag fields' code.
     tag_fields: PackedFields<'a>,
     /// Its layout's locals.
     layout: LayoutCode<'a>,
+    /// The name of the local that counts its words, where a constant counts them.
+    word_count: Ident,
     /// The derive's definition site, where the locals it names take their names.
     def_site: Span,
 }
@@ -42,17 +50,33 @@ pub(crate) fn pointer_word(
     let projection = ProjectionCode::new(implementor, word.fields(), def_site);
     // Each `HasPackedField` keeps its promise: its type parameter is the field's type; a tag's
     // placement is `PackedField::new` of that type's reprs, at the offset where the tag before it
-    // ends, the first above the pointer's own tags, where `to_repr` packs the tag, each in bits of
-    // its own below the pointer's address, as the layout, whose top field is the pointer, says, so
-    // no tag reaches the top and no bit lies above the layout's width to extend; the pointer's
-    // placement is the low bits of the word's repr that are the low bits of the pointer's, its own
-    // tags, below the word's; `from_repr` splits the word's tags off and decodes the pointer and
-    // each tag alone, refusing nothing else, so a repr decodes wherever each field's bits decode;
-    // and `field` returns the field.
+    // ends, the first above the pointer's own tags, or at bit 64 beside an integer word, where
+    // `to_repr` packs the tag, each in bits of its own, as the layout says: below the pointer's
+    // address, in a layout whose top field is the pointer, so no tag reaches the top and no bit
+    // lies above the layout's width to extend; or in the integer word, in a layout of the tags
+    // alone, which `join_words` extends as it says. The first pointer's placement is the low bits
+    // of the word's repr that are the low bits of the pointer's, its own tags, below the word's; a
+    // second's, those of the second word, at bit 64. `from_repr` splits the word's tags off and
+    // decodes the pointers and each tag alone, refusing nothing else but an integer word's bits
+    // that extend no tag, so a repr decodes wherever each field's bits decode and the layout
+    // extends them; and `field` returns the field.
     let items = projection.implementations(code.field_sites());
     let implemented = code.layout.implement(word.fields(), code.atom_impl(items));
     let structure = projection.structure();
-    quote!(#implemented #structure)
+    match word.repr {
+        WordRepr::One | WordRepr::Selected => quote!(#implemented #structure),
+        // Two words whatever the fields: written where atomiks holds two words, else refused once.
+        WordRepr::Pointers | WordRepr::IntegerWord => {
+            let atomiks = &implementor.atomiks;
+            let name = implementor.ident.to_string();
+            let stub = stub(implementor);
+            quote! {
+                #atomiks::__private::in_two_words! {
+                    #name { #implemented #structure } else { #stub }
+                }
+            }
+        },
+    }
 }
 
 impl<'a> WordCode<'a> {
@@ -60,76 +84,134 @@ impl<'a> WordCode<'a> {
     fn new(implementor: &'a Implementor, word: &'a PointerWord, def_site: Span) -> Self {
         let atomiks = &implementor.atomiks;
         let private = quote!(#atomiks::__private);
-        let pointer = &word.pointer.ty;
+        let pointer_types = word.pointer_fields().map(|Field { ty, .. }| ty);
+        let pointer_type: Type = if let [_] = word.pointers.as_slice() {
+            parse_quote!(#(#pointer_types)*)
+        } else {
+            parse_quote!((#(#pointer_types),*))
+        };
         // The pointer's tag width alone, never its alignment, so the word may be held in its own
         // pointee.
-        let pointer_tag_width = quote!(<#pointer as #atomiks::Atom>::TAG_WIDTH);
-        let tag_fields = PackedFields::new(atomiks, &word.tag_fields, "placement", def_site)
-            .starting_at(pointer_tag_width.clone());
-        let mut layout = LayoutCode::new(implementor, def_site).stored_as_pointers([pointer]);
+        let pointer_tag_width = quote!(<#pointer_type as #atomiks::Atom>::TAG_WIDTH);
+        let mut layout = LayoutCode::new(implementor, def_site).stored_as_pointers([&pointer_type]);
+        let word_count = Ident::new("word_count", def_site);
+        let start = match word.repr {
+            WordRepr::One | WordRepr::Pointers => pointer_tag_width.clone(),
+            WordRepr::IntegerWord => {
+                quote!(#private::PointerWordLayout::tag_fields_offset(2, #pointer_tag_width))
+            },
+            WordRepr::Selected => {
+                let tags = word.tag_fields.iter().map(|Field { ty, .. }| {
+                    quote!(#private::PackedField::new(<#ty as #atomiks::Atom>::REPRS, 0))
+                });
+                layout.push(
+                    &word_count,
+                    quote!(::core::primitive::u32),
+                    quote! {
+                        #private::PointerWordLayout::word_count(#pointer_tag_width, &[#(#tags),*])
+                    },
+                );
+                quote!(#private::PointerWordLayout::tag_fields_offset(#word_count, #pointer_tag_width))
+            },
+        };
+        let tag_fields =
+            PackedFields::new(atomiks, &word.tag_fields, "placement", def_site).starting_at(start);
         for (placement, placed) in tag_fields.placed() {
             layout.push(placement, quote!(#private::PackedField), placed);
         }
         let name = layout.name().clone();
         let placements = tag_fields.placements();
-        layout.push(
-            &name,
-            quote!(#private::PointerWordLayout),
-            quote! {
-                #private::PointerWordLayout::new(
-                    #pointer_tag_width,
-                    #private::PackedLayout::new(&[#(#placements),*]),
-                )
+        let tag_layout = quote!(#private::PackedLayout::new(&[#(#placements),*]));
+        let word_layout = match word.repr {
+            WordRepr::One | WordRepr::Pointers => {
+                quote!(#private::PointerWordLayout::new(#pointer_tag_width, #tag_layout))
             },
-        );
-        Self { implementor, word, tag_fields, layout, def_site }
+            WordRepr::IntegerWord => {
+                quote!(#private::PointerWordLayout::in_words(2, #pointer_tag_width, #tag_layout))
+            },
+            WordRepr::Selected => quote! {
+                #private::PointerWordLayout::in_words(#word_count, #pointer_tag_width, #tag_layout)
+            },
+        };
+        layout.push(&name, quote!(#private::PointerWordLayout), word_layout);
+        Self { implementor, word, pointer_type, tag_fields, layout, word_count, def_site }
+    }
+
+    /// Whether the word may lay its tags out in an integer word beside its pointer, so its code
+    /// joins and splits words.
+    const fn may_have_integer_word(&self) -> bool {
+        matches!(self.word.repr, WordRepr::IntegerWord | WordRepr::Selected)
     }
 
     /// Where each field lies, in declaration order, as its `HasPackedField` says: a tag at its
-    /// placement, the pointer in the low bits that hold its own tags, each in the word's layout,
-    /// whose top field is the pointer, so no field reaches the repr's top bit.
+    /// placement, the first pointer in the low bits that hold its own tags, and a second pointer
+    /// in the second word's. Each lies in the word's layout, whose top field is the pointer, or,
+    /// beside an integer word, the tags', so no field reaches the repr's top bit but the last tag
+    /// of an integer word that ends at bit 128, which `reaches_top` finds where the word has no
+    /// parameters, as a packed struct's top field.
     fn field_sites(&self) -> Vec<FieldSite> {
         let atomiks = &self.implementor.atomiks;
         let layout = self.layout.local(self.layout.name());
-        let tag_placements =
-            self.tag_fields.placements().iter().map(|placement| self.layout.local(placement));
-        let placements = pointer_among_tags(
-            self.word.pointer_index,
-            quote!(#layout.pointer_placement()),
-            tag_placements,
-        );
-        placements
+        let below_top = quote!(#atomiks::__private::Reach<false>);
+        let tag_sites = self.tag_fields.placements().iter().map(|placement| {
+            let reach = if self.layout.is_generic() {
+                below_top.clone()
+            } else {
+                let alias = self.layout.repr_alias();
+                quote!(#atomiks::__private::Reach<{
+                    #atomiks::__private::reaches_top::<#alias>(#placement)
+                }>)
+            };
+            (self.layout.local(placement), reach)
+        });
+        let pointer_sites = self.word.pointers.iter().enumerate().map(|(rank, (index, field))| {
+            let placement = if rank == 0 {
+                quote!(#layout.pointer_placement())
+            } else {
+                let ty = &field.ty;
+                quote! {
+                    #atomiks::__private::PointerWordLayout::second_pointer_placement(
+                        <#ty as #atomiks::Atom>::TAG_WIDTH,
+                    )
+                }
+            };
+            (*index, (placement, below_top.clone()))
+        });
+        pointers_among_tags(pointer_sites, tag_sites)
             .into_iter()
-            .map(|placement| FieldSite {
+            .map(|(placement, reach)| FieldSite {
                 placement,
                 layout: quote!(#layout.packed_layout()),
-                reach: quote!(#atomiks::__private::Reach<false>),
+                reach,
             })
             .collect()
     }
 
-    /// The checks of the word: where its pointer field's type names no parameter, that it is
-    /// stored as a pointer, located at the type, the one check that asks it, so a field marked
-    /// a pointer that is none is refused once; and that the tags of the word, or of an instance of
-    /// it, fit the bits its pointer leaves clear above its own tags, located at the word's name
-    /// where it has no parameters, and wherever an instance's code is built where it has.
+    /// The checks of the word: where a thin pointer field's type names no parameter, that it is
+    /// stored as a pointer, located at the type, the one check that asks it, so a field marked a
+    /// pointer that is none is refused once; and that the tags of the word, or of an instance of
+    /// it, fit the bits its pointer leaves clear above its own tags, or the integer word beside it,
+    /// located at the word's name where it has no parameters, and wherever an instance's code is
+    /// built where it has.
     fn checks(&self) -> Vec<TokenStream> {
-        let pointer = &self.word.pointer;
         let atomiks = &self.implementor.atomiks;
-        let stored_as_a_pointer = (!pointer.is_generic).then(|| {
-            let ty = &pointer.ty;
-            located_at(quote!(#atomiks::__private::assert_pointer::<#ty>()), ty.span())
-        });
-        stored_as_a_pointer.into_iter().chain([self.tags_fit_check()]).collect()
+        let stored_as_pointers = self
+            .word
+            .pointer_fields()
+            .filter(|pointer| !pointer.is_generic && !pointer.is_wide_pointer)
+            .map(|Field { ty, .. }| {
+                located_at(quote!(#atomiks::__private::assert_pointer::<#ty>()), ty.span())
+            });
+        stored_as_pointers.chain([self.tags_fit_check()]).collect()
     }
 
     /// The check that the tags of the word, or of an instance of it, fit the bits its pointer
-    /// leaves clear above its own tags: concrete, located at the word's name; generic, wherever
-    /// an instance's code is built.
+    /// leaves clear above its own tags, or the integer word beside it: concrete, located at the
+    /// word's name; generic, wherever an instance's code is built.
     fn tags_fit_check(&self) -> TokenStream {
         let Implementor { ident, generics, .. } = self.implementor;
         let (_, ty_generics, _) = generics.split_for_impl();
-        let (pointer, layout) = (&self.word.pointer.ty, self.layout.name());
+        let (pointer, layout) = (&self.pointer_type, self.layout.name());
         let named = self
             .word
             .tag_fields
@@ -146,12 +228,13 @@ impl<'a> WordCode<'a> {
         if self.layout.is_generic() { check } else { located_at(check, ident.span()) }
     }
 
-    /// `Atom` for the word, beside `items`: of the pointer's repr, its tags' width, and the
-    /// strongest validity its fields promise, or, for a generic word, that zero decodes, where each
-    /// field's does.
+    /// `Atom` for the word, beside `items`: of its pointers' repr, or that beside an integer word,
+    /// its tags' width, and the strongest validity its fields promise, or, for a generic word, that
+    /// zero decodes, where each field's does.
     fn atom_impl(&self, items: TokenStream) -> AtomImpl {
         let atomiks = &self.implementor.atomiks;
-        let pointer = &self.word.pointer.ty;
+        let private = quote!(#atomiks::__private);
+        let pointer = &self.pointer_type;
         let layout = self.layout.local(self.layout.name());
         let validity = if self.layout.is_generic() {
             self.word.fields().collect::<Vec<_>>().into_iter().rev().fold(
@@ -165,14 +248,28 @@ impl<'a> WordCode<'a> {
             )
         } else {
             let (promises, alias) = (self.tag_fields.validity(), self.layout.repr_alias());
-            let bits = quote!(<#alias as #atomiks::Primitive>::BITS);
+            let pointers = self.word.pointer_fields().map(|Field { ty, .. }| {
+                quote! {
+                    .with_field::<<#ty as #atomiks::Atom>::Validity>(#layout.pointer_layout())
+                }
+            });
             self.layout.selected_validity(&quote! {
                 #promises
-                    .with_field::<<#pointer as #atomiks::Atom>::Validity>(#layout.pointer_layout())
-                    .code(#bits, #bits)
+                    #(#pointers)*
+                    .code(#layout.width::<#alias>(), <#alias as #atomiks::Primitive>::BITS)
             })
         };
-        let repr = quote!(<#pointer as #atomiks::Atom>::Repr);
+        let pointer_repr = quote!(<#pointer as #atomiks::Atom>::Repr);
+        let repr = match self.word.repr {
+            WordRepr::One | WordRepr::Pointers => pointer_repr,
+            WordRepr::IntegerWord => {
+                quote!(#atomiks::DoubleWord<#pointer_repr, ::core::primitive::usize>)
+            },
+            WordRepr::Selected => {
+                let word_count = &self.word_count;
+                quote!(<#private::Words<{ #word_count }> as #private::SelectPointerWordRepr<#pointer_repr>>::Repr)
+            },
+        };
         let named = if self.layout.is_generic() {
             repr.clone()
         } else {
@@ -188,6 +285,25 @@ impl<'a> WordCode<'a> {
         }
     }
 
+    /// The codec `codec_name` of the pointers together, `__private`'s or `Atom`'s `method`, as
+    /// [`codec`] gives a field's.
+    fn pointer_codec(&self, codec_name: &str, method: &str) -> TokenStream {
+        let atomiks = &self.implementor.atomiks;
+        match self.word.pointers.as_slice() {
+            [(_, pointer)] => codec(atomiks, pointer, codec_name, method),
+            pointers => {
+                let pointer = &self.pointer_type;
+                if pointers.iter().any(|(_, field)| field.is_generic) {
+                    let method = Ident::new(method, Span::call_site());
+                    quote!(<#pointer as #atomiks::Atom>::#method)
+                } else {
+                    let codec_name = Ident::new(codec_name, Span::call_site());
+                    quote!(#atomiks::__private::#codec_name::<#pointer>)
+                }
+            },
+        }
+    }
+
     /// `to_repr`, `to_tagged_repr`, `from_repr` and `from_repr_unchecked` of the word, whose repr
     /// is `repr`, each started by binding the layout's locals where they are an instance's.
     fn conversions(&self, repr: &TokenStream) -> TokenStream {
@@ -199,48 +315,85 @@ impl<'a> WordCode<'a> {
         let local = |name| Ident::new(name, self.def_site);
         let (repr_value, pointer_value, bits, tags, misaligned) =
             (local("repr"), local("pointer"), local("bits"), local("tags"), local("misaligned"));
-        let pointer = &self.word.pointer;
-        let member = &pointer.member;
+        let members = self.word.pointer_fields().map(|Field { member, .. }| quote!(self.#member));
+        let pointers = if let [_] = self.word.pointers.as_slice() {
+            quote!(#(#members)*)
+        } else {
+            quote!((#(#members),*))
+        };
         let tag_bits = self.tag_fields.encode(
             self.tag_fields.fields().iter().map(|Field { member, .. }| quote!(self.#member)),
         );
-        let to_tagged = codec(atomiks, pointer, "to_tagged_repr", "to_tagged_repr");
+        let to_tagged = self.pointer_codec("to_tagged_repr", "to_tagged_repr");
         let to_tagged_self = if self.layout.is_generic() {
             quote!(<Self as #atomiks::Atom>::to_tagged_repr)
         } else {
             quote!(#private::to_tagged_repr::<Self>)
         };
-        let pointer_with_tags = PointerWithTags {
+        let pointer_indices: Vec<usize> =
+            self.word.pointers.iter().map(|(index, _)| *index).collect();
+        let pointers_with_tags = PointersWithTags {
             fields: self.word.fields().collect(),
-            pointer_index: self.word.pointer_index,
+            pointer_indices: &pointer_indices,
             tag_fields: &self.tag_fields,
         };
-        let decoded = pointer_with_tags.decode(
+        let decoded = pointers_with_tags.decode(
             &quote!(Self),
-            &codec(atomiks, pointer, "from_repr", "from_repr"),
+            &self.pointer_codec("from_repr", "from_repr"),
             &pointer_value.to_token_stream(),
             &bits,
             self.def_site,
         );
-        let decoded_unchecked = pointer_with_tags.decode_unchecked(
+        let decoded_unchecked = pointers_with_tags.decode_unchecked(
             &quote!(Self),
-            &codec(atomiks, pointer, "from_repr_unchecked", "from_repr_unchecked"),
+            &self.pointer_codec("from_repr_unchecked", "from_repr_unchecked"),
             &pointer_value.to_token_stream(),
             &bits,
+            self.def_site,
         );
+        let (to_tagged_repr, split, split_unchecked) = if self.may_have_integer_word() {
+            (
+                quote! {
+                    let #bits = #tag_bits;
+                    let (#pointer_value, #misaligned) =
+                        #to_tagged(#pointers, #layout.pointer_tags(#bits, #tags));
+                    (#layout.join_words(#pointer_value, #bits), #misaligned)
+                },
+                quote! {
+                    let ::core::option::Option::Some((#pointer_value, #bits)) =
+                        #layout.split_words(#repr_value)
+                    else {
+                        return ::core::option::Option::None;
+                    };
+                },
+                quote! {
+                    let (#pointer_value, #bits) =
+                        unsafe { #layout.split_words(#repr_value).unwrap_unchecked() };
+                },
+            )
+        } else {
+            (
+                quote!(#to_tagged(#pointers, #layout.pointer_tags(#tag_bits, #tags))),
+                quote!(let (#pointer_value, #bits) = #layout.split(#repr_value);),
+                quote!(let (#pointer_value, #bits) = #layout.split(#repr_value);),
+            )
+        };
         // The impl keeps each promise of `Atom`: each tag packs into bits of its own, among the
         // word's tag bits, which `to_tagged_repr` passes on, beside those of any word that holds
         // this one, to the pointer field, which sets them as `Tags::set_in` does, as its own impl
-        // promises, so the repr is the pointer's offset by the tags, keeping its provenance;
+        // promises, so the repr is the pointer's offset by the tags, keeping its provenance, or,
+        // beside an integer word, the pointer's beside the tags' bits, which `join_words` writes;
         // `to_repr` is that repr with no tags beside, which refuses a pointer that had a tag bit
         // set, and lies in the range, every repr, or every one but zero where the pointer is never
-        // null; `from_repr` splits the same bits back off and decodes the pointer and each tag as
+        // null; `from_repr` splits the same bits back off and decodes the pointers and each tag as
         // its field does, by the repr alone, so the repr decodes as the value, and each repr that
-        // decodes is one value's, the pointer taking every bit but the word's tags';
+        // decodes is one value's, the pointers taking every bit but the word's tags', and an
+        // integer word's bits above the tags extending the last as `split_words` checks;
         // `from_repr_unchecked` splits alike and decodes each unchecked, which gives what
-        // `from_repr` does; the validity is what the fields promise of the bits they take, or, for
-        // a generic word, of zero alone; and the value may cross threads, as the impl checks or
-        // bounds each field but the pointer, whose own impl promises that it may.
+        // `from_repr` does, since a repr that decodes is one `split_words` accepts; the validity is
+        // what the fields promise of the bits they take, or, for a generic word, of zero alone; and
+        // the value may cross threads, as the impl checks or bounds each field but the pointers,
+        // whose own impls promise that they may.
         quote! {
             #[inline]
             fn to_repr(self) -> #repr {
@@ -251,19 +404,19 @@ impl<'a> WordCode<'a> {
             #[inline]
             fn to_tagged_repr(self, #tags: #private::Tags) -> (#repr, ::core::primitive::usize) {
                 #bind
-                #to_tagged(self.#member, #layout.pointer_tags(#tag_bits, #tags))
+                #to_tagged_repr
             }
             #[inline]
             fn from_repr(#repr_value: #repr) -> ::core::option::Option<Self> {
                 #bind
-                let (#pointer_value, #bits) = #layout.split(#repr_value);
+                #split
                 #decoded
             }
             #[inline]
             unsafe fn from_repr_unchecked(#repr_value: #repr) -> Self {
-                // The caller's repr decodes, so its pointer and each tag do.
+                // The caller's repr decodes, so its pointers and each tag do.
                 #bind
-                let (#pointer_value, #bits) = #layout.split(#repr_value);
+                #split_unchecked
                 #decoded_unchecked
             }
         }

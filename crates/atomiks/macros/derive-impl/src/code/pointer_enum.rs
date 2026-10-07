@@ -12,10 +12,10 @@ use syn::Ident;
 use syn::spanned::Spanned;
 
 use super::enum_with_fields::discriminants;
-use super::field::{PackedFields, PointerWithTags, build, pointer_among_tags, private_codec};
+use super::field::{PackedFields, PointersWithTags, build, private_codec};
 use super::layout::{AtomImpl, ImplRepr, LayoutCode};
 use super::repr::located_at;
-use crate::model::{EnumWithFields, Field, Implementor, Variant};
+use crate::model::{EnumWithFields, Field, Implementor, Variant, pointers_among_tags};
 
 /// What a variant holds, as its code names it.
 enum Contents<'a> {
@@ -299,9 +299,8 @@ impl<'a> EnumCode<'a> {
                 ]
             },
             Contents::Pointer { pointer, pointer_index, tag_fields } => {
-                let bindings = pointer_among_tags(
-                    *pointer_index,
-                    pointer_value.to_token_stream(),
+                let bindings = pointers_among_tags(
+                    [(*pointer_index, pointer_value.to_token_stream())],
                     tag_fields.values().iter().map(ToTokens::to_token_stream),
                 );
                 let pattern = build(&path, &variant.fields, &bindings);
@@ -309,23 +308,24 @@ impl<'a> EnumCode<'a> {
                 let pointer_tags = quote!(#layout.pointer_tags(#discriminant, #tag_bits, #tags));
                 let [encode, decode, decode_unchecked, pointer_argument] =
                     self.pointer_codecs(pointer, &pointer_tags, locals);
-                let pointer_with_tags = PointerWithTags {
+                let pointers_with_tags = PointersWithTags {
                     fields: variant.fields.iter().collect(),
-                    pointer_index: *pointer_index,
+                    pointer_indices: &[*pointer_index],
                     tag_fields,
                 };
-                let value = pointer_with_tags.decode(
+                let value = pointers_with_tags.decode(
                     &path,
                     &decode,
                     &pointer_argument,
                     bits,
                     self.def_site,
                 );
-                let value_unchecked = pointer_with_tags.decode_unchecked(
+                let value_unchecked = pointers_with_tags.decode_unchecked(
                     &path,
                     &decode_unchecked,
                     &pointer_argument,
                     bits,
+                    self.def_site,
                 );
                 // Unread where the variant has no tag fields.
                 let bits_binding =
