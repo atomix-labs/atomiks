@@ -7,10 +7,11 @@
 //! LSE2, refuses the exchange and maximum; and the `x86-64-refused` feature adds a pair of
 //! pointers and a slice's pointer, for the test that `x86_64` without `cmpxchg16b` refuses them.
 //! atomix-core's `deranged-05` feature is always on, for the probes of its conversions, and its
-//! `arbitrary-int` feature, for those of a field of an arbitrary-int integer. The field operations'
-//! probes are in `fields`, over packed structs `tests/testing/packed.rs` writes out, a pointer
-//! word's in `pointer_words`, over words `tests/testing/pointer_word.rs` writes out, and a double
-//! word's, a pair's and a slice pointer's, in `double_words`.
+//! `arbitrary-int` feature, for those of a field of an arbitrary-int integer. A bit's probes, at a
+//! position chosen at run time or by a constant, are in `bits`; the field operations' in `fields`,
+//! over packed structs `tests/testing/packed.rs` writes out; a pointer word's in `pointer_words`,
+//! over words `tests/testing/pointer_word.rs` writes out; and a double word's, a pair's and a slice
+//! pointer's, in `double_words`.
 //!
 //! The empty `[workspace]` in its manifest makes it a workspace of its own: the repository's does
 //! not list it, and the test builds it alone.
@@ -18,6 +19,7 @@
 #![no_std]
 #![feature(const_trait_impl)]
 
+pub mod bits;
 #[cfg(any(target_arch = "aarch64", target_feature = "cmpxchg16b"))]
 pub mod double_words;
 pub mod fields;

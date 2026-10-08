@@ -2,7 +2,7 @@ error[E0277]: `UInt<u8, 3>` has no atomic bitwise operations
  --> tests/compile_fail/arbitrary_int/bitwise_on_an_arbitrary_width_integer.rs:9:29
   |
 9 |     Atomic::new(u3::new(0)).not(Relaxed);
-  |                             ^^^ `and`, `or`, `xor`, `not` and their `fetch_` forms need `AtomBitwise`
+  |                             ^^^ `and`, `or`, `xor`, `not`, their `fetch_` forms, and `bit_set`, `bit_clear` and `bit_toggle` need `AtomBitwise`
   |
   = help: the trait `AtomBitwise` is not implemented for `UInt<u8, 3>`
   = note: for your own newtype over a value that has it, derive it: `#[derive(AtomBitwise)]`

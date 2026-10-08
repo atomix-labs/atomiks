@@ -5,10 +5,14 @@
 
 #[cfg(test)]
 mod tests {
-    use atomix_core::ordering::{AcqRel, Relaxed};
-    use atomix_core::{AtomicBool, AtomicI8, AtomicU8, AtomicU32};
+    use core::num::Wrapping;
+
     #[cfg(target_arch = "aarch64")]
-    use atomix_core::{AtomicI64, AtomicU64};
+    use atomix_core::AtomicI64;
+    use atomix_core::ordering::{AcqRel, Relaxed};
+    use atomix_core::{
+        Atomic, AtomicBool, AtomicI8, AtomicI16, AtomicU8, AtomicU16, AtomicU32, AtomicU64,
+    };
 
     #[test]
     fn add_and_sub_wrap() {
@@ -92,5 +96,63 @@ mod tests {
         let flag = AtomicBool::new(false);
         assert!(!flag.fetch_or(true, AcqRel), "before or");
         assert!(flag.load(Relaxed), "after or");
+    }
+
+    #[test]
+    fn a_bit_chosen_at_run_time_is_set_cleared_and_inverted_alone() {
+        for bit in 0..u64::BITS {
+            let mask = 1_u64 << bit;
+            let bits = AtomicU64::new(0xA5A5_A5A5_A5A5_A5A5 & !mask);
+            let others = bits.load(Relaxed);
+            assert!(!bits.bit_set(bit, AcqRel), "{bit}: clear before the set");
+            assert!(bits.bit_set(bit, AcqRel), "{bit}: set before the second set");
+            assert_eq!(bits.load(Relaxed), others | mask, "{bit}: set, every other bit kept");
+            assert!(bits.bit_toggle(bit, AcqRel), "{bit}: set before the toggle");
+            assert!(!bits.bit_toggle(bit, AcqRel), "{bit}: clear before the toggle back");
+            assert!(bits.bit_clear(bit, AcqRel), "{bit}: set before the clear");
+            assert!(!bits.bit_clear(bit, AcqRel), "{bit}: clear before the second clear");
+            assert_eq!(bits.load(Relaxed), others, "{bit}: clear again, every other bit kept");
+        }
+    }
+
+    #[test]
+    fn a_bit_counts_modulo_the_reprs_width() {
+        let bits = AtomicU16::new(0);
+        assert!(!bits.bit_set(16 + 3, AcqRel), "bit 19 of 16 is bit 3, clear");
+        assert_eq!(bits.load(Relaxed), 0b1000, "bit 3 set");
+        assert!(bits.bit_clear(u32::MAX - 12, AcqRel), "bit 2^32 - 13 of 16 is bit 3, set");
+        assert_eq!(bits.load(Relaxed), 0, "bit 3 clear");
+        assert!(!bits.bit_toggle(16, AcqRel), "bit 16 of 16, one past the top, is bit 0, clear");
+        assert_eq!(bits.load(Relaxed), 0b1, "bit 0 set");
+    }
+
+    #[test]
+    fn a_signed_values_top_bit_is_its_sign() {
+        let level = AtomicI16::new(1);
+        assert!(!level.bit_set(15, AcqRel), "a positive value's sign bit is clear");
+        assert_eq!(level.load(Relaxed), i16::MIN + 1, "negative once set");
+    }
+
+    #[test]
+    fn a_wrapping_value_takes_its_integers_bits() {
+        let bits = Atomic::new(Wrapping(0_u32));
+        assert!(!bits.bit_set(31, AcqRel), "clear before the set");
+        assert_eq!(bits.load(Relaxed), Wrapping(1 << 31), "the top bit set");
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    #[test]
+    fn an_8_bit_value_has_its_bits_on_aarch64() {
+        let bits = AtomicU8::new(0);
+        assert!(!bits.bit_set(7, AcqRel), "clear before the set");
+        assert_eq!(bits.load(Relaxed), 0x80, "the top bit set");
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    #[test]
+    fn a_bools_one_bit_is_every_position_on_aarch64() {
+        let flag = AtomicBool::new(false);
+        assert!(!flag.bit_set(9, AcqRel), "clear before the set, at any position");
+        assert!(flag.load(Relaxed), "and set after");
     }
 }

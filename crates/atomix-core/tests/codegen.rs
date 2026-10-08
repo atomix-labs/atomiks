@@ -19,6 +19,12 @@
 //! word's `update` tests, calls and saves nothing, and a Treiber stack's pop tests only the next
 //! node's pointer, which it reads from the node, and saves a frame record once, for its refusal.
 //!
+//! An atomic's bit chosen at run time is `ldset` and its kin on `aarch64`, and `lock bts` and its
+//! kin on `x86_64`, after the `and` that keeps a memory `bts` within the word. A constant bit, at
+//! either end or past the width too, is the same on `x86_64` with its position moved into a
+//! register; `aarch64` folds it into the mask it moves, and tests the bit with a shift or a mask.
+//! A bit whose value is discarded is `ldset` with no test, or `lock or`.
+//!
 //! A double word, two pointers or a slice's pointer and length, lowers as a 128-bit integer does,
 //! each pointer's exposure no instruction: its load and store are `ldp` and `stp` with LSE2, and
 //! `vmovdqa` with AVX; its read without them, and its exchange, are `casp` and `cmpxchg16b`, on
@@ -114,6 +120,20 @@ mod tests {
         ("ends64_top_test_and_set", Only(&["mov", "ldsetal", "lsr", "ret"])),
         ("ends64_top_test_and_clear", Only(&["mov", "ldclral", "lsr", "ret"])),
         ("ends64_top_test_and_toggle", Only(&["mov", "ldeoral", "lsr", "ret"])),
+        ("u64_bit_set", Only(&["mov", "lsl", "ldsetal", "tst", "cset", "ret"])),
+        ("u64_bit_clear", Only(&["mov", "lsl", "ldclral", "tst", "cset", "ret"])),
+        ("u64_bit_toggle", Only(&["mov", "lsl", "ldeoral", "tst", "cset", "ret"])),
+        ("u64_bit_set_0", Only(&["mov", "ldsetal", "and", "ret"])),
+        ("u64_bit_set_5", Only(&["mov", "ldsetal", "ubfx", "ret"])),
+        ("u64_bit_set_63", Only(&["mov", "ldsetal", "lsr", "ret"])),
+        ("u64_bit_clear_63", Only(&["mov", "ldclral", "lsr", "ret"])),
+        ("u64_bit_set_64", Only(&["mov", "ldsetal", "and", "ret"])),
+        ("u64_bit_set_discarded", Only(&["mov", "lsl", "ldsetal", "ret"])),
+        ("u32_bit_set", Only(&["mov", "lsl", "ldsetal", "tst", "cset", "ret"])),
+        ("u32_bit_set_31", Only(&["mov", "ldsetal", "lsr", "ret"])),
+        ("u16_bit_set", InOrder(&["and", "lsl", "ldsetalh", "tst", "cset"])),
+        ("i64_bit_set", Only(&["mov", "lsl", "ldsetal", "tst", "cset", "ret"])),
+        ("u8_bit_set", InOrder(&["and", "lsl", "ldsetalb", "tst", "cset"])),
         ("tag_set", Only(&["mov", "ldsetl", "ret"])),
         ("tag_clear", Only(&["mov", "ldclrl", "ret"])),
         ("tag_toggle", Only(&["mov", "ldeorl", "ret"])),
@@ -249,10 +269,10 @@ mod tests {
 
     /// Each function of the fixture on `x86_64`, Linux or macOS, at the `x86-64-v3` floor (AVX).
     ///
-    /// A bit's test is one `lock bts`, `btr` or `btc` at every position: with the position an
+    /// A field's bit test is one `lock bts`, `btr` or `btc` at every position: with the position an
     /// immediate, but the lowest bit's and the top bit's, which go through a register, and with
     /// LLVM's `setb`, shift and test where the bit is the upper half's lowest, at 8 of 16 bits or
-    /// 32 of 64.
+    /// 32 of 64. An atomic's bit goes through a register at every position, after an `and`.
     const X86_64: &[(&str, Lowering)] = &[
         ("u64_load", Only(&["movq", "retq"])),
         ("u64_store", Only(&["movq", "retq"])),
@@ -380,6 +400,19 @@ mod tests {
         ("ends64_top_test_and_set", Only(&["movl", "andl", "lock btsq", "setb", "retq"])),
         ("ends64_top_test_and_clear", Only(&["movl", "andl", "lock btrq", "setb", "retq"])),
         ("ends64_top_test_and_toggle", Only(&["movl", "andl", "lock btcq", "setb", "retq"])),
+        ("u64_bit_set", Only(&["andl", "lock btsq", "setb", "retq"])),
+        ("u64_bit_clear", Only(&["andl", "lock btrq", "setb", "retq"])),
+        ("u64_bit_toggle", Only(&["andl", "lock btcq", "setb", "retq"])),
+        ("u64_bit_set_0", Only(&["xorl", "andl", "lock btsq", "setb", "retq"])),
+        ("u64_bit_set_5", Only(&["movl", "andl", "lock btsq", "setb", "retq"])),
+        ("u64_bit_set_63", Only(&["movl", "andl", "lock btsq", "setb", "retq"])),
+        ("u64_bit_clear_63", Only(&["movl", "andl", "lock btrq", "setb", "retq"])),
+        ("u64_bit_set_64", Only(&["movl", "andl", "lock btsq", "setb", "retq"])),
+        ("u64_bit_set_discarded", Only(&["movl", "shlxq", "lock orq", "retq"])),
+        ("u32_bit_set", Only(&["andl", "lock btsl", "setb", "retq"])),
+        ("u32_bit_set_31", Only(&["movl", "andl", "lock btsl", "setb", "retq"])),
+        ("u16_bit_set", Only(&["andl", "lock btsw", "setb", "retq"])),
+        ("i64_bit_set", Only(&["andl", "lock btsq", "setb", "retq"])),
         (
             "word_load",
             Only(&[
@@ -566,7 +599,7 @@ mod tests {
             "= note: x86_64 has no atomic maximum or minimum",
             "= help: the trait `BitTest` is not implemented for `u8`",
             "= note: x86_64's `lock bts`, `btr` and `btc` take 16, 32 or 64 bits",
-            "= note: for an 8-bit word, state `#[atom(repr = u16)]`",
+            "= note: for an 8-bit word, use a 16-bit one, `AtomicU16` or `#[atom(repr = u16)]`",
             "= note: to accept a compare-exchange loop, call `update`",
         ] {
             assert!(stderr.contains(line), "the diagnostics say `{line}`:\n{stderr}");

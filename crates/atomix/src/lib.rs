@@ -44,9 +44,9 @@
 //! - **Primitives.** [`Primitive`], [`ExactBits`] where the bits are the whole value, a
 //!   [`DoubleWord`], two words in one 16-byte atomic, and what the target runs without a loop:
 //!   [`Load`], [`Store`], [`Swap`], [`FetchBitwise`], [`MinMax`], and, for a field's container,
-//!   [`FetchAdd`], [`MaskBitwise`], [`BitTest`]; [`ReadByExchange`], which
-//!   [`load_rmw`](Atomic::load_rmw) needs; and [`RawAccess`], a primitive whose cell lends its
-//!   place, which every primitive but a double word is.
+//!   [`FetchAdd`], [`MaskBitwise`], [`BitTest`], which an atomic's [`bit_set`](Atomic::bit_set)
+//!   needs too; [`ReadByExchange`], which [`load_rmw`](Atomic::load_rmw) needs; and [`RawAccess`],
+//!   a primitive whose cell lends its place, which every primitive but a double word is.
 //! - **Building blocks.** The loom-shaped [`cell`], the spin [`hint`], and `model` under loom.
 //!
 //! # Examples
@@ -320,9 +320,12 @@
 //!   add, and what the container's repr runs: [`MaskBitwise`], [`BitTest`] or [`FetchAdd`].
 //!
 //! The `fetch_` operations take core's names, and return the value before as core's do, a field's
-//! the container before. Only [`and`](Atomic::and), [`or`](Atomic::or), [`xor`](Atomic::xor) and
-//! [`not`](Atomic::not), on an atomic or a field, and a `bool` field's [`set`](AtomicField::set),
-//! [`clear`](AtomicField::clear) and [`toggle`](AtomicField::toggle) discard it.
+//! the container before. [`bit_set`](Atomic::bit_set), [`bit_clear`](Atomic::bit_clear) and
+//! [`bit_toggle`](Atomic::bit_toggle), on a bit chosen at run time, take [portable-atomic]'s
+//! names, and return the bit before as portable-atomic's do. Only [`and`](Atomic::and),
+//! [`or`](Atomic::or), [`xor`](Atomic::xor) and [`not`](Atomic::not), on an atomic or a field, and
+//! a `bool` field's [`set`](AtomicField::set), [`clear`](AtomicField::clear) and
+//! [`toggle`](AtomicField::toggle) discard the value before.
 //!
 //! A tagged pointer's store, swap or compare-exchange costs one test and branch, with no frame
 //! record on its path: a word nested in others tests its pointer once against every tag of each,
@@ -436,6 +439,7 @@
 //! atomix holds `atomix-derive`, which `derive` adds, at its own version whether the feature is
 //! on or not, so the code a derive writes always calls the hidden items it was written against.
 //!
+//! [portable-atomic]: https://docs.rs/portable-atomic
 //! [ucg-517]: https://github.com/rust-lang/unsafe-code-guidelines/issues/517
 
 // Where no atomic holds two words, no `DoubleWord` exists: its links lead to where one does.

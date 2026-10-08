@@ -159,35 +159,53 @@ where
 ///
 /// `x86_64` lowers `fetch_or(bit) & bit != 0` to `lock bts`, but LLVM first folds the test of a
 /// repr's lowest bit into a truncation, and of its top bit into a sign test, either of which
-/// `x86_64` leaves a compare-exchange loop; so those two positions go through an empty `asm!`,
-/// which hides the value, and the test stays a `lock bts` with the position in a register. Miri
-/// runs no `asm!`.
+/// `x86_64` leaves a compare-exchange loop; so those two positions go through
+/// [`opaque_position`], and the test stays a `lock bts` with the position in a register.
 #[inline]
 fn bit<P: FieldPath>() -> ContainerMask<P>
 where
     ContainerRepr<P>: MaskBitwise,
 {
-    #[cfg(opaque_bit_position)]
     if P::OFFSET == 0 || P::OFFSET.wrapping_add(1) == ContainerRepr::<P>::BITS {
-        let mut position = P::OFFSET;
-        // SAFETY: the template is a comment, so the block emits no instruction: it reads and
-        // writes no memory, and leaves `position`, its one register, and the flags as they were.
-        #[expect(unsafe_code, reason = "hides the position in a register; `black_box` spills it")]
-        unsafe {
-            asm!(
-                "/* {0:e} */",
-                inout(reg) position,
-                options(pure, nomem, nostack, preserves_flags)
-            );
-        }
-        return ContainerRepr::<P>::bit(position);
+        return ContainerRepr::<P>::bit(opaque_position(P::OFFSET));
     }
     ContainerRepr::<P>::bit(P::OFFSET)
 }
 
+/// The mask of the bit at `position` of `R`, modulo its width, for a test of that bit.
+///
+/// The position is known only at run time, or is a constant LLVM could fold as [`bit`] says, so it
+/// always goes through [`opaque_position`]: on `x86_64`, a constant costs a move into a register
+/// and an `and` beside `lock bts`, and no position a compare-exchange loop.
+#[inline]
+pub(super) fn bit_mask<R: MaskBitwise>(position: u32) -> R::Mask {
+    R::bit(opaque_position(position))
+}
+
+/// `position`, through an empty `asm!`, which makes its value opaque to LLVM.
+#[cfg(opaque_bit_position)]
+#[inline]
+fn opaque_position(position: u32) -> u32 {
+    let mut position = position;
+    // SAFETY: the template is a comment, so the block emits no instruction: it reads and writes no
+    // memory, and leaves `position`, its one register, and the flags as they were.
+    #[expect(unsafe_code, reason = "hides the position in a register; `black_box` spills it")]
+    unsafe {
+        asm!("/* {0:e} */", inout(reg) position, options(pure, nomem, nostack, preserves_flags));
+    }
+    position
+}
+
+/// `position` itself: off `x86_64` no fold loses a bit test, and Miri runs no `asm!`.
+#[cfg(not(opaque_bit_position))]
+#[inline]
+const fn opaque_position(position: u32) -> u32 {
+    position
+}
+
 /// Whether the bit of `mask` is set in `value`.
 #[inline]
-fn has_bit<R: MaskBitwise>(value: R, mask: R::Mask) -> bool {
+pub(super) fn has_bit<R: MaskBitwise>(value: R, mask: R::Mask) -> bool {
     value.packed_bits() & mask.to_bits() != 0
 }
 

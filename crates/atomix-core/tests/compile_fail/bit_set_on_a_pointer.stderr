@@ -1,0 +1,30 @@
+error[E0277]: `*mut u64` has no atomic bitwise operations
+  --> tests/compile_fail/bit_set_on_a_pointer.rs:11:18
+   |
+11 |     let _ = node.bit_set(0, AcqRel);
+   |                  ^^^^^^^ `and`, `or`, `xor`, `not`, their `fetch_` forms, and `bit_set`, `bit_clear` and `bit_toggle` need `AtomBitwise`
+   |
+   = help: the trait `AtomBitwise` is not implemented for `*mut u64`
+   = note: for your own newtype over a value that has it, derive it: `#[derive(AtomBitwise)]`
+   = note: to change the value in a compare-exchange loop, call `update`
+help: the trait `AtomBitwise` is implemented for `u64`
+  --> src/atom/scalar.rs
+   |
+   |           $(impl $capability for $int {})*
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+   | / integers! {
+   | |     [AtomAdd, AtomOrd, AtomBitwise]
+   | |     u8, u16, u32, u64, usize, i8, i16, i32, i64, isize,
+   | | }
+   | |_- in this macro invocation
+note: required by a bound in `atomix_core::atomic::capability::<impl atomix_core::Atomic<T>>::bit_set`
+  --> src/atomic/capability.rs
+   |
+   | impl<T: Atom> Atomic<T> {
+...
+   |     pub fn bit_set<O: RmwOrdering>(&self, bit: u32, order: O) -> bool
+   |     where
+   |         T: AtomBitwise,
+   |            ^^^^^^^^^^^ required by this bound in `atomix_core::atomic::capability::<impl Atomic<T>>::bit_set`
+   = note: this error originates in the macro `integers` (in Nightly builds, run with -Z macro-backtrace for more info)
