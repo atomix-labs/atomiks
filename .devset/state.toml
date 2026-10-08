@@ -570,8 +570,8 @@ exact = "e5d1bf0bfde89c21dbe14fd07589416386c2810f5836e89f4f6befd39fc73143"
 canonical = "e5d1bf0bfde89c21dbe14fd07589416386c2810f5836e89f4f6befd39fc73143"
 
 [files.".just/rust-doc.py"]
-exact = "20e0f5777b831a97f4efe40c290704a6c304ea803af0981e4b815bb6183c0cf2"
-canonical = "20e0f5777b831a97f4efe40c290704a6c304ea803af0981e4b815bb6183c0cf2"
+exact = "7d28f4d852194eacfc7a653876663e66bc826776fea3feeca83eb26860cfdbd7"
+canonical = "7d28f4d852194eacfc7a653876663e66bc826776fea3feeca83eb26860cfdbd7"
 
 [files.".just/rust-fmt.just"]
 exact = "aedbb96af3066ea64851f190c37afc8f536e85aae24584cda9b2ce684a77cbf1"
