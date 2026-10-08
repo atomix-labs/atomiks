@@ -1,0 +1,15 @@
+[package]
+name    = "atomix-codegen"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[features]
+default        = []
+x86-64-refused = []
+
+[dependencies]
+# internal
+atomix = { package = "atomix-rs", path = "../..", features = ["derive"] }
+
+[workspace]

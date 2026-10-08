@@ -1,0 +1,33 @@
+error[E0080]: evaluation panicked: `Option<atomix_core::ranged::RangedU8<0, u8::MAX>>`: its range holds every repr of `u8`, so `None` has none left: use a type with a spare repr, such as `NonZero<u64>`
+ --> src/atom/option.rs
+  |
+  |             None => <T::Repr as Primitive>::from_bits(const { none_repr::<T>() }),
+  |                                                               ^^^^^^^^^^^^^^^^ evaluation of `atomix_core::atom::option::<impl atomix_core::Atom for std::option::Option<atomix_core::RangedU8<0, u8::MAX>>>::to_repr::{constant#0}` failed inside this call
+  |
+note: inside `atomix_core::atom::option::none_repr::<RangedU8<0, u8::MAX>>`
+ --> src/atom/option.rs
+  |
+  | /         refuse_option::<T>(
+  | |             &Message::new()
+  | |                 .text("its range holds every repr of `")
+  | |                 .name(type_name::<T::Repr>(), rest.len().saturating_add(FRAME_LEN))
+  | |                 .text(rest),
+  | |         );
+  | |_________^
+note: inside `atomix_core::atom::option::refuse_option::<RangedU8<0, u8::MAX>>`
+ --> src/atom/option.rs
+  |
+  | /     refuse(
+  | |         &Message::new()
+  | |             .text("`Option<")
+  | |             .name(type_name::<T>(), close.len().saturating_add(advice.len()))
+  | |             .text(close)
+  | |             .text(advice),
+  | |     )
+  | |_____^ the failure occurred here
+
+note: erroneous constant encountered
+ --> src/atom/option.rs
+  |
+  |             None => <T::Repr as Primitive>::from_bits(const { none_repr::<T>() }),
+  |                                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^

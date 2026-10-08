@@ -1,0 +1,47 @@
+error[E0277]: `u64` is not stored as a pointer, so no tag can share its bits
+  --> tests/compile_fail/derive_on_a_pointer_enum_of_a_marked_field_stored_as_bits.rs:11:26
+   |
+ 8 | #[derive(Clone, Copy, Atom)]
+   |                       ---- `u64` doesn't satisfy the trait bound
+...
+11 |     Counted(#[atom(ptr)] u64),
+   |                          ^^^ expected a value whose repr is a `*mut`
+   |
+   = help: the trait `PtrAtom` is not implemented for `u64`
+   = note: a pointer word's pointer field, or a pointer enum variant's, is a `NonNull`, an `Option` of one, a raw pointer, or a value stored as one, such as a newtype of one
+   = note: a pointer to a slice, a `str` or a trait object is two words, which the derive sees where the field's type writes the pointer out, never through an alias
+note: required by a bound in `atomix::__private::to_tagged_pointer`
+  --> $WORKSPACE/crates/atomix-core/src/__private.rs
+   |
+   | pub const fn to_tagged_pointer<F: const PtrAtom>(value: F, tags: Tags) -> (*mut (), usize) {
+   |                                   ^^^^^^^^^^^^^ required by this bound in `to_tagged_pointer`
+
+error[E0277]: `u64` is not stored as a pointer, so no tag can share its bits
+  --> tests/compile_fail/derive_on_a_pointer_enum_of_a_marked_field_stored_as_bits.rs:11:26
+   |
+11 |     Counted(#[atom(ptr)] u64),
+   |                          ^^^ expected a value whose repr is a `*mut`
+   |
+   = help: the trait `PtrAtom` is not implemented for `u64`
+   = note: a pointer word's pointer field, or a pointer enum variant's, is a `NonNull`, an `Option` of one, a raw pointer, or a value stored as one, such as a newtype of one
+   = note: a pointer to a slice, a `str` or a trait object is two words, which the derive sees where the field's type writes the pointer out, never through an alias
+note: required by a bound in `atomix::__private::from_pointer`
+  --> $WORKSPACE/crates/atomix-core/src/__private.rs
+   |
+   | pub const fn from_pointer<F: const PtrAtom>(pointer: *mut ()) -> Option<F> {
+   |                              ^^^^^^^^^^^^^ required by this bound in `from_pointer`
+
+error[E0277]: `u64` is not stored as a pointer, so no tag can share its bits
+  --> tests/compile_fail/derive_on_a_pointer_enum_of_a_marked_field_stored_as_bits.rs:11:26
+   |
+11 |     Counted(#[atom(ptr)] u64),
+   |                          ^^^ expected a value whose repr is a `*mut`
+   |
+   = help: the trait `PtrAtom` is not implemented for `u64`
+   = note: a pointer word's pointer field, or a pointer enum variant's, is a `NonNull`, an `Option` of one, a raw pointer, or a value stored as one, such as a newtype of one
+   = note: a pointer to a slice, a `str` or a trait object is two words, which the derive sees where the field's type writes the pointer out, never through an alias
+note: required by a bound in `atomix::__private::from_pointer_unchecked`
+  --> $WORKSPACE/crates/atomix-core/src/__private.rs
+   |
+   | pub const unsafe fn from_pointer_unchecked<F: const PtrAtom>(pointer: *mut ()) -> F {
+   |                                               ^^^^^^^^^^^^^ required by this bound in `from_pointer_unchecked`

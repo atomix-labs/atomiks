@@ -1,0 +1,26 @@
+error[E0599]: the method `get_mut` exists for struct `atomix_core::Atomic<NonZero<u64>>`, but its trait bounds were not satisfied
+ --> tests/compile_fail/get_mut_on_a_value_that_is_not_its_repr.rs:9:16
+  |
+9 |     let _ = id.get_mut();
+  |                ^^^^^^^ method cannot be called on `atomix_core::Atomic<NonZero<u64>>` due to unsatisfied trait bounds
+  |
+ ::: $RUST/core/src/num/nonzero.rs
+  |
+  | pub struct NonZero<T: ZeroablePrimitive>(T::NonZeroInner);
+  | ---------------------------------------- doesn't satisfy `<NonZero<u64> as Atom>::Repr = NonZero<u64>`, `<NonZero<u64> as Atom>::Validity = Total` or `NonZero<u64>: RawAccess`
+  |
+  = note: the following trait bounds were not satisfied:
+          `<NonZero<u64> as Atom>::Repr = NonZero<u64>`
+          `<NonZero<u64> as Atom>::Validity = Total`
+          `NonZero<u64>: RawAccess`
+
+error[E0599]: the method `get_mut` exists for struct `atomix_core::Atomic<char>`, but its trait bounds were not satisfied
+  --> tests/compile_fail/get_mut_on_a_value_that_is_not_its_repr.rs:11:20
+   |
+11 |     let _ = letter.get_mut();
+   |                    ^^^^^^^ method cannot be called on `atomix_core::Atomic<char>` due to unsatisfied trait bounds
+   |
+   = note: the following trait bounds were not satisfied:
+           `<char as Atom>::Repr = char`
+           `<char as Atom>::Validity = Total`
+           `char: RawAccess`

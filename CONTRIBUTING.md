@@ -58,8 +58,8 @@ A maintainer takes `triage` off once an issue is understood. See
 [what awaits triage][triage], and the [good first issues][first].
 `.github/labels.toml` holds the labels, and each area's paths.
 
-[triage]: https://github.com/atomix-labs/atomiks/issues?q=is%3Aopen+label%3Atriage
-[first]: https://github.com/atomix-labs/atomiks/contribute
+[triage]: https://github.com/atomix-labs/atomix/issues?q=is%3Aopen+label%3Atriage
+[first]: https://github.com/atomix-labs/atomix/contribute
 
 <!-- <<< devset: github-labels <<< -->
 
@@ -74,15 +74,15 @@ and bash, installs into your home directory without sudo, and `--dry-run` says
 what it would do. Fork the repository, then:
 
 ```sh
-git clone https://github.com/<you>/atomiks.git
-cd atomiks
+git clone https://github.com/<you>/atomix.git
+cd atomix
 ./setup.sh
 ```
 
 Or clone and set up in one line:
 
 ```sh
-curl -fsSL https://atomix-labs.github.io/atxp/setup.sh | bash -s -- github.com/atomix-labs/atomiks
+curl -fsSL https://atomix-labs.github.io/atxp/setup.sh | bash -s -- github.com/atomix-labs/atomix
 ```
 
 The first run takes a few minutes; run it again after pulling, and it installs

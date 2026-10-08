@@ -1,0 +1,23 @@
+error[E0277]: the trait bound `std::sync::atomic::Atomic<*mut u8>: IntoBytes` is not satisfied
+  --> tests/compile_fail/zerocopy/into_bytes_on_a_pointer.rs:11:22
+   |
+11 |     has_into_bytes::<Atomic<*mut u8>>();
+   |                      ^^^^^^^^^^^^^^^ the trait `IntoBytes` is not implemented for `std::sync::atomic::Atomic<*mut u8>`
+   |
+   = note: Consider adding `#[derive(IntoBytes)]` to `std::sync::atomic::Atomic<*mut u8>`
+   = help: the following other types implement trait `IntoBytes`:
+             std::sync::atomic::Atomic<bool>
+             std::sync::atomic::Atomic<i16>
+             std::sync::atomic::Atomic<i32>
+             std::sync::atomic::Atomic<i64>
+             std::sync::atomic::Atomic<i8>
+             std::sync::atomic::Atomic<isize>
+             std::sync::atomic::Atomic<u16>
+             std::sync::atomic::Atomic<u32>
+           and $N others
+   = note: required for `atomix_core::Atomic<*mut u8>` to implement `IntoBytes`
+note: required by a bound in `has_into_bytes`
+  --> tests/compile_fail/zerocopy/into_bytes_on_a_pointer.rs:8:28
+   |
+ 8 | const fn has_into_bytes<T: IntoBytes>() {}
+   |                            ^^^^^^^^^ required by this bound in `has_into_bytes`

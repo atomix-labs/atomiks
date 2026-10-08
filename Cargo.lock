@@ -24,24 +24,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0ab387a0c4143b4fd3804e193946e78c8ab16cf26c5fde2048e4ac3d618c3b64"
 
 [[package]]
-name = "atomiks"
-version = "0.1.0"
-dependencies = [
- "arbitrary",
- "arbitrary-int",
- "atomiks-core",
- "atomiks-derive",
- "bytemuck",
- "deranged",
- "proptest",
- "serde",
- "serde_json",
- "trybuild",
- "zerocopy",
-]
-
-[[package]]
-name = "atomiks-core"
+name = "atomix-core"
 version = "0.1.0"
 dependencies = [
  "arbitrary",
@@ -60,20 +43,37 @@ dependencies = [
 ]
 
 [[package]]
-name = "atomiks-derive"
+name = "atomix-derive"
 version = "0.1.0"
 dependencies = [
- "atomiks-core",
- "atomiks-derive-impl",
+ "atomix-core",
+ "atomix-derive-impl",
 ]
 
 [[package]]
-name = "atomiks-derive-impl"
+name = "atomix-derive-impl"
 version = "0.1.0"
 dependencies = [
  "proc-macro2",
  "quote",
  "syn 3.0.6",
+]
+
+[[package]]
+name = "atomix-rs"
+version = "0.1.0"
+dependencies = [
+ "arbitrary",
+ "arbitrary-int",
+ "atomix-core",
+ "atomix-derive",
+ "bytemuck",
+ "deranged",
+ "proptest",
+ "serde",
+ "serde_json",
+ "trybuild",
+ "zerocopy",
 ]
 
 [[package]]

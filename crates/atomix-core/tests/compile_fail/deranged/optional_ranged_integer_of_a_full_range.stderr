@@ -1,0 +1,33 @@
+error[E0080]: evaluation panicked: `deranged::OptionRangedU8<0, u8::MAX>`: its range holds every integer, so `None` has none left
+ --> src/interop/deranged.rs
+  |
+  |               refuse_full_range::<$type>()
+  |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `atomix_core::interop::deranged::<impl atomix_core::Atom for deranged::OptionRangedU8<0, u8::MAX>>::REPRS` failed inside this call
+...
+  | / optional! {
+  | |     new, ZeroValid:
+  | |         OptionRangedU8(RangedU8, u8), OptionRangedU16(RangedU16, u16),
+  | |         OptionRangedU32(RangedU32, u32), OptionRangedU64(RangedU64, u64),
+... |
+  | |         OptionRangedIsize(RangedIsize, isize);
+  | | }
+  | |_- in this macro invocation
+  |
+note: inside `atomix_core::interop::deranged::refuse_full_range::<OptionRangedU8<0, u8::MAX>>`
+ --> src/interop/deranged.rs
+  |
+  |     refuse(&Message::new().text("`").name(type_name::<T>(), rest.len()).text(rest))
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the failure occurred here
+  = note: this error originates in the macro `none_repr` which comes from the expansion of the macro `optional` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+note: erroneous constant encountered
+ --> tests/compile_fail/deranged/optional_ranged_integer_of_a_full_range.rs:8:30
+  |
+8 | const REPRS: ReprRange<u8> = <OptionRangedU8<0, 255> as Atom>::REPRS;
+  |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+note: erroneous constant encountered
+  --> tests/compile_fail/deranged/optional_ranged_integer_of_a_full_range.rs:11:13
+   |
+11 |     let _ = REPRS;
+   |             ^^^^^

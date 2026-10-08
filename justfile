@@ -17,8 +17,8 @@ check-loom:
     cargo clippy --workspace --all-targets --all-features {{ loom }} --target aarch64-unknown-linux-gnu -- -D warnings
     cargo clippy --workspace --all-targets --all-features {{ loom }} --target x86_64-unknown-linux-gnu -- -D warnings
     RUSTFLAGS='--cfg loom -C target-cpu=x86-64' cargo clippy --workspace --all-targets --all-features --target x86_64-unknown-linux-gnu --target-dir target/loom-x86-64 -- -D warnings
-    cargo test -p atomiks-core --features loom {{ loom }} --test model
-    cargo test -p atomiks --features derive,loom {{ loom }} --test model
+    cargo test -p atomix-core --features loom {{ loom }} --test model
+    cargo test -p atomix-rs --features derive,loom {{ loom }} --test model
 
 # macOS's aarch64 floor has LSE2, which Linux's lacks. x86_64's floor has AVX; x86-64-v2 has
 # `cmpxchg16b` but no AVX; x86-64 has neither, so no 128-bit atomics. The last two go through
@@ -40,11 +40,11 @@ check-targets:
 # Checks the codegen fixtures' formatting, which `cargo fmt --all` misses: each is its own workspace.
 [metadata("rust")]
 check-codegen-fmt:
-    rustfmt --check crates/atomiks-core/tests/codegen/src/lib.rs crates/atomiks/tests/codegen/src/lib.rs
+    rustfmt --check crates/atomix-core/tests/codegen/src/lib.rs crates/atomix/tests/codegen/src/lib.rs
 
 # Formats the codegen fixtures.
 fix-codegen-fmt:
-    rustfmt crates/atomiks-core/tests/codegen/src/lib.rs crates/atomiks/tests/codegen/src/lib.rs
+    rustfmt crates/atomix-core/tests/codegen/src/lib.rs crates/atomix/tests/codegen/src/lib.rs
 
 # macOS's aarch64 floor has LSE2, whose 128-bit load is `ldp`; Linux's floor reads with a
 # compare-exchange. x86_64's floor has AVX; x86-64-v2's 128-bit load is a compare-exchange. x86_64

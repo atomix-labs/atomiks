@@ -72,8 +72,8 @@ exact = "7baa60eaed457e424d6694b65bfc598a4cb8383088efe307c88a61c525af68e9"
 canonical = "7baa60eaed457e424d6694b65bfc598a4cb8383088efe307c88a61c525af68e9"
 
 [files.".claude/skills/preparing-a-release-for-open-source/SKILL.md"]
-exact = "dbe2f1d28925484265c353f145ffe9a35fdc222ee9245dd0d27549b2a031f4ba"
-canonical = "dbe2f1d28925484265c353f145ffe9a35fdc222ee9245dd0d27549b2a031f4ba"
+exact = "72ca8187bab70921d5c499222c972704b358133361227f2e1121353fba2488b6"
+canonical = "72ca8187bab70921d5c499222c972704b358133361227f2e1121353fba2488b6"
 
 [files.".claude/skills/review-names/SKILL.md"]
 exact = "a1a7327c14a79789c3ce73aeafc42f10c249abcb80c1fc172cc250b1c69caa5d"
@@ -410,8 +410,8 @@ canonical = "8d45cd4373e6f54a64d663f8aea3cf87a4ff26d0d52d25d44c483301d1091fac"
 policy = "once"
 
 [files.".github/ISSUE_TEMPLATE/config.yml"]
-exact = "ec2562c58a79a4d3d6896b0c579c72cbd7008a1177964dabbd84f946e1120b94"
-canonical = "ec2562c58a79a4d3d6896b0c579c72cbd7008a1177964dabbd84f946e1120b94"
+exact = "d8bcdf4283a13a9114382a35ad892073a7d45dfee8d6d50d60b26ad04684c265"
+canonical = "d8bcdf4283a13a9114382a35ad892073a7d45dfee8d6d50d60b26ad04684c265"
 policy = "once"
 
 [files.".github/ISSUE_TEMPLATE/feature_request.yml"]
@@ -641,22 +641,32 @@ canonical = "15f274312fc7bf14131cba4956659d61f1f706cdf2ee77297d61bfd18830dd5f"
 policy = "once"
 
 [files."SECURITY.md"]
-exact = "e11b07256fa52c0493caea2dddfadc91b012af6a887863aebd7f84e53689d7ab"
-canonical = "e11b07256fa52c0493caea2dddfadc91b012af6a887863aebd7f84e53689d7ab"
+exact = "ff60d68b1498a00351c4e3e7ad69b2737c7e22753e62b5a4db5e8bb799dea347"
+canonical = "ff60d68b1498a00351c4e3e7ad69b2737c7e22753e62b5a4db5e8bb799dea347"
 policy = "once"
 
 [files."SUPPORT.md"]
-exact = "ae216914059f79ed41ba802ede6b7adca557ebdc836921057cf99eaf9ee345f3"
-canonical = "ae216914059f79ed41ba802ede6b7adca557ebdc836921057cf99eaf9ee345f3"
+exact = "6503831ce2dabe777b74764cb9f891fd01965c65afa1883b8d9c2b44935b77dc"
+canonical = "6503831ce2dabe777b74764cb9f891fd01965c65afa1883b8d9c2b44935b77dc"
 policy = "once"
 
 [files."cliff.toml"]
-exact = "20e59c15c440ba515a9ff9b6bbb4026c3b9dc3503a3095fa482580ca20e93db3"
-canonical = "20e59c15c440ba515a9ff9b6bbb4026c3b9dc3503a3095fa482580ca20e93db3"
+exact = "f9028309947415c22409138fc634e74bf7ee0e4ac6af5fcbb6c3fa0f3c52384e"
+canonical = "f9028309947415c22409138fc634e74bf7ee0e4ac6af5fcbb6c3fa0f3c52384e"
 
 [files."committed.toml"]
 exact = "e247332cdf9e82db6b29a70b0d6628a6dba1054fcb1e76664602f6cda7cfe20e"
 canonical = "e247332cdf9e82db6b29a70b0d6628a6dba1054fcb1e76664602f6cda7cfe20e"
+
+[files."crates/atomix/Cargo.toml"]
+exact = "d527356423fcd02e10dfd0f4f2b00c12f17fb55aba4465265e6eed42f9fb1bdb"
+canonical = "d527356423fcd02e10dfd0f4f2b00c12f17fb55aba4465265e6eed42f9fb1bdb"
+policy = "once"
+
+[files."crates/atomix/src/lib.rs"]
+exact = "31edcc90fd1eda3496cc10644e6916d779278af6e83d744ba65df9b5bec27c6e"
+canonical = "31edcc90fd1eda3496cc10644e6916d779278af6e83d744ba65df9b5bec27c6e"
+policy = "once"
 
 [files."docs/README.md"]
 exact = "9e135659c88198581c0c8b1220edebf06d97a3d9cee99cc9dfef056cf9805b57"
@@ -1031,8 +1041,8 @@ canonical = "8370f539a11c7b96fad133ea2d16c668b014b3312c0c83eb4a539b356f697362"
 
 [parts."CONTRIBUTING.md".github-labels]
 scope = "block"
-exact = "2e41e4762a90d3bbed4a0fb57185a840aad8aa3029953cbf9b4f7e59d50c5501"
-canonical = "0fc44a078e5664b00883fa326807823ba199de58a4ce5b99eae9a4888dbfd7b8"
+exact = "8ec0cac5230034f36283380952d9a4f4d4f8cd5b87b3bac21db515badfaecef1"
+canonical = "af21ba6d5cf5df5daa8d87b22d55bc028c92cf3ef3f52b22f622485c84bec5f9"
 
 [parts."CONTRIBUTING.md".project]
 scope = "block"
@@ -1041,8 +1051,8 @@ canonical = "c3978df92426497a95c09cf81d99010b5a325e16392c361cbc9b90a45e7556ee"
 
 [parts."CONTRIBUTING.md".setup]
 scope = "block"
-exact = "b2d509fcbef849233e935f50aed61796c48a5cd59b24b888c83f542d85e81df8"
-canonical = "ed28026bf292c53a7ebe4e8e3475adac16a759c019a40705e0f947de37f7cc89"
+exact = "7ad5e38fbe98d695a15701aba083a8273ab8a577d8898a716a46493d66994c4e"
+canonical = "c27dab8469e73a761513b7de46e8563e4fd9203f641dcbc2007cf76eeaa39b08"
 
 [parts."Cargo.toml".cargo-profiles]
 scope = "keys"
@@ -1056,8 +1066,8 @@ canonical = "97ae3bed43a289ecb77fd9f99ed84523563adf60c44f27a624f9f62308af2744"
 
 [parts."README.md".project]
 scope = "block"
-exact = "3953388bb6c8dda174b759f4840c3850c3200924beb5a29a0e26541bdd4a3be9"
-canonical = "3953388bb6c8dda174b759f4840c3850c3200924beb5a29a0e26541bdd4a3be9"
+exact = "d39364c4c68bbe15bc419c8e8c01f03cbb12aac0f4c699d844ab7debec172321"
+canonical = "d39364c4c68bbe15bc419c8e8c01f03cbb12aac0f4c699d844ab7debec172321"
 
 [parts."clippy.toml".rust-clippy]
 scope = "keys"
@@ -1071,8 +1081,8 @@ canonical = "3169192e7a77ac97b22386a2ce6fd06004d62b0b5c39658a22f4b7774ef3f7e6"
 
 [parts."docs/book.toml".mdbook]
 scope = "keys"
-exact = "27b51faa54e18732bfc23a28ea0954f60779eaa5f7db84298a38602789a69b73"
-canonical = "27b51faa54e18732bfc23a28ea0954f60779eaa5f7db84298a38602789a69b73"
+exact = "b3865047fa88aa2acb9722fd9d7e22758b0747088e467e8e374d7e2dc883e067"
+canonical = "b3865047fa88aa2acb9722fd9d7e22758b0747088e467e8e374d7e2dc883e067"
 policy = "merge"
 
 [parts."docs/theme/head.hbs".mdbook]

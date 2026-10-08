@@ -1,0 +1,28 @@
+error[E0277]: `RangedU8<1, 10>` has no atomic bitwise operations
+ --> tests/compile_fail/bitwise_on_a_ranged_integer.rs:9:24
+  |
+9 |     Atomic::new(depth).or(RangedU8::new(3).expect("as is 3"), Relaxed);
+  |                        ^^ `and`, `or`, `xor`, `not` and their `fetch_` forms need `AtomBitwise`
+  |
+  = help: the trait `AtomBitwise` is not implemented for `RangedU8<1, 10>`
+  = note: for your own newtype over a value that has it, derive it: `#[derive(AtomBitwise)]`
+  = note: to change the value in a compare-exchange loop, call `update`
+  = help: the following other types implement trait `AtomBitwise`:
+            Saturating<T>
+            Wrapping<T>
+            bool
+            i16
+            i32
+            i64
+            i8
+            isize
+          and $N others
+note: required by a bound in `atomix_core::atomic::capability::<impl atomix_core::Atomic<T>>::or`
+ --> src/atomic/capability.rs
+  |
+  | impl<T: Atom> Atomic<T> {
+...
+  |     pub fn or<O: RmwOrdering>(&self, value: T, order: O)
+  |     where
+  |         T: AtomBitwise,
+  |            ^^^^^^^^^^^ required by this bound in `atomix_core::atomic::capability::<impl Atomic<T>>::or`
