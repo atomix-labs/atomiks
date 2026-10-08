@@ -3,6 +3,7 @@
 //! back, so an atomic of two words lends no place, neither its address nor `&mut`.
 
 use core::ptr::{self, NonNull};
+use core::slice;
 
 use atomix_core::Atomic;
 
@@ -15,6 +16,7 @@ fn main() {
     let mut pair: Atomic<Pair> = Atomic::new((node, node));
     let _ = pair.as_ptr();
     let _ = pair.get_mut();
+    let _ = Atomic::get_mut_slice(slice::from_mut(&mut pair));
     // SAFETY: never runs; the build fails above.
     let _ = unsafe { Atomic::<NonNull<[u8]>>::from_ptr(ptr::null_mut()) };
 }

@@ -21,6 +21,8 @@ mod exclusive;
 mod field;
 mod ptr;
 
+#[doc(hidden)]
+pub use self::exclusive::RawValue;
 pub use self::field::{AtomicField, Field, FieldPath, Join, ProjectFields, Then, TopField, Whole};
 #[doc(hidden)]
 pub use self::field::{HasPackedField, Reach, project_field};
@@ -39,8 +41,9 @@ pub use self::ptr::AtomicPtr;
 /// gates each read-modify-write that means something only on some values.
 ///
 /// [`new`](Self::new) and [`into_inner`](Self::into_inner) need `T: const Atom`, so generic
-/// run-time code builds one with [`From`] and reads it back with [`get`](Self::get); a const
-/// caller of `get` or [`set`](Self::set) needs `const_trait_impl`.
+/// run-time code builds one with [`From`] and reads it back with [`get`](Self::get); a const caller
+/// of `get` or [`set`](Self::set) needs `const_trait_impl`, of `From`, `const_convert` too, and of
+/// `Default`, `const_default`.
 ///
 /// With the `zerocopy-08` feature, and not under loom, it derives zerocopy's traits through its
 /// cell, so it has each its cell has: [`KnownLayout`] always; [`IntoBytes`] but for a pointer, and
@@ -94,12 +97,14 @@ pub struct Atomic<T: Atom> {
     // operations, on `FieldBitwise`, `bool` among them), or by an add whose carry leaves the word
     // (the field's add, on `FieldAdd`, at a `TopField`), each through the place of a field, never
     // of `Whole`, as `ProjectFields` promises; or any repr written through `get_mut`,
-    // whose `Total` bound makes every one decode; or any repr zerocopy's derives read from bytes
-    // or zeros, which they do only where the cell is the primitive's own, so `Total`'s; or the
-    // zero repr bytemuck's `Zeroable` writes, only where `ZeroValid` says it decodes. Its writers
-    // are this module and its submodules, the zerocopy and bytemuck impls, and whoever writes
-    // through `get_mut`'s place, `as_ptr` or `from_ptr`, whose bounds and contracts keep it, each
-    // bounded by `RawAccess`, which no double word has.
+    // `get_mut_slice`, or the place `from_mut` or `from_mut_slice` took, whose `Total` bound makes
+    // every one decode; or any repr zerocopy's derives read from bytes or zeros, which they do
+    // only where the cell is the primitive's own, so `Total`'s; or the zero repr bytemuck's
+    // `Zeroable` writes, only where `ZeroValid` says it decodes. Its writers are this module
+    // and its submodules, the zerocopy and bytemuck impls, and whoever writes through
+    // `get_mut`'s place, `get_mut_slice`'s, the place `from_mut` or `from_mut_slice` took,
+    // `as_ptr` or `from_ptr`, whose bounds and contracts keep it, each bounded by `RawAccess`,
+    // which no double word has.
     /// The cell holding `T`'s repr: the validity's wrapper around the primitive's cell.
     cell: <T::Validity as Validity>::Cell<T::Repr>,
     /// The type of the value the repr encodes.
@@ -156,6 +161,10 @@ impl<T: Atom + UnwindSafe> UnwindSafe for Atomic<T> {}
 // For every `T`, as core's `AtomicPtr<T>` is: shared access is only atomic operations, so a panic
 // leaves a whole repr.
 impl<T: Atom> RefUnwindSafe for Atomic<T> {}
+
+// For every `T`, as core's atomics are: the atomic holds `T`'s repr, never a `T` to pin, and every
+// cell is `Unpin`.
+impl<T: Atom> Unpin for Atomic<T> {}
 
 /// The reprs of an exchange's `current` and `new`, whose pointers, where `T` is a tagged pointer,
 /// are tested for their tags in one test, so one refusal stands on the exchange's path.
@@ -553,12 +562,25 @@ impl<T: Atom> Atomic<T> {
     {
         // SAFETY: `Atomic<T>` is `repr(transparent)` over `T::Validity`'s cell, which has the
         // primitive's cell's layout (the cell itself, or `Opaque`'s `repr(transparent)` over it),
-        // which has the primitive's size; the caller upholds `from_ptr`'s contract, which keeps the
-        // field INVARIANT.
+        // which has the primitive's size and bit validity, by `RawAccess`'s contract; the caller
+        // upholds `from_ptr`'s contract, which keeps the field INVARIANT.
         unsafe { &*ptr.cast::<Self>() }
     }
 }
 
+// `const`, as core's are, where the cells are.
+#[cfg(not(loom))]
+const impl<T: [const] Atom> From<T> for Atomic<T> {
+    #[inline]
+    fn from(value: T) -> Self {
+        Self {
+            cell: T::Validity::wrap::<T::Repr>(value.to_repr().into_cell()),
+            marker: PhantomData,
+        }
+    }
+}
+
+#[cfg(loom)]
 impl<T: Atom> From<T> for Atomic<T> {
     #[inline]
     fn from(value: T) -> Self {
@@ -569,10 +591,31 @@ impl<T: Atom> From<T> for Atomic<T> {
     }
 }
 
+// `const`, as `From` is, where the cells are.
+#[cfg(not(loom))]
+const impl<T: [const] Atom + [const] Default> Default for Atomic<T> {
+    #[inline]
+    fn default() -> Self {
+        Self::from(T::default())
+    }
+}
+
+#[cfg(loom)]
 impl<T: Atom + Default> Default for Atomic<T> {
     #[inline]
     fn default() -> Self {
         Self::from(T::default())
+    }
+}
+
+impl<T: Atom + fmt::Pointer> fmt::Pointer for Atomic<T>
+where
+    T::Repr: Load,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // ORDERING: Relaxed, as core's `AtomicPtr`'s: printing publishes nothing and pairs with no
+        // store.
+        fmt::Pointer::fmt(&self.load(Relaxed), f)
     }
 }
 
@@ -583,5 +626,31 @@ where
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // ORDERING: Relaxed, as core's `Debug`: printing publishes nothing and pairs with no store.
         self.load(Relaxed).fmt(f)
+    }
+}
+
+// Under loom, `From` and `Default` are not `const`.
+#[cfg(not(loom))]
+#[cfg(test)]
+mod tests {
+    use crate::atomic::AtomicU64;
+
+    #[test]
+    fn from_is_const() {
+        const {
+            let mut value = AtomicU64::from(5);
+            assert!(value.get() == 5, "`From` builds the atomic in const");
+        }
+    }
+
+    #[test]
+    fn default_is_const() {
+        const {
+            let mut value = AtomicU64::default();
+            assert!(
+                value.get() == 0,
+                "`Default` builds the atomic of the value's default in const"
+            );
+        }
     }
 }
