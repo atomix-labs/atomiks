@@ -240,8 +240,8 @@ exact = "14ac99a7de72b0fc84f3fde81481d38285421a1d4bede1f0a8bd543471b9381e"
 canonical = "14ac99a7de72b0fc84f3fde81481d38285421a1d4bede1f0a8bd543471b9381e"
 
 [files.".claude/skills/writing-rustdoc/SKILL.md"]
-exact = "1261efadf025e67dd4ca28db3ae19c9de4e5922363d79b0e44788e9175455f0f"
-canonical = "1261efadf025e67dd4ca28db3ae19c9de4e5922363d79b0e44788e9175455f0f"
+exact = "f59636321b376f2e2584e88caca4af893fe75e9f48b57a2879059e5fd5ecc862"
+canonical = "f59636321b376f2e2584e88caca4af893fe75e9f48b57a2879059e5fd5ecc862"
 
 [files.".claude/skills/writing-rustdoc/references/comments.md"]
 exact = "f2f50785b9eed073e34c03d0311b19f3035c0665e94cfce112971efdfca2a34d"
@@ -264,12 +264,12 @@ exact = "1262b61005cd57c90f5facb788953bae3c92f808033b21ceef5432557cf24289"
 canonical = "1262b61005cd57c90f5facb788953bae3c92f808033b21ceef5432557cf24289"
 
 [files.".claude/skills/writing-rustdoc/references/tooling.md"]
-exact = "160385ec243cc977259b7a93ed6b4c4daa4d54ee6b5f07c95f201ab11bbc7ee9"
-canonical = "160385ec243cc977259b7a93ed6b4c4daa4d54ee6b5f07c95f201ab11bbc7ee9"
+exact = "34b97b41ec93aa8bb49284fd4925deb2790eb69d0b5711917ad16f5148e90c7c"
+canonical = "34b97b41ec93aa8bb49284fd4925deb2790eb69d0b5711917ad16f5148e90c7c"
 
 [files.".claude/skills/writing-rustdoc/scripts/doc-audit.sh"]
-exact = "223285eb4be23bfddc569131303b627b41e3b594386b0b3e94e5a2a2a7bf7f5b"
-canonical = "223285eb4be23bfddc569131303b627b41e3b594386b0b3e94e5a2a2a7bf7f5b"
+exact = "7afc24ff5b23e24a53d72edd65dcdd899854d3945219179f41393dcf7afed99b"
+canonical = "7afc24ff5b23e24a53d72edd65dcdd899854d3945219179f41393dcf7afed99b"
 
 [files.".claude/skills/writing-rustdoc/scripts/doc-inventory.py"]
 exact = "7d3d1fde033f55c44977215b504ba32ca8b93becbb559d6c613df4b3a10f1fe0"
@@ -546,8 +546,8 @@ exact = "9da33503e1cf3d55ad71a994b25cb661d2a53b05498e9a05c9177a669c6581ea"
 canonical = "9da33503e1cf3d55ad71a994b25cb661d2a53b05498e9a05c9177a669c6581ea"
 
 [files.".just/mdbook.just"]
-exact = "5dd5f543695fc551c96b66c9fc215c7e2a6be439c5e3ee2d5aaafb6cf53aa475"
-canonical = "5dd5f543695fc551c96b66c9fc215c7e2a6be439c5e3ee2d5aaafb6cf53aa475"
+exact = "6c5694f0b167dcc9b1c5148c9ebb3c79221d19772904cc34020961ee95fec37d"
+canonical = "6c5694f0b167dcc9b1c5148c9ebb3c79221d19772904cc34020961ee95fec37d"
 
 [files.".just/mdbook.py"]
 exact = "017bd24ae6b5894b91fbea158163cab7acb7b120d762aec902991fc7801d7b75"
@@ -566,8 +566,8 @@ exact = "99d4d845bafe937474d857e905e14512104694eb6603df0dde94d300ac6c994a"
 canonical = "99d4d845bafe937474d857e905e14512104694eb6603df0dde94d300ac6c994a"
 
 [files.".just/rust-doc.just"]
-exact = "e5d1bf0bfde89c21dbe14fd07589416386c2810f5836e89f4f6befd39fc73143"
-canonical = "e5d1bf0bfde89c21dbe14fd07589416386c2810f5836e89f4f6befd39fc73143"
+exact = "311c14860678efd1277b89051d7a57deabd706309bcd08a60a53c69f51c91fbc"
+canonical = "311c14860678efd1277b89051d7a57deabd706309bcd08a60a53c69f51c91fbc"
 
 [files.".just/rust-doc.py"]
 exact = "7d28f4d852194eacfc7a653876663e66bc826776fea3feeca83eb26860cfdbd7"
