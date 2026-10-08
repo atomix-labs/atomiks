@@ -7,6 +7,7 @@ use syn::Ident;
 
 use super::field::PackedFields;
 use super::layout::{AtomImpl, ImplRepr, LayoutCode};
+use super::member_in_expansion;
 use super::projection::{FieldSite, ProjectionCode};
 use crate::model::{Field, Implementor};
 
@@ -107,8 +108,10 @@ fn conversions(packed: &PackedFields<'_>, layout: &LayoutCode<'_>, def_site: Spa
     let (name, alias) = (layout.name(), layout.repr_alias());
     let repr = Ident::new("repr", def_site);
     let bits = Ident::new("bits", def_site);
-    let encoded =
-        packed.encode(packed.fields().iter().map(|Field { member, .. }| quote!(self.#member)));
+    let encoded = packed.encode(packed.fields().iter().map(|Field { member, .. }| {
+        let member = member_in_expansion(member);
+        quote!(self.#member)
+    }));
     let decoded = packed.decode(&bits, &quote!(Self));
     let decoded_unchecked = packed.decode_unchecked(&bits, &quote!(Self));
     let (bind, bind_placements) = (layout.bind(&[]), layout.bind(&[name]));

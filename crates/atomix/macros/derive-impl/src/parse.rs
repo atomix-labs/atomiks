@@ -25,8 +25,8 @@ const INTEGERS: [&str; 12] =
 
 /// Reads `input`, a type's definition, or gives syn's errors where it does not parse.
 pub(crate) fn input(input: TokenStream) -> Result<Input, Vec<DeriveError>> {
-    let DeriveInput { attrs, vis, ident, generics, data } =
-        parse2::<DeriveInput>(input).map_err(|error: SyntaxError| {
+    let DeriveInput { attrs, vis, mut ident, generics, data } = parse2::<DeriveInput>(input)
+        .map_err(|error: SyntaxError| {
             error.into_iter().map(DeriveError::from).collect::<Vec<_>>()
         })?;
     let mut errors = Vec::new();
@@ -35,7 +35,10 @@ pub(crate) fn input(input: TokenStream) -> Result<Input, Vec<DeriveError>> {
     let shape = shape(&ident, &generics, &attrs, repr.as_ref(), data, &mut errors);
     let projection_attributes =
         attrs.iter().filter(|attr| is_projection_attribute(attr)).cloned().collect();
-    let implementor = Implementor { vis, projection_attributes, ident, generics, atomix, repr };
+    let name_span = ident.span();
+    ident.set_span(Span::call_site().located_at(name_span));
+    let implementor =
+        Implementor { vis, projection_attributes, ident, name_span, generics, atomix, repr };
     let shape = match shape {
         Some(shape) if errors.is_empty() => Ok(shape),
         _ => Err(errors),
@@ -385,10 +388,17 @@ fn fields(
             let is_wide_pointer = pointee(&field.ty).is_some_and(is_unsized);
             let docs =
                 field.attrs.iter().filter(|attr| attr.path().is_ident("doc")).cloned().collect();
+            let deprecation = field
+                .attrs
+                .iter()
+                .filter(|attr| attr.path().is_ident("deprecated"))
+                .cloned()
+                .collect();
             Field {
                 member,
                 vis: field.vis,
                 docs,
+                deprecation,
                 ty: field.ty,
                 is_generic,
                 is_pointer,

@@ -95,12 +95,13 @@ What a change here keeps, beyond what the checks hold it to.
   `min`: a dropped `fetch_add` is `lock add` already.
 - Every packed struct the derive takes gets a projection, `QuoteFields<'a, P>`
   beside `Quote`, of its visibility: one `&'a AtomicField` per field, of the
-  field's visibility and with its docs, and a tuple struct's a tuple struct.
-  Beside it go each field's hidden `HasPackedField` and the `ProjectFields`
-  impl, and nothing else names a field: no constant per field, no `impl Quote`.
-  The projection is the one way to a field's place, since a private field may
-  carry an invariant its module's unsafe code relies on: a path is a type alone,
-  and the hidden `project_field` that builds each place is `unsafe`.
+  field's visibility and with its docs and `#[deprecated]`, and a tuple struct's
+  a tuple struct. Beside it go each field's hidden `HasPackedField` and the
+  `ProjectFields` impl, and nothing else names a field: no constant per field,
+  no `impl Quote`. The projection is the one way to a field's place, since a
+  private field may carry an invariant its module's unsafe code relies on: a
+  path is a type alone, and the hidden `project_field` that builds each place is
+  `unsafe`.
 - A pointer word, a struct of pointers beside tags, and a pointer enum, an enum
   some of whose variants hold a pointer, keep their tags in the low bits a
   pointee's alignment leaves clear, or, a pointer word of two words, in an

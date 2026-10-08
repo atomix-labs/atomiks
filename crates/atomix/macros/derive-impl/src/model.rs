@@ -2,6 +2,7 @@
 
 use core::iter;
 
+use proc_macro2::Span;
 use syn::{Attribute, Expr, Generics, Ident, Member, Path, Type, Visibility};
 
 use crate::errors::DeriveError;
@@ -25,8 +26,13 @@ pub(crate) struct Implementor {
     /// Its attributes that a packed struct's projection takes too: `#[non_exhaustive]` and
     /// `#[doc(hidden)]`.
     pub(crate) projection_attributes: Vec<Attribute>,
-    /// The type's name.
+    /// The type's name, as the impl writes it: at the user's name, but in the derive's expansion,
+    /// so that rustc's `deprecated` lint, which reads no use a derive writes, reads none of the
+    /// impl's uses of a deprecated type, as it reads none of std's derives'.
     pub(crate) ident: Ident,
+    /// Where the user wrote the type's name: where an error about the type points, and the span
+    /// of its projection's name.
+    pub(crate) name_span: Span,
     /// Its parameters and where clause.
     pub(crate) generics: Generics,
     /// The path to atomix: `crate = …`, else `::atomix`.
@@ -214,6 +220,9 @@ pub(crate) struct Field {
     pub(crate) vis: Visibility,
     /// Its doc comments, which its place in a packed struct's projection carries.
     pub(crate) docs: Vec<Attribute>,
+    /// Its `#[deprecated]`, which its place in a packed struct's projection carries too, so a use
+    /// of the place warns as a use of the field does.
+    pub(crate) deprecation: Vec<Attribute>,
     /// Its type, with the user's spans.
     pub(crate) ty: Type,
     /// Whether its type names a parameter of the type, so that an impl bounds it in its where

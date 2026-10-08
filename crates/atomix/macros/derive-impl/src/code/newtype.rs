@@ -10,6 +10,7 @@ use syn::spanned::Spanned;
 
 use super::bound::{thread_bounds, thread_checks, where_clause};
 use super::field::built_with_markers;
+use super::member_in_expansion;
 use super::repr::located_at;
 use crate::derive::Capability;
 use crate::model::{Field, Implementor, Newtype};
@@ -22,6 +23,7 @@ use crate::model::{Field, Implementor, Newtype};
 pub(crate) fn newtype(implementor: &Implementor, newtype: &Newtype, def_site: Span) -> TokenStream {
     let Implementor { ident, generics, atomix, .. } = implementor;
     let Field { member, ty, is_generic, .. } = &newtype.value;
+    let member = member_in_expansion(member);
     // A concrete field's conversions go through `__private`, whose bound is `const`, so the user's
     // crate needs no `const_trait_impl`; a generic field's are the trait's, the only calls that
     // keep the impl's `[const]` bound.

@@ -24,9 +24,12 @@ note: required for `Wrap<*mut u8>` to implement `Atom`
   --> tests/compile_fail/derive_on_a_generic_newtype_instance_of_a_pointer.rs:11:8
    |
 10 | #[derive(Clone, Copy, Atom)]
-   |                       ---- type parameter would need to implement `Atom`
+   |                       ----
+   |                       |
+   |                       type parameter would need to implement `Atom`
+   |                       in this derive macro expansion
 11 | struct Wrap<T>(T);
-   |        ^^^^^^^
+   |        ^^^^
 note: required by a bound in `atomix::Atomic::<T>::new`
   --> $WORKSPACE/crates/atomix-core/src/atomic/mod.rs
    |
@@ -62,9 +65,12 @@ note: required for `Wrap<*mut u8>` to implement `Atom`
   --> tests/compile_fail/derive_on_a_generic_newtype_instance_of_a_pointer.rs:11:8
    |
 10 | #[derive(Clone, Copy, Atom)]
-   |                       ---- type parameter would need to implement `Atom`
+   |                       ----
+   |                       |
+   |                       type parameter would need to implement `Atom`
+   |                       in this derive macro expansion
 11 | struct Wrap<T>(T);
-   |        ^^^^^^^
+   |        ^^^^
 note: required by a bound in `atomix::Atomic`
   --> $WORKSPACE/crates/atomix-core/src/atomic/mod.rs
    |

@@ -21,10 +21,13 @@ note: required for `Pair<NonNull<u64>, u8>` to implement `Atom`
   --> tests/compile_fail/derive_on_a_generic_instance_with_a_pointer_field.rs:12:8
    |
 10 | #[derive(Clone, Copy, Atom)]
-   |                       ---- type parameter would need to implement `Atom`
+   |                       ----
+   |                       |
+   |                       type parameter would need to implement `Atom`
+   |                       in this derive macro expansion
 11 | #[atom(repr = u64)]
 12 | struct Pair<A, B> {
-   |        ^^^^^^^^^^
+   |        ^^^^
 note: required by a bound in `atomix::Atomic::<T>::new`
   --> $WORKSPACE/crates/atomix-core/src/atomic/mod.rs
    |
@@ -57,10 +60,13 @@ note: required for `Pair<NonNull<u64>, u8>` to implement `Atom`
   --> tests/compile_fail/derive_on_a_generic_instance_with_a_pointer_field.rs:12:8
    |
 10 | #[derive(Clone, Copy, Atom)]
-   |                       ---- type parameter would need to implement `Atom`
+   |                       ----
+   |                       |
+   |                       type parameter would need to implement `Atom`
+   |                       in this derive macro expansion
 11 | #[atom(repr = u64)]
 12 | struct Pair<A, B> {
-   |        ^^^^^^^^^^
+   |        ^^^^
 note: required by a bound in `atomix::Atomic`
   --> $WORKSPACE/crates/atomix-core/src/atomic/mod.rs
    |
