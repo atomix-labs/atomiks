@@ -224,7 +224,8 @@ macro_rules! unsigned_bits {
 macro_rules! integers {
     ($($int:ident => $cell:ident $(, $signed:ident)?);+ $(;)?) => {$(
         cells!($int => atomic::$cell);
-        // Wrapping, as `x86_64`'s `bts` with its position in a register needs.
+        // Wrapping: `bit_set` counts its bit modulo the width, and `x86_64`'s `bts` with its
+        // position in a register needs it.
         bitwise!($int: !0, |position: u32| <$int>::wrapping_shl(1, position));
         const impl Primitive for $int {
             const BITS: u32 = <$int>::BITS;

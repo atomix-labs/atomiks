@@ -2,7 +2,7 @@ error[E0277]: `RangedU8<1, 10>` has no atomic bitwise operations
  --> tests/compile_fail/bitwise_on_a_ranged_integer.rs:9:24
   |
 9 |     Atomic::new(depth).or(RangedU8::new(3).expect("as is 3"), Relaxed);
-  |                        ^^ `and`, `or`, `xor`, `not` and their `fetch_` forms need `AtomBitwise`
+  |                        ^^ `and`, `or`, `xor`, `not`, their `fetch_` forms, and `bit_set`, `bit_clear` and `bit_toggle` need `AtomBitwise`
   |
   = help: the trait `AtomBitwise` is not implemented for `RangedU8<1, 10>`
   = note: for your own newtype over a value that has it, derive it: `#[derive(AtomBitwise)]`

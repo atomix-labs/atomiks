@@ -313,7 +313,8 @@ pub impl(crate) trait MaskBitwise: CompareExchange {
     /// The mask: the integer itself, or a pointer's address.
     #[doc(hidden)]
     type Mask: ExactBits;
-    /// The mask of the one bit at `position`, below `BITS`.
+    /// The mask of the one bit at `position`, modulo `BITS`, as `wrapping_shl` counts a shift:
+    /// `Atomic::bit_set` and its kin pass any position.
     #[doc(hidden)]
     fn bit(position: u32) -> Self::Mask;
     /// Turns on the bits of `mask`, and returns the value before.
@@ -333,7 +334,8 @@ pub impl(crate) trait MaskBitwise: CompareExchange {
 /// Each is `lock bts`, `btr` and `btc` on `x86_64`, of 16 bits or more, and `ldset`, `ldclr` and
 /// `ldeor` on `aarch64` (without LSE, an outline call or an LL/SC pair). A `bool` field's
 /// `test_and_set`, `test_and_clear` and `test_and_toggle` ask it of the container's repr, so
-/// generic code over a field states it.
+/// generic code over a field states it; an atomic's `bit_set`, `bit_clear` and `bit_toggle` ask
+/// it of their own repr.
 ///
 /// # Examples
 /// [`#[derive(Atom)]`'s example][generic] states it in generic code over a field.
@@ -344,7 +346,7 @@ pub impl(crate) trait MaskBitwise: CompareExchange {
     target_arch = "x86_64",
     diagnostic::on_unimplemented(
         note = "x86_64's `lock bts`, `btr` and `btc` take 16, 32 or 64 bits: an 8-bit or a 128-bit word's bit would be a compare-exchange loop",
-        note = "for an 8-bit word, state `#[atom(repr = u16)]`, or call `set`, `clear` or `toggle`, which discard the bit before"
+        note = "for an 8-bit word, use a 16-bit one, `AtomicU16` or `#[atom(repr = u16)]`, or call `or`, `and` or `xor`, or a field's `set`, `clear` or `toggle`, which discard the bit before"
     )
 )]
 #[diagnostic::on_unimplemented(

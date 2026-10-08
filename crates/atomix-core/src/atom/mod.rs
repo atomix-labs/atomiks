@@ -184,14 +184,15 @@ pub trait AtomAdd: Atom<Validity = Total, Repr: FetchAdd> {}
 )]
 pub trait AtomOrd: Atom + Ord {}
 
-/// And, or, xor and not on the repr, an integer of at most 64 bits or `bool`, combine values.
+/// And, or, xor and not on the repr, an integer of at most 64 bits or `bool`, combine values, and
+/// any one bit of the repr may be set, cleared or inverted.
 ///
 /// A newtype over a value that has it derives it, `#[derive(AtomBitwise)]`.
 ///
 /// A wrong impl gives wrong values, never undefined behaviour: every repr decodes ([`Total`]).
 #[diagnostic::on_unimplemented(
     message = "`{Self}` has no atomic bitwise operations",
-    label = "`and`, `or`, `xor`, `not` and their `fetch_` forms need `AtomBitwise`",
+    label = "`and`, `or`, `xor`, `not`, their `fetch_` forms, and `bit_set`, `bit_clear` and `bit_toggle` need `AtomBitwise`",
     note = "for your own newtype over a value that has it, derive it: `#[derive(AtomBitwise)]`",
     note = "to change the value in a compare-exchange loop, call `update`"
 )]

@@ -579,8 +579,8 @@ pub fn derive_atom_ord(input: TokenStream) -> TokenStream {
     emit(expand_capability(input.into(), Capability::Ord))
 }
 
-/// Derives `AtomBitwise` for a newtype whose field has it: `and`, `or`, `xor`, `not` and their
-/// `fetch_` forms.
+/// Derives `AtomBitwise` for a newtype whose field has it: `and`, `or`, `xor`, `not`, their
+/// `fetch_` forms, and `bit_set`, `bit_clear` and `bit_toggle`.
 ///
 /// # Examples
 /// ```

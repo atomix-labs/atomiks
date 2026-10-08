@@ -1,14 +1,18 @@
 //! The read-modify-writes that need a capability: add and subtract ([`AtomAdd`]), maximum and
-//! minimum ([`AtomOrd`]), and the bitwise operations ([`AtomBitwise`]).
+//! minimum ([`AtomOrd`]), and the bitwise operations, a bit's among them ([`AtomBitwise`]).
 //!
 //! Each bound sits on its method, so a value without the capability gets the capability's own
 //! message. `fetch_max` and `fetch_min` also need the target's [`MinMax`], and the `fetch_` bitwise
-//! forms its [`FetchBitwise`]: `aarch64` has both, `x86_64` neither.
+//! forms its [`FetchBitwise`]: `aarch64` has both, `x86_64` neither. A bit's set, clear and toggle
+//! need the target's [`BitTest`]: both have it from 16 bits, and `aarch64` from 8.
 
 use super::Atomic;
+use super::field::{bit_mask, has_bit};
 use crate::atom::{Atom, AtomAdd, AtomBitwise, AtomOrd};
 use crate::ordering::RmwOrdering;
-use crate::primitive::{Bitwise, FetchAdd, FetchBitwise, MinMax};
+use crate::primitive::{
+    BitTest, Bitwise, ExactBits, FetchAdd, FetchBitwise, MaskBitwise, MinMax, Primitive,
+};
 
 impl<T: Atom> Atomic<T> {
     /// Adds `delta` to the repr, wrapping, and returns the value before.
@@ -182,5 +186,108 @@ impl<T: Atom> Atomic<T> {
         let before = T::Repr::fetch_not(self.primitive_cell(), O::CORE);
         // SAFETY: by the field INVARIANT, the repr read from the cell decodes.
         unsafe { T::from_repr_unchecked(before) }
+    }
+
+    /// Turns bit `bit` of the repr on, and returns it before: `lock bts` on `x86_64`, `ldset` on
+    /// `aarch64`.
+    ///
+    /// `bit` counts from the repr's lowest bit, modulo its width, as a shift by
+    /// [`wrapping_shl`](u64::wrapping_shl) does, so bit 67 of a `u64` is bit 3, and every bit of a
+    /// `bool` is its one bit. `x86_64` has no 8-bit `lock bts`, so an 8-bit repr or a `bool` has it
+    /// on `aarch64` alone.
+    ///
+    /// It takes its name from [portable-atomic]'s `bit_set`, and so returns the bit before as that
+    /// does. The atomic's own [`set`](Self::set) writes a whole value through `&mut`. A `bool`
+    /// field's [`set`](crate::AtomicField::set) returns nothing, since the field's form that
+    /// returns the bit is [`test_and_set`](crate::AtomicField::test_and_set); an atomic's form that
+    /// discards it is [`or`](Self::or).
+    ///
+    /// # Examples
+    /// ```
+    /// # extern crate atomix_core as atomix;
+    /// use atomix::AtomicU64;
+    /// use atomix::ordering::AcqRel;
+    ///
+    /// // A bit per worker of a pool, set while the worker is busy.
+    /// static BUSY: AtomicU64 = AtomicU64::new(0);
+    ///
+    /// let worker = 5;
+    /// assert!(!BUSY.bit_set(worker, AcqRel), "worker 5 was idle, and this thread took it");
+    /// assert!(BUSY.bit_set(worker, AcqRel), "so a second claim finds it busy");
+    /// ```
+    ///
+    /// [portable-atomic]: https://docs.rs/portable-atomic
+    #[must_use = "to discard the bit before, call `or`, which every target has"]
+    #[inline]
+    pub fn bit_set<O: RmwOrdering>(&self, bit: u32, order: O) -> bool
+    where
+        T: AtomBitwise,
+        T::Repr: BitTest,
+    {
+        let _ = order;
+        let mask = bit_mask::<T::Repr>(bit);
+        has_bit(T::Repr::fetch_or_mask(self.primitive_cell(), mask, O::CORE), mask)
+    }
+
+    /// Turns bit `bit` of the repr off, and returns it before: `lock btr` on `x86_64`, `ldclr` on
+    /// `aarch64`.
+    ///
+    /// As [`bit_set`](Self::bit_set), on the reprs it takes; [`and`](Self::and) is the form that
+    /// discards the bit.
+    ///
+    /// # Examples
+    /// ```
+    /// # extern crate atomix_core as atomix;
+    /// use atomix::AtomicU64;
+    /// use atomix::ordering::{AcqRel, Acquire};
+    ///
+    /// // A bit per worker of a pool, set while the worker is busy: worker 5 is.
+    /// static BUSY: AtomicU64 = AtomicU64::new(1 << 5);
+    ///
+    /// assert!(BUSY.bit_clear(5, AcqRel), "worker 5 was busy, and this thread freed it");
+    /// assert_eq!(BUSY.load(Acquire), 0, "so every worker is idle");
+    /// ```
+    #[must_use = "to discard the bit before, call `and`, which every target has"]
+    #[inline]
+    pub fn bit_clear<O: RmwOrdering>(&self, bit: u32, order: O) -> bool
+    where
+        T: AtomBitwise,
+        T::Repr: BitTest,
+    {
+        let _ = order;
+        let mask = bit_mask::<T::Repr>(bit);
+        let others = <T::Repr as MaskBitwise>::Mask::from_bits(!mask.to_bits());
+        has_bit(T::Repr::fetch_and_mask(self.primitive_cell(), others, O::CORE), mask)
+    }
+
+    /// Inverts bit `bit` of the repr, and returns it before: `lock btc` on `x86_64`, `ldeor` on
+    /// `aarch64`.
+    ///
+    /// As [`bit_set`](Self::bit_set), on the reprs it takes; [`xor`](Self::xor) is the form that
+    /// discards the bit.
+    ///
+    /// # Examples
+    /// ```
+    /// # extern crate atomix_core as atomix;
+    /// use atomix::AtomicU32;
+    /// use atomix::ordering::AcqRel;
+    ///
+    /// // A bit per shard of a cache, the parity of the shard's epoch.
+    /// static PARITY: AtomicU32 = AtomicU32::new(0);
+    ///
+    /// let shard = 3;
+    /// assert!(!PARITY.bit_toggle(shard, AcqRel), "shard 3 left an even epoch");
+    /// assert!(PARITY.bit_toggle(shard, AcqRel), "and then the odd one it entered");
+    /// ```
+    #[must_use = "to discard the bit before, call `xor`, which every target has"]
+    #[inline]
+    pub fn bit_toggle<O: RmwOrdering>(&self, bit: u32, order: O) -> bool
+    where
+        T: AtomBitwise,
+        T::Repr: BitTest,
+    {
+        let _ = order;
+        let mask = bit_mask::<T::Repr>(bit);
+        has_bit(T::Repr::fetch_xor_mask(self.primitive_cell(), mask, O::CORE), mask)
     }
 }
