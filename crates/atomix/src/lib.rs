@@ -176,7 +176,10 @@
 //!
 //! ## Holding Two Words in One Atomic
 //! ```
-//! # #[cfg(feature = "derive")] {
+//! # #[cfg(all(
+//! #     feature = "derive",
+//! #     any(target_arch = "aarch64", target_feature = "cmpxchg16b"),
+//! # ))] {
 //! use core::ptr::NonNull;
 //!
 //! use atomix::ordering::{AcqRel, Acquire, Relaxed, Release};

@@ -1,6 +1,7 @@
 # What `check.yml`, on x86_64 Linux, cannot show: the tests and the loom models on arm64 Linux,
 # where `fetch_or`, `fetch_max` and `fetch_min` exist and the 128-bit atomics are core's; on arm64
-# macOS, whose floor adds LSE2's 128-bit load and store; and on x86_64 macOS.
+# macOS, whose floor adds LSE2's 128-bit load and store; and on x86_64 macOS. Then the tests on
+# the CPUs below or above the floor that a dependent may build for.
 name: platforms
 
 on:
@@ -25,17 +26,60 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner: [ubuntu-24.04-arm, macos-latest, macos-15-intel]
+        include:
+          # Each target at the floor `.cargo/config.toml` sets.
+          - runner: ubuntu-24.04-arm
+          - runner: macos-latest
+          - runner: macos-15-intel
+          # aarch64 Linux with LSE2, which the floor lacks: a 128-bit load and store are `ldp` and
+          # `stp`. The runner's core, Cobalt 100's Neoverse N2, is named rather than `native`, so
+          # every run builds the same code whatever core it lands on.
+          - runner: ubuntu-24.04-arm
+            cpu: lse2
+            rustflags: -C target-cpu=neoverse-n2
+          # aarch64 Linux as a dependent builds it, at the target's own CPU: each read-modify-write
+          # is an outline call, which takes LSE's instruction on this runner, and a maximum or a
+          # minimum an LL/SC loop. `generic` is that CPU, named so the flags are not empty.
+          - runner: ubuntu-24.04-arm
+            cpu: outline-atomics
+            rustflags: -C target-cpu=generic
+          # x86_64 as a dependent builds it: no `cmpxchg16b`, so no 128-bit atomic and no two
+          # words, and each refusal of one runs.
+          - runner: ubuntu-24.04
+            cpu: x86-64
+            rustflags: -C target-cpu=x86-64
+          # x86-64-v2: `cmpxchg16b` without AVX, so a 128-bit load is a compare-exchange.
+          - runner: ubuntu-24.04
+            cpu: x86-64-v2
+            rustflags: -C target-cpu=x86-64-v2
+    name: test (${{ matrix.runner }}${{ matrix.cpu && format(', {0}', matrix.cpu) || '' }})
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # A CPU's flags replace the floor's, for rustc and rustdoc alike. trybuild and the codegen
+      # test remove `RUSTFLAGS`, so their builds keep the floor.
+      - if: matrix.cpu
+        env:
+          FLAGS: ${{ matrix.rustflags }}
+        run: |
+          echo "RUSTFLAGS=$FLAGS" >> "$GITHUB_ENV"
+          echo "RUSTDOCFLAGS=$FLAGS" >> "$GITHUB_ENV"
+      # LSE2 adds no instruction, only the atomicity of `ldp` and `stp`, so a core without it runs
+      # the build and passes: the leg checks the runner's core has it.
+      - if: matrix.cpu == 'lse2'
+        run: grep -qw uscat /proc/cpuinfo
       - run: cargo test --workspace --all-features --locked
-      - run: >-
+      # A model sees only the cfgs a CPU sets, and each leg's are a floor's above, or fewer: LSE2's
+      # are arm64 macOS's, x86-64-v2's arm64 Linux's. Under a leg, `RUSTFLAGS` would also replace
+      # the `--config` that carries `--cfg loom`, and the models would build to nothing.
+      - if: "!matrix.cpu"
+        run: >-
           cargo test -p atomix-core --features loom --test model --locked
           --config 'target."cfg(all())".rustflags=["--cfg","loom"]' --target-dir target/loom
-      - run: >-
+      - if: "!matrix.cpu"
+        run: >-
           cargo test -p atomix-rs --features derive,loom --test model --locked
           --config 'target."cfg(all())".rustflags=["--cfg","loom"]' --target-dir target/loom

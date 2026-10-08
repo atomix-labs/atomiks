@@ -60,7 +60,8 @@ on aarch64 Linux, and the M1 on macOS. The tools are the versions
 recipes: the loom models, the lints for each target and CPU, the codegen
 fixture's format, and Miri. `.github/workflows/platforms.yml` is the
 repository's own: the tests and the loom models on arm64 Linux and on macOS,
-arm64 and x86_64, which `check.yml`, on x86_64 Linux, cannot run.
+arm64 and x86_64, which `check.yml`, on x86_64 Linux, cannot run; and the tests
+on aarch64 Linux with LSE2 and without LSE, and on x86-64 v1 and v2.
 
 ## Rules
 
