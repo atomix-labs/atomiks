@@ -11,7 +11,7 @@ rustdocflags = ["-C", "target-cpu=x86-64-v3"]
 # Armv8.1 (Graviton 2, Cortex-A55 and A76 and newer; not Graviton 1 or a Raspberry Pi 4): CRC32,
 # and LSE's one-instruction read-modify-writes in place of an outline call or an LL/SC loop. LSE2's
 # 16-byte `ldp`/`stp` needs Armv8.4, which Graviton 2 lacks.
-[target.'cfg(all(target_arch = "aarch64", not(target_vendor = "apple")))']
+[target.'cfg(all(any(target_arch = "aarch64", target_arch = "arm64ec"), not(target_vendor = "apple")))']
 rustflags    = ["-C", "target-feature=+crc,+lse"]
 rustdocflags = ["-C", "target-feature=+crc,+lse"]
 

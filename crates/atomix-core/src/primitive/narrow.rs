@@ -18,7 +18,7 @@ use super::{
     BitTest, Bitwise, CellAccess, CompareExchange, ExactBits, FetchAdd, Load, MaskBitwise,
     Primitive, PtrOffset, RawAccess, Store, Swap,
 };
-#[cfg(target_arch = "aarch64")]
+#[cfg(aarch64_code)]
 use super::{FetchBitwise, MinMax};
 #[cfg(lock_bit_test)]
 use crate::atomic::FieldPath;
@@ -205,10 +205,10 @@ macro_rules! bitwise {
                 cell.fetch_xor($ones, order)
             }
         }
-        // `atomic/capability.rs` and `atomic/field/mod.rs` repeat this cfg in the `doc(cfg(...))`
-        // of `fetch_and`, `fetch_or`, `fetch_xor` and `fetch_not`: change them with it, and the
-        // pointer's below.
-        #[cfg(target_arch = "aarch64")]
+        // `atomic/capability.rs` and `atomic/field/mod.rs` write this alias's condition out in the
+        // `doc(cfg(...))` of `fetch_and`, `fetch_or`, `fetch_xor` and `fetch_not`: change them
+        // with it, and the pointer's below.
+        #[cfg(aarch64_code)]
         impl FetchBitwise for $kind {}
     )+};
 }
@@ -311,11 +311,11 @@ bit_test!(
     i16: "word" ":x", i32: "dword" ":e", i64: "qword" ":r", isize: "qword" ":r",
 );
 // `aarch64`'s `ldset`, `ldclr` and `ldeor` take 8 bits too.
-#[cfg(target_arch = "aarch64")]
+#[cfg(aarch64_code)]
 impl BitTest for u8 {}
-#[cfg(target_arch = "aarch64")]
+#[cfg(aarch64_code)]
 impl BitTest for i8 {}
-#[cfg(target_arch = "aarch64")]
+#[cfg(aarch64_code)]
 impl BitTest for bool {}
 
 /// The unsigned bits of an integer: itself, or its two's complement.
@@ -370,9 +370,9 @@ macro_rules! integers {
             }
         }
         // `ldsmax`, `ldumin` and the rest (an LL/SC pair without LSE); `x86_64` has neither.
-        // `atomic/capability.rs` repeats this cfg in the `doc(cfg(...))` of `fetch_max` and
-        // `fetch_min`: change them with it.
-        #[cfg(target_arch = "aarch64")]
+        // `atomic/capability.rs` writes this alias's condition out in the `doc(cfg(...))` of
+        // `fetch_max` and `fetch_min`: change them with it.
+        #[cfg(aarch64_code)]
         impl MinMax for $int {
             #[inline]
             fn fetch_max(cell: &Self::Cell, value: Self, order: CoreOrdering) -> Self {
@@ -605,8 +605,8 @@ impl<T> BitTest for *mut T {
     lock_bit_test_methods!("qword" ":r", usize::BITS);
 }
 
-// As the integers', whose cfg `atomic/field/mod.rs` repeats.
-#[cfg(target_arch = "aarch64")]
+// As the integers', whose condition `atomic/field/mod.rs` writes out.
+#[cfg(aarch64_code)]
 impl<T> FetchBitwise for *mut T {}
 
 #[cfg(not(loom))]

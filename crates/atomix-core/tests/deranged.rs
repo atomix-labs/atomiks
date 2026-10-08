@@ -42,7 +42,7 @@ mod tests {
     use core::fmt::Debug;
     use core::mem::transmute_copy;
 
-    #[cfg(target_arch = "aarch64")]
+    #[cfg(aarch64_code)]
     use atomix_core::ordering::Relaxed;
     use atomix_core::ordering::{Acquire, Release};
     use atomix_core::validity::{Partial, Validity, ZeroValid};
@@ -279,7 +279,7 @@ mod tests {
         assert_eq!(OWNER.load(Acquire).get_primitive(), Some(u64::MAX), "the largest id");
     }
 
-    #[cfg(target_arch = "aarch64")]
+    #[cfg(aarch64_code)]
     #[test]
     fn max_and_min_follow_the_order_through_zero() {
         let atomic = Atomic::new(PriceMove::new_static::<-1>());

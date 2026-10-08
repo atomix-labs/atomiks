@@ -7,7 +7,7 @@
 mod tests {
     use core::num::Wrapping;
 
-    #[cfg(target_arch = "aarch64")]
+    #[cfg(aarch64_code)]
     use atomix_core::AtomicI64;
     use atomix_core::ordering::{AcqRel, Relaxed};
     use atomix_core::{
@@ -64,7 +64,7 @@ mod tests {
         assert!(!flag.load(Relaxed), "and with true keeps false");
     }
 
-    #[cfg(target_arch = "aarch64")]
+    #[cfg(aarch64_code)]
     #[test]
     fn max_and_min_follow_the_values_sign() {
         let signed = AtomicI64::new(-5);
@@ -84,7 +84,7 @@ mod tests {
         assert_eq!(narrow.load(Relaxed), -1, "-1 is the smaller signed value");
     }
 
-    #[cfg(target_arch = "aarch64")]
+    #[cfg(aarch64_code)]
     #[test]
     fn the_fetch_forms_return_the_value_before() {
         let bits = AtomicU32::new(0b1100);
@@ -140,7 +140,7 @@ mod tests {
         assert_eq!(bits.load(Relaxed), Wrapping(1 << 31), "the top bit set");
     }
 
-    #[cfg(target_arch = "aarch64")]
+    #[cfg(aarch64_code)]
     #[test]
     fn an_8_bit_value_has_its_bits_on_aarch64() {
         let bits = AtomicU8::new(0);
@@ -148,7 +148,7 @@ mod tests {
         assert_eq!(bits.load(Relaxed), 0x80, "the top bit set");
     }
 
-    #[cfg(target_arch = "aarch64")]
+    #[cfg(aarch64_code)]
     #[test]
     fn a_bools_one_bit_is_every_position_on_aarch64() {
         let flag = AtomicBool::new(false);

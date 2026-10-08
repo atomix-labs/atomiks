@@ -39,7 +39,7 @@ impl<T: Atom> Atomic<T> {
     }
 
     /// Keeps the larger of `value` and the current value, and returns the value before.
-    #[doc(cfg(target_arch = "aarch64"))]
+    #[doc(cfg(any(target_arch = "aarch64", target_arch = "arm64ec")))]
     #[expect(unsafe_code, reason = "decodes a repr read from the cell")]
     #[inline]
     pub fn fetch_max<O: RmwOrdering>(&self, value: T, order: O) -> T
@@ -54,7 +54,7 @@ impl<T: Atom> Atomic<T> {
     }
 
     /// Keeps the smaller of `value` and the current value, and returns the value before.
-    #[doc(cfg(target_arch = "aarch64"))]
+    #[doc(cfg(any(target_arch = "aarch64", target_arch = "arm64ec")))]
     #[expect(unsafe_code, reason = "decodes a repr read from the cell")]
     #[inline]
     pub fn fetch_min<O: RmwOrdering>(&self, value: T, order: O) -> T
@@ -122,7 +122,7 @@ impl<T: Atom> Atomic<T> {
     }
 
     /// Applies `& value`, and returns the value before.
-    #[doc(cfg(target_arch = "aarch64"))]
+    #[doc(cfg(any(target_arch = "aarch64", target_arch = "arm64ec")))]
     #[expect(unsafe_code, reason = "decodes a repr read from the cell")]
     #[must_use = "to discard the value before, call `and`, which every target has"]
     #[inline]
@@ -138,7 +138,7 @@ impl<T: Atom> Atomic<T> {
     }
 
     /// Applies `| value`, and returns the value before.
-    #[doc(cfg(target_arch = "aarch64"))]
+    #[doc(cfg(any(target_arch = "aarch64", target_arch = "arm64ec")))]
     #[expect(unsafe_code, reason = "decodes a repr read from the cell")]
     #[must_use = "to discard the value before, call `or`, which every target has"]
     #[inline]
@@ -154,7 +154,7 @@ impl<T: Atom> Atomic<T> {
     }
 
     /// Applies `^ value`, and returns the value before.
-    #[doc(cfg(target_arch = "aarch64"))]
+    #[doc(cfg(any(target_arch = "aarch64", target_arch = "arm64ec")))]
     #[expect(unsafe_code, reason = "decodes a repr read from the cell")]
     #[must_use = "to discard the value before, call `xor`, which every target has"]
     #[inline]
@@ -170,7 +170,7 @@ impl<T: Atom> Atomic<T> {
     }
 
     /// Inverts every bit, and returns the value before.
-    #[doc(cfg(target_arch = "aarch64"))]
+    #[doc(cfg(any(target_arch = "aarch64", target_arch = "arm64ec")))]
     #[expect(unsafe_code, reason = "decodes a repr read from the cell")]
     #[must_use = "to discard the value before, call `not`, which every target has"]
     #[inline]

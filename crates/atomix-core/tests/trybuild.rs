@@ -48,7 +48,7 @@ mod tests {
         // with the floor; a `CARGO_TARGET_<TRIPLE>_RUSTFLAGS` adds to the floor instead,
         // and fails this batch. On `aarch64`, only Apple's floor has LSE2's 16-byte load
         // and store.
-        if cfg!(all(target_arch = "aarch64", not(target_vendor = "apple"))) {
+        if cfg!(all(aarch64_code, not(target_vendor = "apple"))) {
             cases.compile_fail("tests/compile_fail/aarch64_without_lse2/*.rs");
             if cfg!(feature = "serde") {
                 cases.compile_fail("tests/compile_fail/aarch64_without_lse2/serde/*.rs");

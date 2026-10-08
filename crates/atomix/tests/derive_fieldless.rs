@@ -397,7 +397,7 @@ mod tests {
     }
 
     /// What a 128-bit repr holds, on aarch64, which every build gives 128-bit atomics.
-    #[cfg(target_arch = "aarch64")]
+    #[cfg(any(target_arch = "aarch64", target_arch = "arm64ec"))]
     mod wide {
         use atomix::validity::ZeroNiche;
         use atomix::{Atom, ReprRange};

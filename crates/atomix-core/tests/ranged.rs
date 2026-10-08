@@ -15,7 +15,7 @@ mod tests {
     use core::str::FromStr;
     use std::hash::RandomState;
 
-    #[cfg(target_arch = "aarch64")]
+    #[cfg(aarch64_code)]
     use atomix_core::ordering::Relaxed;
     use atomix_core::ordering::{AcqRel, Acquire, Release};
     use atomix_core::{
@@ -345,7 +345,7 @@ mod tests {
     }
 
     // x86_64 has no atomic maximum or minimum, so `fetch_max` and `fetch_min` are aarch64's alone.
-    #[cfg(target_arch = "aarch64")]
+    #[cfg(aarch64_code)]
     #[test]
     fn max_and_min_order_as_the_integers_through_zero() {
         let price_move = Atomic::new(PriceMove::new(-3).expect("-3 is a move"));

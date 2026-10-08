@@ -113,6 +113,7 @@ const fn tail_alignment<T: ?Sized + Pointee<Metadata = usize>>() -> usize {
 #[cfg(wide)]
 #[doc(cfg(any(
     target_arch = "aarch64",
+    target_arch = "arm64ec",
     all(target_arch = "x86_64", target_feature = "cmpxchg16b")
 )))]
 #[repr(transparent)]

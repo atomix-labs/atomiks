@@ -228,44 +228,44 @@ pub fn u4_flags_or(atomic: &Atomic<Flagged>, flags: u4) {
     atomic.fields().flags.or(flags, Release);
 }
 
-#[cfg(any(target_arch = "aarch64", feature = "aarch64-only"))]
+#[cfg(any(target_arch = "aarch64", target_arch = "arm64ec", feature = "aarch64-only"))]
 #[unsafe(no_mangle)]
 pub fn field_fetch_or(atomic: &Atomic<Order>) -> Order {
     atomic.fields().live.fetch_or(true, AcqRel)
 }
 
-#[cfg(any(target_arch = "aarch64", feature = "aarch64-only"))]
+#[cfg(any(target_arch = "aarch64", target_arch = "arm64ec", feature = "aarch64-only"))]
 #[unsafe(no_mangle)]
 pub fn flags_fetch_and(atomic: &Atomic<Order>, flags: u8) -> Order {
     atomic.fields().flags.fetch_and(flags, AcqRel)
 }
 
-#[cfg(any(target_arch = "aarch64", feature = "aarch64-only"))]
+#[cfg(any(target_arch = "aarch64", target_arch = "arm64ec", feature = "aarch64-only"))]
 #[unsafe(no_mangle)]
 pub fn flags_fetch_or(atomic: &Atomic<Order>, flags: u8) -> Order {
     atomic.fields().flags.fetch_or(flags, AcqRel)
 }
 
-#[cfg(any(target_arch = "aarch64", feature = "aarch64-only"))]
+#[cfg(any(target_arch = "aarch64", target_arch = "arm64ec", feature = "aarch64-only"))]
 #[unsafe(no_mangle)]
 pub fn flags_fetch_xor(atomic: &Atomic<Order>, flags: u8) -> Order {
     atomic.fields().flags.fetch_xor(flags, AcqRel)
 }
 
-#[cfg(any(target_arch = "aarch64", feature = "aarch64-only"))]
+#[cfg(any(target_arch = "aarch64", target_arch = "arm64ec", feature = "aarch64-only"))]
 #[unsafe(no_mangle)]
 pub fn flags_fetch_not(atomic: &Atomic<Order>) -> Order {
     atomic.fields().flags.fetch_not(AcqRel)
 }
 
 // `x86_64` has no 8-bit `lock bts`.
-#[cfg(any(target_arch = "aarch64", feature = "aarch64-only"))]
+#[cfg(any(target_arch = "aarch64", target_arch = "arm64ec", feature = "aarch64-only"))]
 #[unsafe(no_mangle)]
 pub fn ends8_low_test_and_set(atomic: &Atomic<Ends8>) -> bool {
     atomic.fields().low.test_and_set(AcqRel)
 }
 
-#[cfg(any(target_arch = "aarch64", feature = "aarch64-only"))]
+#[cfg(any(target_arch = "aarch64", target_arch = "arm64ec", feature = "aarch64-only"))]
 #[unsafe(no_mangle)]
 pub fn ends8_top_test_and_set(atomic: &Atomic<Ends8>) -> bool {
     atomic.fields().top.test_and_set(AcqRel)

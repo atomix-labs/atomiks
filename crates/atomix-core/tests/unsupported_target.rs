@@ -1,6 +1,6 @@
 //! What a build for a target atomix does not support sees: one error, from the build script,
 //! before rustc compiles a line, so the target needs no `core` installed; and a build for a
-//! supported architecture on another OS does not.
+//! supported architecture on another OS, or for `arm64ec`, does not.
 
 // Miri cannot run cargo, and loom changes nothing the build script reads.
 #![cfg(on_hardware)]
@@ -28,10 +28,10 @@ mod tests {
     fn refusal(target: &str) -> [String; 2] {
         [
             format!(
-                "error: atomix-core@{}: atomix builds for `aarch64` and `x86_64`, little-endian \
-                 with 64-bit pointers, not for `{target}`: on another target, an operation it \
-                 promises as one instruction could be a compare-exchange loop, as a 64-bit add is \
-                 on 32-bit x86",
+                "error: atomix-core@{}: atomix builds for `aarch64`, `arm64ec` and `x86_64`, \
+                 little-endian with 64-bit pointers, not for `{target}`: on another target, an \
+                 operation it promises as one instruction could be a compare-exchange loop, as a \
+                 64-bit add is on 32-bit x86",
                 env!("CARGO_PKG_VERSION")
             ),
             "error: build script logged errors".to_owned(),
@@ -63,18 +63,22 @@ mod tests {
     }
 
     #[test]
-    fn arm64ec_is_refused_though_it_runs_aarch64_code() {
-        let target = "arm64ec-pc-windows-msvc";
-        assert_eq!(errors_checking_for(target), refusal(target), "arm64ec, which is not aarch64");
-    }
-
-    #[test]
     fn a_target_of_a_supported_architecture_on_another_os_is_not_refused() {
         let target = "x86_64-unknown-freebsd";
         let errors = errors_checking_for(target);
         assert!(
             !errors.iter().any(|line| line.starts_with("error: atomix-core@")),
             "FreeBSD on x86_64, whose check fails, if at all, for want of its `core`: {errors:?}"
+        );
+    }
+
+    #[test]
+    fn arm64ec_is_not_refused_since_it_runs_aarch64_code() {
+        let target = "arm64ec-pc-windows-msvc";
+        let errors = errors_checking_for(target);
+        assert!(
+            !errors.iter().any(|line| line.starts_with("error: atomix-core@")),
+            "arm64ec, whose architecture is not `aarch64`, though its code is: {errors:?}"
         );
     }
 }

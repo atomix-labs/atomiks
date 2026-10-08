@@ -14,7 +14,7 @@ mod testing;
 mod tests {
     use arbitrary_int::traits::Integer;
     use arbitrary_int::{i3, u3, u20};
-    #[cfg(target_arch = "aarch64")]
+    #[cfg(any(target_arch = "aarch64", target_arch = "arm64ec"))]
     use atomix::ordering::Relaxed;
     use atomix::ordering::{Acquire, Release};
     use atomix::validity::ZeroValid;
@@ -66,7 +66,7 @@ mod tests {
         assert_eq!(SEQ.load(Acquire), Seq(u20::MAX), "the largest");
     }
 
-    #[cfg(target_arch = "aarch64")]
+    #[cfg(any(target_arch = "aarch64", target_arch = "arm64ec"))]
     #[test]
     fn a_newtype_keeps_the_order() {
         let seq = Atomic::new(Seq(u20::new(0)));

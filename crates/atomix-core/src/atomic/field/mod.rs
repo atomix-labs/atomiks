@@ -504,7 +504,7 @@ impl<P: FieldPath> AtomicField<P> {
     }
 
     /// Applies `& value` to the field, and returns the container before.
-    #[doc(cfg(target_arch = "aarch64"))]
+    #[doc(cfg(any(target_arch = "aarch64", target_arch = "arm64ec")))]
     #[expect(unsafe_code, reason = "decodes a repr read from the cell")]
     #[must_use = "to discard the container before, call `and`, which every target has"]
     #[inline]
@@ -521,7 +521,7 @@ impl<P: FieldPath> AtomicField<P> {
     }
 
     /// Applies `| value` to the field, and returns the container before.
-    #[doc(cfg(target_arch = "aarch64"))]
+    #[doc(cfg(any(target_arch = "aarch64", target_arch = "arm64ec")))]
     #[expect(unsafe_code, reason = "decodes a repr read from the cell")]
     #[must_use = "to discard the container before, call `or`, which every target has"]
     #[inline]
@@ -537,7 +537,7 @@ impl<P: FieldPath> AtomicField<P> {
     }
 
     /// Applies `^ value` to the field, and returns the container before.
-    #[doc(cfg(target_arch = "aarch64"))]
+    #[doc(cfg(any(target_arch = "aarch64", target_arch = "arm64ec")))]
     #[expect(unsafe_code, reason = "decodes a repr read from the cell")]
     #[must_use = "to discard the container before, call `xor`, which every target has"]
     #[inline]
@@ -553,7 +553,7 @@ impl<P: FieldPath> AtomicField<P> {
     }
 
     /// Inverts every bit of the field, and returns the container before.
-    #[doc(cfg(target_arch = "aarch64"))]
+    #[doc(cfg(any(target_arch = "aarch64", target_arch = "arm64ec")))]
     #[expect(unsafe_code, reason = "decodes a repr read from the cell")]
     #[must_use = "to discard the container before, call `not`, which every target has"]
     #[inline]

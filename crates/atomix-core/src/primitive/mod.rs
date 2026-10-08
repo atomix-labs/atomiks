@@ -450,7 +450,7 @@ pub impl(crate) trait FetchBitwise: MaskBitwise {}
     diagnostic::on_unimplemented(note = "x86_64 has no atomic maximum or minimum")
 )]
 #[cfg_attr(
-    target_arch = "aarch64",
+    aarch64_code,
     diagnostic::on_unimplemented(
         note = "aarch64's atomic maximum and minimum take an integer of at most 64 bits"
     )

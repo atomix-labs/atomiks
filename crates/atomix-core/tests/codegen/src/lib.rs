@@ -20,7 +20,7 @@
 #![feature(const_trait_impl)]
 
 pub mod bits;
-#[cfg(any(target_arch = "aarch64", target_feature = "cmpxchg16b"))]
+#[cfg(any(target_arch = "aarch64", target_arch = "arm64ec", target_feature = "cmpxchg16b"))]
 pub mod double_words;
 pub mod fields;
 #[path = "../../testing/packed.rs"]
@@ -34,9 +34,9 @@ pub mod without_cmpxchg16b;
 use core::cell::Cell;
 use core::num::NonZero;
 
-#[cfg(any(target_arch = "aarch64", feature = "aarch64-only"))]
+#[cfg(any(target_arch = "aarch64", target_arch = "arm64ec", feature = "aarch64-only"))]
 use atomix_core::AtomicI64;
-#[cfg(any(target_arch = "aarch64", target_feature = "cmpxchg16b"))]
+#[cfg(any(target_arch = "aarch64", target_arch = "arm64ec", target_feature = "cmpxchg16b"))]
 use atomix_core::AtomicU128;
 use atomix_core::ordering::{AcqRel, Acquire, Relaxed, Release, SeqCst, StoreStore};
 use atomix_core::{
@@ -105,55 +105,55 @@ pub fn u64_not(atomic: &AtomicU64) {
     atomic.not(Release);
 }
 
-#[cfg(any(target_arch = "aarch64", feature = "aarch64-only"))]
+#[cfg(any(target_arch = "aarch64", target_arch = "arm64ec", feature = "aarch64-only"))]
 #[unsafe(no_mangle)]
 pub fn u64_fetch_and(atomic: &AtomicU64, value: u64) -> u64 {
     atomic.fetch_and(value, AcqRel)
 }
 
-#[cfg(any(target_arch = "aarch64", feature = "aarch64-only"))]
+#[cfg(any(target_arch = "aarch64", target_arch = "arm64ec", feature = "aarch64-only"))]
 #[unsafe(no_mangle)]
 pub fn u64_fetch_or(atomic: &AtomicU64, value: u64) -> u64 {
     atomic.fetch_or(value, AcqRel)
 }
 
-#[cfg(any(target_arch = "aarch64", feature = "aarch64-only"))]
+#[cfg(any(target_arch = "aarch64", target_arch = "arm64ec", feature = "aarch64-only"))]
 #[unsafe(no_mangle)]
 pub fn u64_fetch_xor(atomic: &AtomicU64, value: u64) -> u64 {
     atomic.fetch_xor(value, AcqRel)
 }
 
-#[cfg(any(target_arch = "aarch64", feature = "aarch64-only"))]
+#[cfg(any(target_arch = "aarch64", target_arch = "arm64ec", feature = "aarch64-only"))]
 #[unsafe(no_mangle)]
 pub fn u64_fetch_not(atomic: &AtomicU64) -> u64 {
     atomic.fetch_not(AcqRel)
 }
 
-#[cfg(any(target_arch = "aarch64", feature = "aarch64-only"))]
+#[cfg(any(target_arch = "aarch64", target_arch = "arm64ec", feature = "aarch64-only"))]
 #[unsafe(no_mangle)]
 pub fn u64_fetch_max_discarded(atomic: &AtomicU64, value: u64) {
     atomic.fetch_max(value, Relaxed);
 }
 
-#[cfg(any(target_arch = "aarch64", feature = "aarch64-only"))]
+#[cfg(any(target_arch = "aarch64", target_arch = "arm64ec", feature = "aarch64-only"))]
 #[unsafe(no_mangle)]
 pub fn u64_fetch_min_discarded(atomic: &AtomicU64, value: u64) {
     atomic.fetch_min(value, Relaxed);
 }
 
-#[cfg(any(target_arch = "aarch64", feature = "aarch64-only"))]
+#[cfg(any(target_arch = "aarch64", target_arch = "arm64ec", feature = "aarch64-only"))]
 #[unsafe(no_mangle)]
 pub fn u64_fetch_max(atomic: &AtomicU64, value: u64) -> u64 {
     atomic.fetch_max(value, AcqRel)
 }
 
-#[cfg(any(target_arch = "aarch64", feature = "aarch64-only"))]
+#[cfg(any(target_arch = "aarch64", target_arch = "arm64ec", feature = "aarch64-only"))]
 #[unsafe(no_mangle)]
 pub fn i64_fetch_max_discarded(atomic: &AtomicI64, value: i64) {
     atomic.fetch_max(value, Relaxed);
 }
 
-#[cfg(any(target_arch = "aarch64", feature = "aarch64-only"))]
+#[cfg(any(target_arch = "aarch64", target_arch = "arm64ec", feature = "aarch64-only"))]
 #[unsafe(no_mangle)]
 pub fn i64_fetch_min(atomic: &AtomicI64, value: i64) -> i64 {
     atomic.fetch_min(value, AcqRel)
@@ -239,19 +239,19 @@ pub fn u128_store_seq_cst(atomic: &AtomicU128, value: u128) {
     atomic.store(value, SeqCst);
 }
 
-#[cfg(any(target_arch = "aarch64", target_feature = "cmpxchg16b"))]
+#[cfg(any(target_arch = "aarch64", target_arch = "arm64ec", target_feature = "cmpxchg16b"))]
 #[unsafe(no_mangle)]
 pub fn u128_compare_exchange(atomic: &AtomicU128, current: u128, new: u128) -> Result<u128, u128> {
     atomic.compare_exchange(current, new, AcqRel, Acquire)
 }
 
-#[cfg(any(target_arch = "aarch64", target_feature = "cmpxchg16b"))]
+#[cfg(any(target_arch = "aarch64", target_arch = "arm64ec", target_feature = "cmpxchg16b"))]
 #[unsafe(no_mangle)]
 pub fn u128_load_rmw(atomic: &AtomicU128) -> u128 {
     atomic.load_rmw(Acquire)
 }
 
-#[cfg(any(target_arch = "aarch64", target_feature = "cmpxchg16b"))]
+#[cfg(any(target_arch = "aarch64", target_arch = "arm64ec", target_feature = "cmpxchg16b"))]
 #[unsafe(no_mangle)]
 pub fn u128_update(atomic: &AtomicU128) -> u128 {
     atomic.update(AcqRel, Acquire, |value| value.wrapping_add(1))

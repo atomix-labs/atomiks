@@ -154,7 +154,7 @@ mod tests {
     }
 
     // x86_64 has no atomic maximum, so `fetch_max` exists on aarch64 alone.
-    #[cfg(target_arch = "aarch64")]
+    #[cfg(any(target_arch = "aarch64", target_arch = "arm64ec"))]
     #[test]
     fn atom_ord_brings_fetch_max_where_the_target_has_one() {
         let count = Atomic::new(Count(1));

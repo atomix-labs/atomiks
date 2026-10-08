@@ -48,7 +48,7 @@ mod tests {
     };
     #[cfg(wide)]
     use arbitrary_int::{i65, i127, u65, u127};
-    #[cfg(target_arch = "aarch64")]
+    #[cfg(aarch64_code)]
     use atomix_core::ordering::Relaxed;
     use atomix_core::ordering::{AcqRel, Acquire, Release};
     use atomix_core::validity::ZeroValid;
@@ -237,7 +237,7 @@ mod tests {
         }
     }
 
-    #[cfg(target_arch = "aarch64")]
+    #[cfg(aarch64_code)]
     #[test]
     fn max_and_min_follow_the_order_through_zero() {
         let unsigned = Atomic::new(u20::new(7));

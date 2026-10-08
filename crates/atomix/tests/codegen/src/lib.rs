@@ -455,7 +455,7 @@ pub unsafe fn guarded_load_inner(atomic: &Atomic<Guarded>) -> u64 {
 
 /// A Treiber stack's head: the top node, or none, beside a counter no alignment holds, in a word
 /// of its own.
-#[cfg(any(target_arch = "aarch64", target_feature = "cmpxchg16b"))]
+#[cfg(any(target_arch = "aarch64", target_arch = "arm64ec", target_feature = "cmpxchg16b"))]
 #[derive(Clone, Copy, Atom)]
 pub struct CountedHead {
     /// The top node.
@@ -465,7 +465,7 @@ pub struct CountedHead {
 }
 
 /// Two nodes, and a mark in the first one's low bits.
-#[cfg(any(target_arch = "aarch64", target_feature = "cmpxchg16b"))]
+#[cfg(any(target_arch = "aarch64", target_arch = "arm64ec", target_feature = "cmpxchg16b"))]
 #[derive(Clone, Copy, Atom)]
 pub struct MarkedPair {
     /// A node.
@@ -482,13 +482,13 @@ pub fn counted_head_load(atomic: &Atomic<CountedHead>) -> CountedHead {
     atomic.load(Acquire)
 }
 
-#[cfg(any(target_arch = "aarch64", target_feature = "cmpxchg16b"))]
+#[cfg(any(target_arch = "aarch64", target_arch = "arm64ec", target_feature = "cmpxchg16b"))]
 #[unsafe(no_mangle)]
 pub fn counted_head_load_rmw(atomic: &Atomic<CountedHead>) -> CountedHead {
     atomic.load_rmw(Acquire)
 }
 
-#[cfg(any(target_arch = "aarch64", target_feature = "cmpxchg16b"))]
+#[cfg(any(target_arch = "aarch64", target_arch = "arm64ec", target_feature = "cmpxchg16b"))]
 #[unsafe(no_mangle)]
 pub fn counted_head_compare_exchange(
     atomic: &Atomic<CountedHead>, current: CountedHead, new: CountedHead,
@@ -496,7 +496,7 @@ pub fn counted_head_compare_exchange(
     atomic.compare_exchange(current, new, AcqRel, Acquire)
 }
 
-#[cfg(any(target_arch = "aarch64", target_feature = "cmpxchg16b"))]
+#[cfg(any(target_arch = "aarch64", target_arch = "arm64ec", target_feature = "cmpxchg16b"))]
 #[unsafe(no_mangle)]
 pub fn counted_head_update_version(atomic: &Atomic<CountedHead>) -> CountedHead {
     atomic.fields().version.update(AcqRel, Acquire, |version| version.wrapping_add(1))
@@ -508,7 +508,7 @@ pub fn marked_pair_store(atomic: &Atomic<MarkedPair>, value: MarkedPair) {
     atomic.store(value, Release);
 }
 
-#[cfg(any(target_arch = "aarch64", target_feature = "cmpxchg16b"))]
+#[cfg(any(target_arch = "aarch64", target_arch = "arm64ec", target_feature = "cmpxchg16b"))]
 #[unsafe(no_mangle)]
 pub fn marked_pair_compare_exchange(
     atomic: &Atomic<MarkedPair>, current: MarkedPair, new: MarkedPair,
