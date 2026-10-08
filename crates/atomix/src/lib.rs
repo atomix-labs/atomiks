@@ -327,19 +327,23 @@
 //! a `bool` field's [`set`](AtomicField::set), [`clear`](AtomicField::clear) and
 //! [`toggle`](AtomicField::toggle) discard the value before.
 //!
-//! A tagged pointer's store, swap or compare-exchange costs one test and branch, with no frame
-//! record on its path: a word nested in others tests its pointer once against every tag of each,
-//! an exchange tests both its pointers in one test, and a pointer enum's unit or data, or a pointer
-//! that fills a niche beside no tag field, tests nothing. The branch is to one cold refusal, a
-//! panic, where the pointer has a bit set that its tags take. A compare-exchange loop tests nothing
-//! its decode already cleared: an [`update`](Atomic::update) that keeps the pointer tests, calls
-//! and saves nothing, and a Treiber stack's pop tests only the next node's pointer, which it reads
-//! from the node, and saves the frame record its cold refusal needs. The one exception is a word
-//! that holds a pointer enum of several pointer variants: its update saves a frame record on
-//! `aarch64`, and on `x86_64` keeps a branch to the cold refusal that it never takes. A match of a
-//! pointer enum folds an arm's tag into the offset of the load through its pointer; where LLVM
-//! merges arms that read through pointers of several tags, one mask takes the tags off. A constant
-//! reads no pointer's address but null's, so it decodes only null, and tags only a null pointer.
+//! A tagged pointer's store, swap or compare-exchange costs one test and branch, and saves no frame
+//! record on its path on macOS, on `x86_64` Linux, and on `aarch64` Linux with `+lse`: a word
+//! nested in others tests its pointer once against every tag of each, an exchange tests both its
+//! pointers in one test, and a pointer enum's unit or data, or a pointer that fills a niche beside
+//! no tag field, tests nothing. The branch is to one cold refusal, a panic, where the pointer has a
+//! bit set that its tags take. On `x86_64` Windows, a function that can call the refusal reserves
+//! its stack before the test. At Android's default CPU, without LSE, a compare-exchange saves its
+//! frame record before the test too, and restores it after its LL/SC loop. A compare-exchange loop
+//! tests nothing its decode already cleared: an [`update`](Atomic::update) that keeps the pointer
+//! tests, calls and saves nothing, and a Treiber stack's pop tests only the next node's pointer,
+//! which it reads from the node, and saves the frame record its cold refusal needs. The one
+//! exception is a word that holds a pointer enum of several pointer variants: its update saves a
+//! frame record on `aarch64`, and on `x86_64` keeps a branch to the cold refusal that it never
+//! takes. A match of a pointer enum folds an arm's tag into the offset of the load through its
+//! pointer; where LLVM merges arms that read through pointers of several tags, one mask takes the
+//! tags off. A constant reads no pointer's address but null's, so it decodes only null, and tags
+//! only a null pointer.
 //!
 //! Two words are one 16-byte atomic, with `u128`'s operations: a compare-exchange is
 //! `lock cmpxchg16b`, or `caspal`; [`load`](Atomic::load) and [`store`](Atomic::store) are AVX's

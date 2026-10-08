@@ -13,11 +13,10 @@ pub(crate) enum Lowering {
     InOrder(&'static [&'static str]),
     /// These instructions and no others.
     Only(&'static [&'static str]),
-    /// As `InOrder`, plus branches back, each over a compare-exchange, which it retries:
-    /// `update`'s loop.
+    /// As `InOrder`, plus loops, each through a compare-exchange it retries: `update`'s loop.
     Retry(&'static [&'static str]),
-    /// As `Only`, its branches back each over a compare-exchange, which it retries: a loop that
-    /// tests, calls and saves nothing it does not name.
+    /// As `Only`, its loops each through a compare-exchange it retries: a loop that tests, calls
+    /// and saves nothing it does not name.
     RetryOnly(&'static [&'static str]),
     /// As `InOrder` up to the return, with no branch there but those named and nothing pushed or
     /// popped, `stp` and `ldp` included, then one cold block that calls [`REFUSAL`]: a tagged
@@ -39,6 +38,10 @@ pub(crate) const AARCH64_MACOS: &str = "aarch64-apple-darwin";
 pub(crate) const X86_64_LINUX: &str = "x86_64-unknown-linux-gnu";
 /// `x86_64` macOS, at the same floor.
 pub(crate) const X86_64_MACOS: &str = "x86_64-apple-darwin";
+/// `aarch64` Android, whose default CPU has no LSE: each read-modify-write is an LL/SC loop.
+pub(crate) const AARCH64_ANDROID: &str = "aarch64-linux-android";
+/// `x86_64` Windows, whose default CPU has `cmpxchg16b` but no AVX.
+pub(crate) const X86_64_WINDOWS: &str = "x86_64-pc-windows-msvc";
 
 /// Cargo's `command` on the fixture for `target`, with the floor `.cargo/config.toml` sets.
 ///
@@ -81,7 +84,8 @@ fn run(cargo: &mut Command, target: &str) -> Output {
     output
 }
 
-/// The fixture's assembly for `target`, for the floor or, with `cpu`, for that CPU.
+/// The fixture's assembly for `target`, for the floor or, with `cpu`, for that CPU, which
+/// `RUSTFLAGS` names, since it replaces the floor where a `--config` would join it.
 ///
 /// Each build starts from an empty target directory: cargo keeps one build per configuration,
 /// but `--emit` writes each to the same file, and a deleted file is not rebuilt. Each probe
@@ -97,9 +101,7 @@ fn assembly(target: &str, cpu: Option<&str>) -> String {
     emit.push(&file);
     let mut build = cargo("rustc", target, &out);
     if let Some(cpu) = cpu {
-        build
-            .arg("--config")
-            .arg(format!("target.{target}.rustflags=[\"-C\",\"target-cpu={cpu}\"]"));
+        build.env("RUSTFLAGS", format!("-C target-cpu={cpu}"));
     }
     build.args(["--release", "--", "-C", "codegen-units=1", "-Z", "merge-functions=disabled"]);
     let build = run(build.arg("--emit").arg(emit), target);
@@ -111,7 +113,7 @@ fn assembly(target: &str, cpu: Option<&str>) -> String {
     fs::read_to_string(&file).expect("rustc wrote the assembly where `--emit` named")
 }
 
-/// How a target's assembly is written: Mach-O on macOS, ELF on Linux.
+/// How a target's assembly is written: Mach-O on macOS, COFF on Windows, ELF elsewhere.
 struct Syntax {
     /// What starts a comment: `#` on `x86_64`; on `aarch64`, where `#` marks an immediate, `;`
     /// in Mach-O and `//` in ELF.
@@ -151,7 +153,8 @@ enum Line {
 
 /// The labels and instructions of the function `name` in `target`'s assembly.
 ///
-/// A function ends at its `.cfi_endproc`, in ELF and Mach-O alike.
+/// A function ends at its `.cfi_endproc`, in ELF and Mach-O alike; in COFF, at its
+/// `.seh_endproc`, or, where it has no unwind directives, at the next symbol's `.def`.
 fn function(target: &str, assembly: &str, name: &str) -> Vec<Line> {
     let syntax = syntax(target);
     let mut lines = assembly
@@ -160,7 +163,9 @@ fn function(target: &str, assembly: &str, name: &str) -> Vec<Line> {
     let start = format!("{}{name}:", syntax.symbol_prefix);
     assert!(lines.any(|line| line == start), "{target}: the assembly has `{name}`");
     let mut function = Vec::new();
-    for line in lines.take_while(|line| *line != ".cfi_endproc") {
+    let end =
+        |line: &&str| [".cfi_endproc", ".seh_endproc"].contains(line) || line.starts_with(".def");
+    for line in lines.take_while(|line| !end(line)) {
         let words: Vec<&str> = line.split_whitespace().collect();
         if syntax.frame_record
             && [["pushq", "%rbp"].as_slice(), &["movq", "%rsp,", "%rbp"], &["popq", "%rbp"]]
@@ -222,71 +227,130 @@ fn is_load_linked(mnemonic: &str) -> bool {
     ["ldxr", "ldaxr", "ldxp", "ldaxp"].iter().any(|load| mnemonic.starts_with(load))
 }
 
+/// Whether `mnemonic` is the store of a load-linked/store-conditional loop.
+fn is_store_conditional(mnemonic: &str) -> bool {
+    ["stxr", "stlxr", "stxp", "stlxp"].iter().any(|store| mnemonic.starts_with(store))
+}
+
+/// Whether `mnemonic` is an attempt that a loop retries: a compare-exchange, or the load-linked of
+/// an LL/SC loop, which is the compare-exchange where a target has no instruction for one.
+fn is_exchange_attempt(mnemonic: &str) -> bool {
+    is_compare_exchange(mnemonic) || is_load_linked(mnemonic)
+}
+
+/// Whether control can pass from `mnemonic` to the next instruction: all but a return, a trap,
+/// and a branch that is not conditional.
+fn can_fall_through(mnemonic: &str) -> bool {
+    !["b", "br", "ret", "brk", "jmp", "jmpq", "retq", "ud2"].contains(&mnemonic)
+}
+
+/// Which instructions `steps` lead to from `start`, itself included.
+fn reached(steps: &[Vec<usize>], start: usize) -> Vec<bool> {
+    let mut reached = vec![false; steps.len()];
+    let mut pending = vec![start];
+    while let Some(index) = pending.pop() {
+        if let Some(seen @ false) = reached.get_mut(index) {
+            *seen = true;
+            pending.extend(steps.get(index).into_iter().flatten());
+        }
+    }
+    reached
+}
+
 /// Checks that `name` costs nothing its `lowering` does not name.
 ///
 /// That is no call but, for a `Refuses` or a lowering that names a call, the one to [`REFUSAL`], no
-/// load-linked, no backward branch but, for a `Retry` or a `RetryOnly`, at least one, each from
-/// past a compare-exchange to before it, and no compare-exchange or barrier beyond those the
-/// lowering names. A call or a jump out of the function counts, since what it reaches, such as an
-/// outline atomic, could loop.
+/// loop but, for a `Retry` or a `RetryOnly`, at least one, each through a compare-exchange, and no
+/// compare-exchange, load-linked or barrier beyond those the lowering names. A call or a jump out
+/// of the function counts, since what it reaches, such as an outline atomic, could loop.
+///
+/// A loop is a branch back that control reaches again, and every path around it must pass a
+/// compare-exchange; a branch back to where paths join is none. An LL/SC loop is one operation, as
+/// LSE's instruction is: its branch back, which only its store-conditional reaches, goes to its
+/// load-linked, and retries only where the core lost its reservation between the two, never
+/// because the value differs. Where a target has no compare-exchange instruction, its
+/// compare-exchange is an LL/SC loop, which counts as one around a loop.
 fn assert_no_unnamed_cost(target: &str, name: &str, lines: &[Line], lowering: &Lowering) {
     let (InOrder(wanted) | Only(wanted) | Retry(wanted) | RetryOnly(wanted) | Refuses(wanted)) =
         *lowering;
     let retries = matches!(lowering, Retry(_) | RetryOnly(_));
     let refuses = matches!(lowering, Refuses(_)) || wanted.iter().any(|mnemonic| is_call(mnemonic));
-    let mut refusals = 0_usize;
-    let local: Vec<&str> = lines
-        .iter()
-        .filter_map(|line| match line {
-            Line::Label(label) => Some(label.as_str()),
-            Line::Instruction { .. } => None,
-        })
-        .collect();
-    // Each label above the line, with how many compare-exchanges lie above it.
+    // Each label, with the index of the instruction it marks.
     let mut labels = Vec::new();
-    let mut compare_exchanges = 0_usize;
-    let mut mnemonics = Vec::new();
-    let mut branches_back = 0_usize;
+    let mut instructions = Vec::new();
     for line in lines {
         match line {
-            Line::Label(label) => labels.push((label.as_str(), compare_exchanges)),
+            Line::Label(label) => labels.push((label.as_str(), instructions.len())),
             Line::Instruction { mnemonic, branch, callee } => {
-                let leaves = branch.as_deref().is_some_and(|to| !local.contains(&to));
-                let refusal = refuses && callee.as_deref().is_some_and(|to| to.contains(REFUSAL));
-                refusals = refusals.saturating_add(usize::from(refusal));
-                assert!(
-                    !leaves && (!is_call(mnemonic) || refusal),
-                    "{target}: `{name}` calls out: `{mnemonic}`"
-                );
-                assert!(
-                    !is_load_linked(mnemonic),
-                    "{target}: `{name}` has a load-linked loop: `{mnemonic}`"
-                );
-                // Where the branch is back, whether a compare-exchange lies between its label and
-                // it.
-                let back = branch.as_deref().and_then(|to| {
-                    let (_, above) = labels.iter().find(|(label, _)| *label == to)?;
-                    Some(compare_exchanges > *above)
-                });
-                assert!(
-                    retries || back.is_none(),
-                    "{target}: `{name}` branches back: `{mnemonic}`"
-                );
-                assert!(
-                    back != Some(false),
-                    "{target}: `{name}` branches back over no compare-exchange: `{mnemonic}`"
-                );
-                branches_back = branches_back.saturating_add(usize::from(back.is_some()));
-                compare_exchanges =
-                    compare_exchanges.saturating_add(usize::from(is_compare_exchange(mnemonic)));
-                mnemonics.push(mnemonic.as_str());
+                instructions.push((mnemonic.as_str(), branch.as_deref(), callee.as_deref()));
             },
         }
     }
-    assert!(
-        !retries || branches_back > 0,
-        "{target}: `{name}` branches back to retry its compare-exchange"
-    );
+    let mnemonics: Vec<&str> = instructions.iter().map(|(mnemonic, ..)| *mnemonic).collect();
+    // The instruction each branch goes to, where its label is the function's own.
+    let destinations: Vec<Option<usize>> = instructions
+        .iter()
+        .map(|(_, branch, _)| {
+            let destination = (*branch)?;
+            labels.iter().find(|(label, _)| *label == destination).map(|(_, index)| *index)
+        })
+        .collect();
+    let successors: Vec<Vec<usize>> = mnemonics
+        .iter()
+        .zip(&destinations)
+        .enumerate()
+        .map(|(index, (mnemonic, destination))| {
+            let next = index.saturating_add(1);
+            let fall_through =
+                (can_fall_through(mnemonic) && next < mnemonics.len()).then_some(next);
+            fall_through.into_iter().chain(*destination).collect()
+        })
+        .collect();
+    // The control flow with each compare-exchange and load-linked a dead end.
+    let bypassing: Vec<Vec<usize>> = successors
+        .iter()
+        .zip(&mnemonics)
+        .map(
+            |(nexts, mnemonic)| {
+                if is_exchange_attempt(mnemonic) { Vec::new() } else { nexts.clone() }
+            },
+        )
+        .collect();
+    let mut predecessors = vec![Vec::new(); successors.len()];
+    for (index, nexts) in successors.iter().enumerate() {
+        for next in nexts {
+            predecessors[*next].push(index);
+        }
+    }
+    let mut refusals = 0_usize;
+    let mut loops = 0_usize;
+    for (index, ((mnemonic, branch, callee), destination)) in
+        instructions.iter().zip(&destinations).enumerate()
+    {
+        let refusal = refuses && callee.is_some_and(|callee| callee.contains(REFUSAL));
+        refusals = refusals.saturating_add(usize::from(refusal));
+        assert!(
+            (branch.is_none() || destination.is_some()) && (!is_call(mnemonic) || refusal),
+            "{target}: `{name}` calls out: `{mnemonic}`"
+        );
+        let Some(destination) = destination.filter(|destination| *destination <= index) else {
+            continue;
+        };
+        // The branch only its store-conditional reaches, back to its load-linked.
+        let closes_ll_sc_loop = index.checked_sub(1).is_some_and(|previous| {
+            predecessors[index] == [previous] && is_store_conditional(mnemonics[previous])
+        }) && is_load_linked(mnemonics[destination]);
+        if !reached(&successors, destination)[index] || closes_ll_sc_loop {
+            continue;
+        }
+        assert!(retries, "{target}: `{name}` loops: `{mnemonic}`");
+        assert!(
+            !reached(&bypassing, destination)[index],
+            "{target}: `{name}` loops through no compare-exchange: `{mnemonic}`"
+        );
+        loops = loops.saturating_add(1);
+    }
+    assert!(retries == (loops > 0), "{target}: `{name}` loops to retry its compare-exchange");
     assert!(
         !refuses || refusals == 1,
         "{target}: `{name}` calls the refusal of a misaligned pointer once, off its fast path"
@@ -298,6 +362,11 @@ fn assert_no_unnamed_cost(target: &str, name: &str, lines: &[Line], lowering: &L
         count(&mnemonics, is_compare_exchange),
         count(wanted, is_compare_exchange),
         "{target}: `{name}` has only the compare-exchanges it names, among {mnemonics:?}"
+    );
+    assert_eq!(
+        count(&mnemonics, is_load_linked),
+        count(wanted, is_load_linked),
+        "{target}: `{name}` has only the load-linkeds it names, among {mnemonics:?}"
     );
     assert_eq!(
         count(&mnemonics, is_barrier),
@@ -318,7 +387,8 @@ pub(crate) fn lowers_as_expected(
     let mut found: Vec<&str> = assembly
         .lines()
         .filter_map(|line| line.trim().strip_prefix(".globl")?.trim().strip_prefix(symbol_prefix))
-        .filter(|symbol| !symbol.contains(REFUSAL))
+        // COFF's `@feat.00` is a flag for the linker.
+        .filter(|symbol| !symbol.contains(REFUSAL) && !symbol.starts_with('@'))
         .collect();
     found.sort_unstable();
     let mut named: Vec<&str> = expected.iter().copied().flatten().map(|(name, _)| *name).collect();
