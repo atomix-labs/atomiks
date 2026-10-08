@@ -6,7 +6,9 @@
 #[cfg(test)]
 mod tests {
     use core::fmt::Write;
+    use core::marker::{PhantomData, PhantomPinned};
     use core::panic::{AssertUnwindSafe, RefUnwindSafe, UnwindSafe};
+    use core::ptr;
     use std::panic;
 
     use atomix_core::ordering::{AcqRel, Acquire, Relaxed, Release, SeqCst};
@@ -134,8 +136,8 @@ mod tests {
     /// Compiles only where `T` has the auto traits core's atomics have.
     const fn has_auto_traits<T: Send + Sync + Unpin + RefUnwindSafe + UnwindSafe>() {}
 
-    /// Compiles only where every `Atomic<T>` of an `Unpin` and `UnwindSafe` `T` has them.
-    const fn atomic_has_auto_traits<T: Atom + Unpin + UnwindSafe>() {
+    /// Compiles only where every `Atomic<T>` of an `UnwindSafe` `T` has them, `Unpin` whatever `T`.
+    const fn atomic_has_auto_traits<T: Atom + UnwindSafe>() {
         has_auto_traits::<Atomic<T>>();
     }
 
@@ -143,9 +145,11 @@ mod tests {
     const _: () = has_auto_traits::<Atomic<*mut u8>>();
 
     #[test]
-    fn an_atomic_is_send_sync_and_ref_unwind_safe_whatever_its_value() {
+    fn an_atomic_is_send_sync_unpin_and_ref_unwind_safe_whatever_its_value() {
         atomic_has_auto_traits::<u64>();
         atomic_has_auto_traits::<bool>();
+        // `PhantomPinned` is not `Unpin`, but an atomic holds its repr, a `u8`, never one to pin.
+        atomic_has_auto_traits::<PhantomData<PhantomPinned>>();
     }
 
     #[test]
@@ -194,5 +198,83 @@ mod tests {
     #[test]
     fn generic_code_reads_back_through_get() {
         assert_eq!(round_trip(-3_i64), -3, "get reads what `From` wrote");
+    }
+
+    #[test]
+    fn a_primitives_place_is_an_atomic_while_borrowed() {
+        let mut fills = 1_u64;
+        assert_eq!(AtomicU64::from_mut(&mut fills).fetch_add(2, AcqRel), 1, "the value before");
+        assert_eq!(fills, 3, "the plain `u64` holds what the atomic added");
+        let mut live = false;
+        Atomic::from_mut(&mut live).or(true, Release);
+        assert!(live, "and a `bool` what it set");
+    }
+
+    #[test]
+    fn a_slice_of_primitives_is_a_slice_of_atomics_and_back() {
+        let mut counts = [1_u32, 2, 3];
+        for count in Atomic::from_mut_slice(&mut counts).iter() {
+            count.fetch_add(10, Relaxed);
+        }
+        assert_eq!(counts, [11, 12, 13], "each place, through its atomic");
+        let mut atomics = [const { AtomicU64::new(7) }; 3];
+        Atomic::get_mut_slice(&mut atomics)[1] = 8;
+        let values: Vec<u64> = atomics.iter().map(|atomic| atomic.load(Relaxed)).collect();
+        assert_eq!(values, [7, 8, 7], "and each atomic, through its place");
+    }
+
+    #[test]
+    fn an_empty_slice_converts_both_ways() {
+        let mut values: [u16; 0] = [];
+        assert!(Atomic::from_mut_slice(&mut values).is_empty(), "no atomics");
+        let mut atomics: [Atomic<u16>; 0] = [];
+        assert!(Atomic::get_mut_slice(&mut atomics).is_empty(), "and no values");
+    }
+
+    #[cfg(wide)]
+    #[test]
+    fn a_128_bit_place_is_an_atomic_too() {
+        use atomix_core::AtomicI128;
+
+        let mut balance = -1_i128;
+        assert_eq!(AtomicI128::from_mut(&mut balance).load_rmw(Acquire), -1, "the value held");
+        let mut pair = [0_u128, u128::MAX];
+        let atomics = Atomic::from_mut_slice(&mut pair);
+        let exchanged = atomics[1].compare_exchange(u128::MAX, 1, AcqRel, Acquire);
+        assert_eq!(exchanged, Ok(u128::MAX), "the second exchanged");
+        Atomic::get_mut_slice(atomics)[0] = 2;
+        assert_eq!(pair, [2, 1], "each through its place, and back");
+    }
+
+    #[test]
+    fn a_pointers_place_keeps_its_provenance() {
+        let mut value = 7_u64;
+        let mut pointer = ptr::from_mut(&mut value);
+        let loaded = Atomic::from_mut(&mut pointer).load(Acquire);
+        // SAFETY: `loaded` is the pointer to `value` the atomic held, its provenance kept, and
+        // nothing else reaches `value` while it reads.
+        #[expect(unsafe_code, reason = "reads through the pointer, so Miri checks its provenance")]
+        let read = unsafe { loaded.read() };
+        assert_eq!(read, 7, "the pointer read back reads the value");
+    }
+
+    #[test]
+    fn a_pointer_written_through_a_slice_keeps_its_provenance() {
+        let mut value = 7_u64;
+        let mut atomics = [Atomic::new(ptr::null_mut::<u64>())];
+        Atomic::get_mut_slice(&mut atomics)[0] = ptr::from_mut(&mut value);
+        let loaded = atomics[0].load(Acquire);
+        // SAFETY: `loaded` is the pointer to `value` written through the slice, its provenance
+        // kept, and nothing else reaches `value` while it reads.
+        #[expect(unsafe_code, reason = "reads through the pointer, so Miri checks its provenance")]
+        let read = unsafe { loaded.read() };
+        assert_eq!(read, 7, "the pointer read back reads the value");
+    }
+
+    #[test]
+    fn a_pointer_atomic_prints_its_pointer() {
+        let pointer = ptr::without_provenance_mut::<u8>(0x1000);
+        let atomic = Atomic::new(pointer);
+        assert_eq!(format!("{atomic:p}"), format!("{pointer:p}"), "the pointer it holds");
     }
 }

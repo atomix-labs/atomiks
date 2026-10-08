@@ -140,7 +140,15 @@ macro_rules! cells {
                 *cell.get_mut() = $to(value);
             }
         }
-        const impl RawAccess for $int {
+        // SAFETY: `Wide` is `repr(C, align(16))` over an `UnsafeCell<u128>` alone, whose 16 bytes
+        // that alignment pads with none, so it holds the bits at its start, with a `u128`'s size
+        // and bit validity, which an `i128` shares, every 128 bits being one of each; `$place`
+        // lends the bits as the integer, and `as_ptr` their address.
+        #[expect(
+            unsafe_code,
+            reason = "the 16-byte cell holds its integer as the integer lays it out"
+        )]
+        const unsafe impl RawAccess for $int {
             #[inline]
             fn get_mut(cell: &mut Wide) -> &mut Self {
                 $place(cell.get_mut())
@@ -448,7 +456,9 @@ mod modelled {
                     cell.index.with_mut(|place| *place = index);
                 }
             }
-            impl RawAccess for $int {}
+            // SAFETY: under loom, `RawAccess` promises nothing.
+            #[expect(unsafe_code, reason = "a marker under loom, which promises nothing")]
+            unsafe impl RawAccess for $int {}
             impl CompareExchange for $int {
                 #[inline]
                 fn read_for_rmw(cell: &Wide, order: CoreOrdering) -> Self {

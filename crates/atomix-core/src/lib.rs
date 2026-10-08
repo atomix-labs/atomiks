@@ -83,7 +83,7 @@
     structural_match,
     transmute_neo
 )]
-#![cfg_attr(not(loom), feature(const_atomic))]
+#![cfg_attr(not(loom), feature(const_atomic, const_default))]
 #![cfg_attr(wide, feature(f128))]
 #![cfg_attr(core_atomic_u128, feature(integer_atomics))]
 #![expect(

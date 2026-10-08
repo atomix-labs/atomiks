@@ -1,0 +1,20 @@
+error[E0277]: an atomic of `()` shares no place with a `()`
+ --> tests/compile_fail/from_mut_slice_on_values_that_are_not_their_reprs.rs:7:36
+  |
+7 |     let _ = Atomic::from_mut_slice(&mut [(); 2]);
+  |             ---------------------- ^^^^^^^^^^^^ expected `bool`, an integer or a `*mut` pointer to a sized value
+  |             |
+  |             required by a bound introduced by this call
+  |
+  = help: the trait `atomix_core::__private::RawValue` is not implemented for `()`
+  = note: an atomic's place is its value's only where the value is its own repr, every one of which decodes
+  = note: an atomic of any other value reaches it through `&mut` with `get`, `set` and `with_mut`
+note: required by a bound in `atomix_core::atomic::exclusive::<impl atomix_core::Atomic<T>>::from_mut_slice`
+ --> src/atomic/exclusive.rs
+  |
+  | impl<T: Atom> Atomic<T> {
+...
+  |     pub const fn from_mut_slice(values: &mut [T]) -> &mut [Self]
+  |     where
+  |         T: const RawValue,
+  |            ^^^^^^^^^^^^^^ required by this bound in `atomix_core::atomic::exclusive::<impl Atomic<T>>::from_mut_slice`

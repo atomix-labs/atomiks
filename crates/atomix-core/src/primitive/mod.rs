@@ -100,17 +100,26 @@ primitive!(CellAccess);
 /// A primitive whose cell holds it as its own type lays it out, so the place the cell lends is the
 /// primitive's: every primitive but a `DoubleWord`.
 ///
-/// [`Atomic::as_ptr`](crate::Atomic::as_ptr), [`Atomic::from_ptr`](crate::Atomic::from_ptr) and
-/// [`Atomic::get_mut`](crate::Atomic::get_mut) need it. A double word's cell holds its pointers'
-/// addresses, their provenance exposed, so a pointer read from its place would have no provenance,
-/// and one written there unexposed none for a load to take back: its words are reached through its
-/// atomic operations alone.
+/// [`Atomic::as_ptr`](crate::Atomic::as_ptr), [`Atomic::from_ptr`](crate::Atomic::from_ptr),
+/// [`Atomic::get_mut`](crate::Atomic::get_mut), [`Atomic::from_mut`](crate::Atomic::from_mut) and
+/// the slice conversions need it. A double word's cell holds its pointers' addresses, their
+/// provenance exposed, so a pointer read from its place would have no provenance, and one written
+/// there unexposed none for a load to take back: its words are reached through its atomic
+/// operations alone.
+///
+/// # Safety
+/// Outside loom, the cell has a `Self`'s size and bit validity, and holds the `Self` at its start
+/// as `Self` lays it out, which [`get_mut`](Self::get_mut) and [`as_ptr`](Self::as_ptr) reach: a
+/// place of a `Self` aligned as the cell is, is a place of the cell. It promises nothing of
+/// alignment, which code that takes a `Self`'s place as the cell's checks. Under loom it promises
+/// nothing, and nothing that relies on it exists there.
 #[diagnostic::on_unimplemented(
     message = "`{Self}` lends no place of its own",
     label = "expected a primitive other than a `DoubleWord`",
     note = "a double word's cell holds each pointer's address, its provenance exposed, so a pointer read through a place would have none: reach two words through `load`, `store` and the compare-exchanges"
 )]
-pub impl(crate) const trait RawAccess: [const] Primitive {
+#[expect(unsafe_code, reason = "`Atomic::from_mut` takes a value's place as the cell's")]
+pub impl(crate) const unsafe trait RawAccess: [const] Primitive {
     /// The value's place, through exclusive access.
     #[cfg(not(loom))]
     #[doc(hidden)]

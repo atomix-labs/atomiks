@@ -64,8 +64,15 @@ macro_rules! cells {
                 *cell.get_mut() = value;
             }
         }
+        // SAFETY: core's atomic cell has the size and bit validity of the primitive it holds, which
+        // it holds as the primitive lays it out, as core documents, and its `get_mut` and `as_ptr`
+        // reach it.
         #[cfg(not(loom))]
-        const impl$(<$param>)? RawAccess for $kind {
+        #[expect(
+            unsafe_code,
+            reason = "core's atomic cell holds its primitive as the primitive lays it out"
+        )]
+        const unsafe impl$(<$param>)? RawAccess for $kind {
             #[inline]
             fn get_mut(cell: &mut Self::Cell) -> &mut Self {
                 cell.get_mut()
@@ -75,8 +82,10 @@ macro_rules! cells {
                 cell.as_ptr()
             }
         }
+        // SAFETY: under loom, `RawAccess` promises nothing.
         #[cfg(loom)]
-        impl$(<$param>)? RawAccess for $kind {}
+        #[expect(unsafe_code, reason = "a marker under loom, which promises nothing")]
+        unsafe impl$(<$param>)? RawAccess for $kind {}
         #[cfg(loom)]
         impl$(<$param>)? CellAccess for $kind {
             type Cell = $cell;
