@@ -58,7 +58,8 @@ toolchain, with each target the tests and the lints build for, is the nightly
 The CPU floor is `.cargo/config.toml`'s: x86-64-v3, LSE on aarch64 beyond macOS,
 and the M1 on macOS. The tools are the versions `.config/mise/` pins. The
 justfile's top section holds the repository's own recipes: the loom models, the
-lints for each target and CPU, the codegen fixture's format, and Miri.
+lints for each target and CPU, the codegen fixture's format, Miri, and the
+nightly build for every target rustup ships that the build script admits.
 `.github/workflows/platforms.yml` is the repository's own: the tests and the
 loom models on arm64 Linux, and on macOS and Windows, arm64 and x86_64, which
 `check.yml`, on x86_64 Linux, cannot run; and the tests on aarch64 Linux with
@@ -175,7 +176,8 @@ What a change here keeps, beyond what the checks hold it to.
 ### Checks Beyond `just check`
 
 - A change to unsafe code, a primitive or a cell runs `just miri`, Miri on
-  aarch64 Linux and macOS, x86_64 and x86-64-v2, which CI runs only each night.
+  aarch64 Linux and macOS, x86_64 and x86-64-v2, and x86_64 Windows, which CI
+  runs only each night.
 - A change to an ordering, a fence or a cell adds or updates its model in
   `crates/atomix-core/tests/model.rs`, which `just check-loom` runs.
 - What the types refuse has a fixture in
