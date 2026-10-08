@@ -49,9 +49,15 @@ const fn none_repr<T: Atom>() -> u128 {
         return 0;
     }
     let Some(spare) = T::REPRS.spare_for_none() else {
+        if <T::Repr as Primitive>::BITS == 1 {
+            refuse_option::<T>(&Message::new().text(concat!(
+                "a `bool` spends both its reprs, so `None` has none: derive an enum of three ",
+                "states, such as `enum Vote { Unset, No, Yes }`"
+            )));
+        }
         let rest = concat!(
-            "`, so `None` has none left: ",
-            "use a type with a spare repr, such as `NonZero<u64>`"
+            "`, so `None` has none left: each `Option` takes a spare repr, so hold a type with ",
+            "one per `Option`, such as `NonZero<u64>` for one, or `RangedU64<2>` for two"
         );
         refuse_option::<T>(
             &Message::new()

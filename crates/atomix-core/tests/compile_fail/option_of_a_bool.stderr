@@ -1,0 +1,31 @@
+error[E0080]: evaluation panicked: `Option<bool>`: a `bool` spends both its reprs, so `None` has none: derive an enum of three states, such as `enum Vote { Unset, No, Yes }`
+ --> src/atom/option.rs
+  |
+  |             None => <T::Repr as Primitive>::from_bits(const { none_repr::<T>() }),
+  |                                                               ^^^^^^^^^^^^^^^^ evaluation of `atomix_core::atom::option::<impl atomix_core::Atom for std::option::Option<bool>>::to_repr::{constant#0}` failed inside this call
+  |
+note: inside `atomix_core::atom::option::none_repr::<bool>`
+ --> src/atom/option.rs
+  |
+  | /             refuse_option::<T>(&Message::new().text(concat!(
+  | |                 "a `bool` spends both its reprs, so `None` has none: derive an enum of three ",
+  | |                 "states, such as `enum Vote { Unset, No, Yes }`"
+  | |             )));
+  | |_______________^
+note: inside `atomix_core::atom::option::refuse_option::<bool>`
+ --> src/atom/option.rs
+  |
+  | /     refuse(
+  | |         &Message::new()
+  | |             .text("`Option<")
+  | |             .name(type_name::<T>(), close.len().saturating_add(advice.len()))
+  | |             .text(close)
+  | |             .text(advice),
+  | |     )
+  | |_____^ the failure occurred here
+
+note: erroneous constant encountered
+ --> src/atom/option.rs
+  |
+  |             None => <T::Repr as Primitive>::from_bits(const { none_repr::<T>() }),
+  |                                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^

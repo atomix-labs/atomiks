@@ -1,0 +1,23 @@
+error[E0277]: `[u8; 4]` cannot be stored in an atomic
+ --> tests/compile_fail/derive_on_a_newtype_of_a_value_that_is_not_an_atom.rs:7:15
+  |
+7 | struct Ticker([u8; 4]);
+  |               ^^^^^^^ not `Atom`
+  |
+  = help: the trait `Atom` is not implemented for `[u8; 4]`
+  = note: for a type of your own, derive it, `#[derive(Atom)]`, with atomix's `derive` feature, or keep each promise of `Atom`'s `# Safety` section in a `const unsafe impl`
+  = help: the following other types implement trait `Atom`:
+            ()
+            (P, Q)
+            NonZero<i128>
+            NonZero<i16>
+            NonZero<i32>
+            NonZero<i64>
+            NonZero<i8>
+            NonZero<isize>
+          and $N others
+note: required by a bound in `atomix::__private::assert_atom`
+ --> $WORKSPACE/crates/atomix-core/src/__private.rs
+  |
+  | pub const fn assert_atom<T: const Atom>() {}
+  |                             ^^^^^^^^^^ required by this bound in `assert_atom`

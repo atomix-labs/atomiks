@@ -13,7 +13,7 @@ use crate::ordering::{LoadOrdering, Relaxed, RmwOrdering, StoreOrdering};
 #[cfg(not(loom))]
 use crate::primitive::RawAccess;
 use crate::primitive::{CellAccess, CompareExchange, Load, Primitive, ReadByExchange, Store, Swap};
-use crate::range::{Tags, assert_aligned};
+use crate::range::{ReprRange, Tags, assert_aligned};
 use crate::validity::Validity;
 
 mod capability;
@@ -626,6 +626,43 @@ where
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // ORDERING: Relaxed, as core's `Debug`: printing publishes nothing and pairs with no store.
         self.load(Relaxed).fmt(f)
+    }
+}
+
+/// An atomic as a value: never true, so the one impl it bounds never applies, and rustc reports
+/// its message for an atomic inside an atomic.
+///
+/// `Copy` is its supertrait, so the bound fails here rather than at `Atom`'s own `Copy`, and no
+/// type implements it: an atomic is never `Copy`.
+#[diagnostic::on_unimplemented(
+    message = "`{Self}` is an atomic, a place a value lives in, not a value an atomic holds",
+    label = "an atomic, not a value",
+    note = "store its value instead, `Atomic<u64>` for `Atomic<AtomicU64>`; for a place inside a value, derive `Atom` for a struct of values, whose atomic lends each field as a place through `fields()`",
+    note = "to keep several atomics together, put them side by side in a struct; to point at one, store a `NonNull` to it"
+)]
+pub impl(crate) trait NotAnAtomic: Copy {}
+
+// It exists so that rustc reports `NotAnAtomic`'s message for an atomic inside an atomic, rather
+// than `Atom`'s, which advises deriving `Atom`; hidden, since rustdoc would list it among `Atom`'s
+// implementors.
+//
+// SAFETY: it never applies: its bound, `NotAnAtomic`, has no impl, and an `Atomic<T>` is not
+// `Copy`, which `NotAnAtomic` needs.
+#[expect(unsafe_code, reason = "an impl that never applies, for its diagnostic")]
+#[doc(hidden)]
+unsafe impl<T: Atom> Atom for Atomic<T>
+where
+    Self: NotAnAtomic,
+{
+    type Repr = T::Repr;
+    const REPRS: ReprRange<T::Repr> = T::REPRS;
+    #[inline]
+    fn to_repr(self) -> T::Repr {
+        T::Repr::from_cell(T::Validity::into_inner::<T::Repr>(self.cell))
+    }
+    #[inline]
+    fn from_repr(_: T::Repr) -> Option<Self> {
+        None
     }
 }
 

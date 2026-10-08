@@ -27,7 +27,8 @@ pub(crate) use self::newtype::{capability, newtype};
 pub(crate) use self::packed::packed;
 pub(crate) use self::pointer_enum::pointer_enum;
 pub(crate) use self::pointer_word::pointer_word;
-pub(crate) use self::stub::stub;
+pub(crate) use self::projection::{member_shown, shown};
+pub(crate) use self::stub::{stub, stub_of_a_type_holding_a_place};
 pub(crate) use self::zero_width::zero_width;
 
 /// `ident`, spanned at `span`.

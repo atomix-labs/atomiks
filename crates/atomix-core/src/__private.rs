@@ -1,6 +1,6 @@
-//! What the code `#[derive(Atom)]` writes calls, and `RawValue`, the bound of `get_mut`, `from_mut`
-//! and the slice conversions, which rustc's messages name by this path: hidden, since nothing else
-//! should name either.
+//! What the code `#[derive(Atom)]` writes calls, and the bounds rustc's messages name by this path:
+//! `NotAnAtomic`, of `Atomic`'s impl of `Atom` that never applies, and `RawValue`, of `get_mut`,
+//! `from_mut` and the slice conversions. Hidden, since nothing else should name them.
 //!
 //! A derived impl for a type with no parameters calls the codecs here rather than `Atom`'s methods:
 //! their bound is `const`, never `[const]`, so the call needs no `const_trait_impl` in the crate
@@ -10,7 +10,7 @@ use core::any::type_name;
 use core::ptr;
 
 use crate::atom::{Atom, AtomAdd, AtomBitwise, AtomOrd, PtrAtom};
-pub use crate::atomic::{HasPackedField, RawValue, Reach, project_field};
+pub use crate::atomic::{HasPackedField, NotAnAtomic, RawValue, Reach, project_field};
 use crate::message::{Message, refuse};
 use crate::primitive::{CompareExchange, ExactBits, Primitive};
 #[cfg(wide)]
@@ -139,6 +139,11 @@ pub const fn assert_send_and_sync<T: Send + Sync>() {}
 /// written as one or marked `#[atom(ptr)]`.
 #[inline]
 pub const fn assert_pointer<F: PtrAtom>() {}
+
+/// Compiles only where `T` is an atom of a `const` impl, as a derived newtype's concrete field must
+/// be: the one check of the field, since the newtype's impl assumes it.
+#[inline]
+pub const fn assert_atom<T: const Atom>() {}
 
 /// Compiles only where `T`'s repr is `R`: the repr a derived value states, checked against the
 /// field whose repr it takes.

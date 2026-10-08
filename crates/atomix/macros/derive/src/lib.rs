@@ -65,6 +65,11 @@ use proc_macro::{Diagnostic, Level, Span, TokenStream};
 ///
 /// `from_repr` refuses each repr no value encodes to, so each value has one repr.
 ///
+/// Each field is a value, since a value is `Copy` and copying a place would split it: a field
+/// whose type's path ends in the name of an atomic, a cell or a lock, such as `AtomicU64` or
+/// `Cell<u32>`, is refused, once, with the value to write instead. A value of your own that takes
+/// such a name derives once the field names it otherwise, by an alias or `use … as`.
+///
 /// # Fields
 /// A packed struct's atomic projects onto its fields. Beside a struct `Quote`, the derive writes
 /// the projection `Atomic::fields` lends, and `AtomicField::fields` where a field's value is a

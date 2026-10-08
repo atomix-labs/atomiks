@@ -1,6 +1,8 @@
 //! A newtype's impls: `Atom`, each item the field's that holds the value, and each capability it
 //! takes from that field.
 
+use core::iter;
+
 use proc_macro2::{Span, TokenStream};
 use quote::{ToTokens, quote, quote_spanned};
 use syn::Ident;
@@ -45,8 +47,11 @@ pub(crate) fn newtype(implementor: &Implementor, newtype: &Newtype, def_site: Sp
     let repr_type = quote!(<#ty as #atomix::Atom>::Repr);
     let checks = checks(implementor, newtype);
     let (impl_generics, ty_generics, _) = generics.split_for_impl();
-    let where_clause =
-        where_clause(implementor, bounds(implementor, newtype, &quote!([const] #atomix::Atom)));
+    let concrete_bound = quote!(const #atomix::Atom);
+    let where_clause = where_clause(
+        implementor,
+        bounds(implementor, newtype, &quote!([const] #atomix::Atom), &concrete_bound),
+    );
     // The impl keeps each promise of `Atom` as the value's field's does: the repr, range,
     // validity, tag width, alignment and conversions, its tagged repr among them, are its, and the
     // rest of `Self` is `PhantomData` markers, built alike on every decode. The value may cross
@@ -103,8 +108,10 @@ pub(crate) fn capability(
         quote!(const _: () = #atomix::__private::#assertion::<#ty>();)
     });
     let (impl_generics, ty_generics, _) = generics.split_for_impl();
-    let where_clause =
-        where_clause(implementor, bounds(implementor, newtype, &quote!(#atomix::#name)));
+    let where_clause = where_clause(
+        implementor,
+        bounds(implementor, newtype, &quote!(#atomix::#name), &quote!(#atomix::#name)),
+    );
     quote! {
         #check
         #[automatically_derived]
@@ -118,9 +125,11 @@ fn built(newtype: &Newtype, value: &TokenStream) -> TokenStream {
     built_with_markers(markers_before, Some((field, value)), markers_after)
 }
 
-/// The checks of the newtype, each a constant beside the impl: that it may cross threads, as
-/// `thread_checks` says, that its concrete value's repr is the one stated, and that a concrete
-/// value written or marked as a thin pointer, whose markers alone the thread checks read, is one.
+/// The checks of the newtype, each a constant beside the impl: that its concrete value is an atom
+/// of a `const` impl, the one error where it is not, since the impl assumes it; that it may cross
+/// threads, as `thread_checks` says; that its concrete value's repr is the one stated; and that a
+/// concrete value written or marked as a thin pointer, whose markers alone the thread checks read,
+/// is one.
 /// A wide pointer, two words, is written as one, so no check asks.
 fn checks(implementor: &Implementor, newtype: &Newtype) -> TokenStream {
     let atomix = &implementor.atomix;
@@ -130,17 +139,20 @@ fn checks(implementor: &Implementor, newtype: &Newtype) -> TokenStream {
     let repr = implementor.repr.as_ref().filter(|_| !value.is_generic).map(|repr| {
         quote!(const _: () = #atomix::__private::assert_repr::<#ty, ::core::primitive::#repr>();)
     });
+    let atom = (!value.is_generic)
+        .then(|| quote!(const _: () = #atomix::__private::assert_atom::<#ty>();));
     let pointer = (value.is_pointer && !value.is_wide_pointer && !value.is_generic).then(|| {
         located_at(quote!(const _: () = #atomix::__private::assert_pointer::<#ty>();), ty.span())
     });
-    quote!(#threads #repr #pointer)
+    quote!(#atom #threads #repr #pointer)
 }
 
 /// The newtype's bounds in an impl's where clause: `bound`, with the repr stated, on the
-/// value's field where it names a parameter, `PtrAtom` too where it is written or marked as
-/// a thin pointer, and those `thread_bounds` says.
+/// value's field where it names a parameter, else `concrete_bound`; `PtrAtom` too where it is
+/// written or marked as a thin pointer; and those `thread_bounds` says.
 fn bounds<'a>(
     implementor: &Implementor, newtype: &'a Newtype, bound: &TokenStream,
+    concrete_bound: &TokenStream,
 ) -> impl Iterator<Item = TokenStream> + use<'a> {
     let value = &newtype.value;
     // An instance whose field has another repr is refused at the repr stated.
@@ -149,14 +161,17 @@ fn bounds<'a>(
         quote_spanned!(span=> <Repr = ::core::primitive::#repr>)
     });
     let atomix = &implementor.atomix;
-    let value_bound = value.is_generic.then(|| {
-        let ty = &value.ty;
+    let ty = &value.ty;
+    // The impl assumes a concrete field has `concrete_bound`, so the bound states it: where the
+    // field lacks it, the check beside the impl raises the one error, and the impl none of its own.
+    // The bound binds a lifetime it never names: rustc refuses a false bound that names no
+    // parameter, with a help to enable `trivial_bounds`, but not one under a binder.
+    let value_bound = if value.is_generic {
         quote!(#ty: #bound #repr)
-    });
-    let pointer_bound =
-        (value.is_generic && value.is_pointer && !value.is_wide_pointer).then(|| {
-            let ty = &value.ty;
-            quote!(#ty: #atomix::PtrAtom)
-        });
-    value_bound.into_iter().chain(pointer_bound).chain(thread_bounds(implementor, newtype.fields()))
+    } else {
+        quote!(for<'__atomix> #ty: #concrete_bound)
+    };
+    let pointer_bound = (value.is_generic && value.is_pointer && !value.is_wide_pointer)
+        .then(|| quote!(#ty: #atomix::PtrAtom));
+    iter::once(value_bound).chain(pointer_bound).chain(thread_bounds(implementor, newtype.fields()))
 }

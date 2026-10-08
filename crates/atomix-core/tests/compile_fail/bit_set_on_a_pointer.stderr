@@ -6,6 +6,7 @@ error[E0277]: `*mut u64` has no atomic bitwise operations
    |
    = help: the trait `AtomBitwise` is not implemented for `*mut u64`
    = note: for your own newtype over a value that has it, derive it: `#[derive(AtomBitwise)]`
+   = note: for a pointer, whose bits are its address, keep tags beside it in a derived pointer word, whose tag fields have `or`, `and` and `xor`
    = note: to change the value in a compare-exchange loop, call `update`
 help: the trait `AtomBitwise` is implemented for `u64`
   --> src/atom/scalar.rs

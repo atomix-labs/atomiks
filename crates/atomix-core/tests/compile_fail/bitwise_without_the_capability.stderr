@@ -8,6 +8,7 @@ error[E0277]: `char` has no atomic bitwise operations
   |
   = help: the trait `AtomBitwise` is not implemented for `char`
   = note: for your own newtype over a value that has it, derive it: `#[derive(AtomBitwise)]`
+  = note: for a pointer, whose bits are its address, keep tags beside it in a derived pointer word, whose tag fields have `or`, `and` and `xor`
   = note: to change the value in a compare-exchange loop, call `update`
   = help: the following other types implement trait `AtomBitwise`:
             Saturating<T>

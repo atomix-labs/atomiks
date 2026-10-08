@@ -1,0 +1,27 @@
+error: the field `seq` is an atomic, a place, but `Pair` derives a value that one atomic holds
+  --> tests/compile_fail/derive_with_a_place_as_a_field.rs:11:10
+   |
+11 |     seq: core::sync::atomic::AtomicU64,
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: a value is `Copy`, and copying a place would split it in two
+   = help: make the field its value, `seq: u64`, and share `Atomic<Pair>`, whose `fields().seq` is the field's place; or keep the atomics side by side in a struct that derives no `Atom`
+
+error: the field `0` is an atomic, a place, but `Seq` derives a value that one atomic holds
+  --> tests/compile_fail/derive_with_a_place_as_a_field.rs:16:12
+   |
+16 | struct Seq(AtomicU32);
+   |            ^^^^^^^^^
+   |
+   = note: a value is `Copy`, and copying a place would split it in two
+   = help: make the field its value, `u32`, and share `Atomic<Seq>`; or keep the atomics side by side in a struct that derives no `Atom`
+
+error: `Full`'s field `lap` is a `Cell`, a place, but `Slot` derives a value that one atomic holds
+  --> tests/compile_fail/derive_with_a_place_as_a_field.rs:21:17
+   |
+21 |     Full { lap: Cell<u32> },
+   |                 ^^^^^^^^^
+   |
+   = note: a value is `Copy`, and copying a place would split it in two
+   = note: a value of your own named `Cell` derives once the field names it otherwise, by an alias or `use … as`
+   = help: make the field its value, `lap: u32`, and share `Atomic<Slot>`; or keep the places side by side in a struct that derives no `Atom`
