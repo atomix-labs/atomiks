@@ -1,6 +1,8 @@
 error[E0277]: `NonNull<u64>` cannot be sent between threads safely
   --> tests/compile_fail/derive_on_a_pointer_word_of_an_unmarked_alias.rs:11:8
    |
+10 | #[derive(Clone, Copy, Atom)]
+   |                       ---- in this derive macro expansion
 11 | struct Link {
    |        ^^^^ `NonNull<u64>` cannot be sent between threads safely
    |
@@ -16,10 +18,13 @@ note: required by a bound in `atomix::__private::assert_send_and_sync`
    |
    | pub const fn assert_send_and_sync<T: Send + Sync>() {}
    |                                      ^^^^ required by this bound in `assert_send_and_sync`
+   = note: this error originates in the derive macro `Atom` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 error[E0277]: `NonNull<u64>` cannot be shared between threads safely
   --> tests/compile_fail/derive_on_a_pointer_word_of_an_unmarked_alias.rs:11:8
    |
+10 | #[derive(Clone, Copy, Atom)]
+   |                       ---- in this derive macro expansion
 11 | struct Link {
    |        ^^^^ `NonNull<u64>` cannot be shared between threads safely
    |
@@ -35,6 +40,7 @@ note: required by a bound in `atomix::__private::assert_send_and_sync`
    |
    | pub const fn assert_send_and_sync<T: Send + Sync>() {}
    |                                             ^^^^ required by this bound in `assert_send_and_sync`
+   = note: this error originates in the derive macro `Atom` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 error[E0277]: a field stored as `*mut u64` cannot be packed beside others
   --> tests/compile_fail/derive_on_a_pointer_word_of_an_unmarked_alias.rs:12:11

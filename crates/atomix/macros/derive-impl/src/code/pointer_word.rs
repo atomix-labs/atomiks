@@ -11,6 +11,7 @@ use syn::{Ident, Type, parse_quote};
 
 use super::field::{PackedFields, PointersWithTags, codec};
 use super::layout::{AtomImpl, ImplRepr, LayoutCode};
+use super::member_in_expansion;
 use super::projection::{FieldSite, ProjectionCode, member_shown};
 use super::repr::located_at;
 use super::stub::stub;
@@ -315,15 +316,18 @@ impl<'a> WordCode<'a> {
         let local = |name| Ident::new(name, self.def_site);
         let (repr_value, pointer_value, bits, tags, misaligned) =
             (local("repr"), local("pointer"), local("bits"), local("tags"), local("misaligned"));
-        let members = self.word.pointer_fields().map(|Field { member, .. }| quote!(self.#member));
+        let field_read = |Field { member, .. }: &Field| {
+            let member = member_in_expansion(member);
+            quote!(self.#member)
+        };
+        let members = self.word.pointer_fields().map(field_read);
         let pointers = if let [_] = self.word.pointers.as_slice() {
             quote!(#(#members)*)
         } else {
             quote!((#(#members),*))
         };
-        let tag_bits = self.tag_fields.encode(
-            self.tag_fields.fields().iter().map(|Field { member, .. }| quote!(self.#member)),
-        );
+        let tag_bits =
+            self.tag_fields.encode(self.tag_fields.fields().iter().map(|field| field_read(field)));
         let to_tagged = self.pointer_codec("to_tagged_repr", "to_tagged_repr");
         let to_tagged_self = if self.layout.is_generic() {
             quote!(<Self as #atomix::Atom>::to_tagged_repr)

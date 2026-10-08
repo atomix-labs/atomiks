@@ -8,6 +8,7 @@ use syn::ext::IdentExt;
 use syn::{GenericParam, Ident, Lifetime, Member, Type};
 
 use super::bound::{BoundSite, field_bounds, own_where_clause, thread_bounds, where_clause};
+use super::member_in_expansion;
 use crate::model::{Field, Implementor};
 
 /// Where a field the projection lends lies, as its `HasPackedField` says.
@@ -62,7 +63,7 @@ impl<'a> ProjectionCode<'a> {
         Self {
             implementor,
             fields: fields.into_iter().collect(),
-            name: format_ident!("{ident}Fields", span = ident.span()),
+            name: format_ident!("{ident}Fields", span = implementor.name_span),
             lifetime: Lifetime::new(&format!("'{lifetime}"), def_site),
             path: Ident::new(&path.to_string(), def_site),
             def_site,
@@ -81,6 +82,7 @@ impl<'a> ProjectionCode<'a> {
         let field_implementations = self.fields.iter().zip(sites).enumerate().map(
             |(index, (Field { ty, member, .. }, FieldSite { placement, layout, reach }))| {
                 let index = field_index(index);
+                let member = member_in_expansion(member);
                 quote! {
                     #[automatically_derived]
                     unsafe impl #impl_generics #atomix::__private::HasPackedField<#index, #ty>
@@ -106,15 +108,15 @@ impl<'a> ProjectionCode<'a> {
     }
 
     /// The projection, `QuoteFields<'a, P>`, of one `&'a AtomicField` per field, each with the
-    /// field's visibility and docs, and the struct's `#[non_exhaustive]` and `#[doc(hidden)]`: the
-    /// item beside the struct.
+    /// field's visibility, docs and `#[deprecated]`, and the struct's `#[non_exhaustive]` and
+    /// `#[doc(hidden)]`: the item beside the struct.
     pub(super) fn structure(&self) -> TokenStream {
         let Implementor { vis, ident, atomix, projection_attributes, .. } = self.implementor;
         let (name, lifetime, path) = (&self.name, &self.lifetime, &self.path);
         let (parameters, instance) = (self.parameters(), self.instance());
         let where_clause = self.own_where_clause(&[]);
         let places = self.fields.iter().enumerate().map(|(index, field)| {
-            let Field { member, vis, docs, ty, .. } = field;
+            let Field { member, vis, docs, deprecation, ty, .. } = field;
             let line = format!(
                 " The field `{}`, of type `{}`, in an atomic `{ident}`.",
                 member_shown(member),
@@ -124,8 +126,12 @@ impl<'a> ProjectionCode<'a> {
             let field_path = self.field_path(index, ty);
             let place = quote!(&#lifetime #atomix::AtomicField<#field_path>);
             match member {
-                Member::Named(named) => quote!(#(#docs)* #gap #[doc = #line] #vis #named: #place),
-                Member::Unnamed(_) => quote!(#(#docs)* #gap #[doc = #line] #vis #place),
+                Member::Named(named) => {
+                    quote!(#(#docs)* #gap #[doc = #line] #(#deprecation)* #vis #named: #place)
+                },
+                Member::Unnamed(_) => {
+                    quote!(#(#docs)* #gap #[doc = #line] #(#deprecation)* #vis #place)
+                },
             }
         });
         let body = if self.is_tuple() {
@@ -172,12 +178,15 @@ impl<'a> ProjectionCode<'a> {
         let formatter = Ident::new("formatter", self.def_site);
         let shown_name = name.to_string();
         let (start, fields) = if self.is_tuple() {
-            let fields =
-                self.fields.iter().map(|Field { member, .. }| quote!(.field(&self.#member)));
+            let fields = self.fields.iter().map(|Field { member, .. }| {
+                let member = member_in_expansion(member);
+                quote!(.field(&self.#member))
+            });
             (quote!(debug_tuple(#shown_name)), fields.collect::<Vec<_>>())
         } else {
             let fields = self.fields.iter().map(|Field { member, .. }| {
                 let shown = member_shown(member);
+                let member = member_in_expansion(member);
                 quote!(.field(#shown, &self.#member))
             });
             (quote!(debug_struct(#shown_name)), fields.collect())
@@ -210,10 +219,13 @@ impl<'a> ProjectionCode<'a> {
         // Each call keeps its contract: the projection's field that holds the place takes the
         // field's visibility, so the place reaches only code the field is visible to.
         let field_place = quote!(unsafe { #atomix::__private::project_field(#place) });
-        let fields = self.fields.iter().map(|Field { member, .. }| match member {
-            Member::Named(named) => quote!(#named: #field_place),
-            Member::Unnamed(_) => field_place.clone(),
-        });
+        // Each member named in the derive's expansion, located at the user's: a deprecated
+        // field's place is deprecated too, and the `deprecated` lint reads no use a derive writes.
+        let fields =
+            self.fields.iter().map(|Field { member, .. }| match member_in_expansion(member) {
+                named @ Member::Named(_) => quote!(#named: #field_place),
+                Member::Unnamed(_) => field_place.clone(),
+            });
         let built = if self.is_tuple() {
             quote!(#name(#(#fields),*))
         } else {

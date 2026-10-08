@@ -7,12 +7,15 @@ error[E0271]: type mismatch resolving `<u64 as Atom>::Repr == u32`
 note: required for `Word<u64>` to implement `Atom`
   --> tests/compile_fail/derive_with_a_repr_other_than_an_instances_field.rs:10:8
    |
+ 8 | #[derive(Clone, Copy, Atom)]
+   |                       ---- in this derive macro expansion
  9 | #[atom(repr = u32)]
    |               --- type parameter would need to implement `Atom`
 10 | struct Word<T>(T);
-   |        ^^^^^^^
+   |        ^^^^
 note: required by a bound in `atomix::Atomic`
   --> $WORKSPACE/crates/atomix-core/src/atomic/mod.rs
    |
    | pub struct Atomic<T: Atom> {
    |                      ^^^^ required by this bound in `Atomic`
+   = note: this error originates in the derive macro `Atom` (in Nightly builds, run with -Z macro-backtrace for more info)

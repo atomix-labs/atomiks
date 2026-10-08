@@ -8,6 +8,7 @@ use quote::{ToTokens, format_ident, quote};
 use syn::spanned::Spanned;
 use syn::{Ident, Member, Path};
 
+use super::member_in_expansion;
 use super::repr::located_at;
 use crate::model::{Field, pointers_among_tags};
 
@@ -334,7 +335,7 @@ where
     if let Some(Field { member: Member::Unnamed(_), .. }) = fields.peek() {
         quote!(#constructor(#(#values),*))
     } else {
-        let members = fields.map(|field| &field.member);
+        let members = fields.map(|field| member_in_expansion(&field.member));
         quote!(#constructor { #(#members: #values),* })
     }
 }

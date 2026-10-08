@@ -150,8 +150,9 @@ pub(super) fn discriminants<'a, I: IntoIterator<Item = (&'a Variant, &'a Ident)>
     }
 }
 
-/// `tokens`, each `Self` among them `enumeration`, spanned as it was: the type it names in the
-/// enum's discriminants, outside of which they are read.
+/// `tokens`, each `Self` among them `enumeration`, located where it was: the type it names in the
+/// enum's discriminants, outside of which they are read. It keeps `enumeration`'s hygiene, the
+/// derive's expansion, so the `deprecated` lint reads no use of a deprecated enum it writes.
 fn with_self_as(tokens: TokenStream, enumeration: &Ident) -> TokenStream {
     tokens
         .into_iter()
@@ -163,7 +164,7 @@ fn with_self_as(tokens: TokenStream, enumeration: &Ident) -> TokenStream {
                 TokenTree::Group(named)
             },
             TokenTree::Ident(word) if word == "Self" => {
-                TokenTree::Ident(respan(enumeration, word.span()))
+                TokenTree::Ident(respan(enumeration, enumeration.span().located_at(word.span())))
             },
             other @ (TokenTree::Ident(_) | TokenTree::Punct(_) | TokenTree::Literal(_)) => other,
         })

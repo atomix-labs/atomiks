@@ -1,6 +1,8 @@
 error[E0277]: `Token` cannot be sent between threads safely
  --> tests/compile_fail/derive_on_a_type_with_a_negative_send_impl.rs:9:8
   |
+8 | #[derive(Clone, Copy, Atom)]
+  |                       ---- in this derive macro expansion
 9 | struct Token(u64);
   |        ^^^^^ `Token` cannot be sent between threads safely
   |
@@ -14,3 +16,4 @@ note: required by a bound in `atomix::__private::assert_send_and_sync`
   |
   | pub const fn assert_send_and_sync<T: Send + Sync>() {}
   |                                      ^^^^ required by this bound in `assert_send_and_sync`
+  = note: this error originates in the derive macro `Atom` (in Nightly builds, run with -Z macro-backtrace for more info)

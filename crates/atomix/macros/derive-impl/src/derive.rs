@@ -118,7 +118,7 @@ pub fn expand_capability(input: TokenStream, capability: Capability) -> Expansio
 /// The refusal of `capability` for a type that is not a newtype.
 fn not_a_newtype(implementor: &Implementor, capability: Capability) -> DeriveError {
     let name = capability.name();
-    DeriveError::new(implementor.ident.span(), format!("`{name}` derives only for a newtype"))
+    DeriveError::new(implementor.name_span, format!("`{name}` derives only for a newtype"))
         .note(
             None,
             format!(
@@ -595,11 +595,12 @@ mod tests {
     }
 
     #[test]
-    fn each_place_of_the_projection_takes_its_fields_visibility_and_docs() {
+    fn each_place_of_the_projection_takes_its_fields_visibility_docs_and_deprecation() {
         let quote = written(&derive_atom(quote! {
             pub struct Quote {
                 /// How many.
                 pub quantity: u32,
+                #[deprecated = "read the book's side"]
                 side: Side,
                 pub(crate) live: bool,
             }
@@ -611,6 +612,7 @@ mod tests {
                 #[doc = " The field `quantity`, of type `u32`, in an atomic `Quote`."]
                 pub quantity: &'a ::atomix::AtomicField<::atomix::Join<P, ::atomix::Field<Quote, 0, u32>>>,
                 #[doc = " The field `side`, of type `Side`, in an atomic `Quote`."]
+                #[deprecated = "read the book's side"]
                 side: &'a ::atomix::AtomicField<::atomix::Join<P, ::atomix::Field<Quote, 1, Side>>>,
                 #[doc = " The field `live`, of type `bool`, in an atomic `Quote`."]
                 pub(crate) live: &'a ::atomix::AtomicField<::atomix::Join<P, ::atomix::Field<Quote, 2, bool>>>

@@ -74,13 +74,14 @@ use proc_macro::{Diagnostic, Level, Span, TokenStream};
 /// A packed struct's atomic projects onto its fields. Beside a struct `Quote`, the derive writes
 /// the projection `Atomic::fields` lends, and `AtomicField::fields` where a field's value is a
 /// `Quote`: `QuoteFields<'a, P>`, of `Quote`'s visibility, and `#[non_exhaustive]` and
-/// `#[doc(hidden)]` where `Quote` is. It holds one `&'a AtomicField` per field, each of the field's
-/// own visibility and docs, so each field is a place of its own, changed alone, and a private
-/// field's place stays in its module. Each place's type names its field's path, as `Field<Quote,
-/// 2, bool>`, which is a type alone. A tuple struct's projection is a tuple struct. A type named
-/// `QuoteFields` beside `Quote` clashes with the projection. A pointer word projects so too: each
-/// tag is a place, and its pointer a place whose `load` reads it through the word, and whose own
-/// `fields` reach an inner word's tags.
+/// `#[doc(hidden)]` where `Quote` is. It holds one `&'a AtomicField` per field, so each field is a
+/// place of its own, changed alone; each place takes its field's own visibility, docs and
+/// `#[deprecated]`, so a private field's place stays in its module, and a deprecated field's place
+/// warns where it is used. Each place's type names its field's path, as `Field<Quote, 2, bool>`,
+/// which is a type alone. A tuple struct's projection is a tuple struct. A type named `QuoteFields`
+/// beside `Quote` clashes with the projection. A pointer word projects so too: each tag is a
+/// place, and its pointer a place whose `load` reads it through the word, and whose own `fields`
+/// reach an inner word's tags.
 ///
 /// Generic code takes a place as `&AtomicField<P>`, and states what each operation asks of the
 /// container's repr: [`BitTest`], [`MaskBitwise`] or [`FetchAdd`].
