@@ -367,8 +367,8 @@
 //! atomix builds for every `aarch64` and `x86_64` target with 64-bit pointers, little-endian, on
 //! any OS or none, and for `arm64ec`, the `aarch64` code Windows runs beside `x86_64` code; its
 //! build script refuses any other target, where an operation it promises as one instruction could
-//! be a compare-exchange loop, as a 64-bit add is on 32-bit x86. CI runs the tests on Linux and
-//! macOS. It needs a nightly Rust, `nightly-2026-09-28` or newer, for `const_trait_impl`,
+//! be a compare-exchange loop, as a 64-bit add is on 32-bit x86. CI runs the tests on Linux, macOS
+//! and Windows. It needs a nightly Rust, `nightly-2026-09-28` or newer, for `const_trait_impl`,
 //! pattern types and the other unstable features its crates enable; that nightly's
 //! version, 1.101, is its `rust-version`.
 //!
@@ -381,8 +381,8 @@
 //! | `aarch64` macOS                    | LSE                             | yes                    | yes, with LSE2        |
 //! | `aarch64` simulators, Mac Catalyst | LSE                             | yes                    | a CPU with LSE2       |
 //! | `aarch64` Linux gnu, musl          | an outline call; `+lse` for LSE | yes                    | a CPU with LSE2       |
+//! | `aarch64` Windows, `arm64ec`       | an LL/SC loop; `+lse` for LSE   | yes                    | a CPU with LSE2       |
 //! | `aarch64` elsewhere                | an LL/SC loop; `+lse` for LSE   | yes                    | a CPU with LSE2       |
-//! | `arm64ec`                          | an LL/SC loop; `+lse` for LSE   | yes                    | a CPU with LSE2       |
 //! | `x86_64` Apple, Windows, Fuchsia   | one instruction                 | yes, with `cmpxchg16b` | `x86-64-v3`, for AVX  |
 //! | `x86_64` elsewhere                 | one instruction                 | `x86-64-v2`            | `x86-64-v3`, for AVX  |
 //!
