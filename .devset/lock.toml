@@ -12,7 +12,7 @@ tag = "v0.22.0"
 [[profiles]]
 name = "agents"
 rev = "a3d4578c7ac97d2f742e0e3b2533661df18150a5"
-digest = "7f121565606ecaadeff38c506b729f8834adee0508a91bcca13d7e9c695b5296"
+digest = "b74e1afdc458f75721a4c5a79791f0d0c08f95c7aba37de33354bb0817e27756"
 
 [profiles.source]
 git = "https://github.com/atomix-labs/atxp"
@@ -26,7 +26,7 @@ security = ["default"]
 [[profiles]]
 name = "cargo-workspace"
 rev = "a3d4578c7ac97d2f742e0e3b2533661df18150a5"
-digest = "4c448a5e86f86844e9c92750d28c1b83c56fc2a8211238b849e08fa6272becea"
+digest = "19ea1f414abaea4811c3c7bfb666abb069128c418f5cc1cb5406abcb7344bc15"
 
 [profiles.source]
 git = "https://github.com/atomix-labs/atxp"
@@ -330,7 +330,7 @@ tag = "v0.22.0"
 [[profiles]]
 name = "mdbook"
 rev = "a3d4578c7ac97d2f742e0e3b2533661df18150a5"
-digest = "d624741a645b36c7e0c6b087361a92c63bf057d3deb9d5afe242d129e083c3a5"
+digest = "808de59fc9e6a5c24aab16a854ff0095cab02c9e0094bc707a802a21b8548b5d"
 
 [profiles.source]
 git = "https://github.com/atomix-labs/atxp"

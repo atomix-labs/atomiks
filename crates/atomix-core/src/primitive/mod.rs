@@ -193,7 +193,7 @@ impl<A: Word, B: Word> ReadByExchange for DoubleWord<A, B> {}
 #[diagnostic::on_unimplemented(
     message = "`{Self}` has no pure-read atomic load on this target",
     label = "this load would be a read-modify-write: it writes the line and faults on read-only pages",
-    note = "a 128-bit load is one instruction with FEAT_LSE2 (aarch64: `-C target-cpu=neoverse-v1` or newer) or AVX (x86_64: `-C target-cpu=x86-64-v3`)",
+    note = "a 128-bit load is one instruction with FEAT_LSE2 (aarch64: `-C target-cpu` of a CPU with LSE2) or AVX (x86_64: `-C target-cpu=x86-64-v3`)",
     note = "to accept a load that writes the cache line, call `load_rmw`"
 )]
 pub impl(crate) trait Load: CompareExchange {
@@ -206,7 +206,7 @@ pub impl(crate) trait Load: CompareExchange {
 #[diagnostic::on_unimplemented(
     message = "`{Self}` has no atomic store without a compare-exchange loop on this target",
     label = "this store would be a compare-exchange loop",
-    note = "a 128-bit store is one instruction with FEAT_LSE2 (aarch64: `-C target-cpu=neoverse-v1` or newer) or AVX (x86_64: `-C target-cpu=x86-64-v3`)",
+    note = "a 128-bit store is one instruction with FEAT_LSE2 (aarch64: `-C target-cpu` of a CPU with LSE2) or AVX (x86_64: `-C target-cpu=x86-64-v3`)",
     note = "to accept a compare-exchange loop, call `store_rmw`"
 )]
 pub impl(crate) trait Store: CompareExchange {

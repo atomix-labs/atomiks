@@ -358,23 +358,44 @@
 //!
 //! # Platforms
 //!
-//! atomix builds for Linux and macOS, on `aarch64` and `x86_64`. What a target's default CPU
-//! lacks, a flag adds, `-C target-feature` on `aarch64` and `-C target-cpu` on `x86_64`:
+//! atomix builds for every `aarch64` and `x86_64` target with 64-bit pointers, little-endian, on
+//! any OS or none; its build script refuses any other target, where an operation it promises as one
+//! instruction could be a compare-exchange loop, as a 64-bit add is on 32-bit x86. CI runs the
+//! tests on Linux and macOS. It needs a nightly Rust, `nightly-2026-09-28` or newer, for
+//! `const_trait_impl`, pattern types and the other unstable features its crates enable; that
+//! nightly's version, 1.101, is its `rust-version`.
 //!
-//! | Target          | 128-Bit Atomics        | Their `Load`, `Store` | `FetchBitwise`, `MinMax` |
-//! | --------------- | ---------------------- | --------------------- | ------------------------ |
-//! | `aarch64` macOS | yes                    | yes, with LSE2        | yes                      |
-//! | `aarch64` Linux | yes                    | `+lse2`               | yes                      |
-//! | `x86_64` macOS  | yes, with `cmpxchg16b` | `x86-64-v3`, for AVX  | no                       |
-//! | `x86_64` Linux  | `x86-64-v2`            | `x86-64-v3`, for AVX  | no                       |
+//! What an operation lowers to depends on the features a target turns on, which
+//! `rustc --print cfg --target <triple>` lists, not on its OS; what a target's default lacks, a
+//! flag adds. For the targets rustup ships:
+//!
+//! | Target                             | Read-Modify-Write               | 128-Bit Atomics        | Their `Load`, `Store` |
+//! | ---------------------------------- | ------------------------------- | ---------------------- | --------------------- |
+//! | `aarch64` macOS                    | LSE                             | yes                    | yes, with LSE2        |
+//! | `aarch64` simulators, Mac Catalyst | LSE                             | yes                    | a CPU with LSE2       |
+//! | `aarch64` Linux gnu, musl          | an outline call; `+lse` for LSE | yes                    | a CPU with LSE2       |
+//! | `aarch64` elsewhere                | an LL/SC loop; `+lse` for LSE   | yes                    | a CPU with LSE2       |
+//! | `x86_64` Apple, Windows, Fuchsia   | one instruction                 | yes, with `cmpxchg16b` | `x86-64-v3`, for AVX  |
+//! | `x86_64` elsewhere                 | one instruction                 | `x86-64-v2`            | `x86-64-v3`, for AVX  |
+//!
+//! LSE2 (Armv8.4) comes with a CPU, not a flag: rustc warns that `-C target-feature=+lse2` is
+//! unstable and will be refused. A CPU turns on more than LSE2, so `neoverse-n2`'s SVE2 faults on
+//! Graviton 3: name the one the code runs on. `neoverse-v1` (Graviton 3), `neoverse-n2` (Azure
+//! Cobalt 100), `neoverse-v2` (Graviton 4) and `apple-m1` have LSE2, as does `native` on any of
+//! them; `neoverse-n1` (Graviton 2) does not.
+//!
+//! Where an OS requires a CPU, its flag costs nothing: `+lse` for Windows 11 24H2,
+//! `-C target-cpu=apple-a12` for iOS 18 and `apple-a13`, with LSE2, for iOS 26, `x86-64-v2` for
+//! RHEL 9 and `x86-64-v3` for RHEL 10.
 //!
 //! Every target has [`FetchAdd`] and [`MaskBitwise`] for each integer up to 64 bits, and
 //! [`BitTest`] from 16 bits on `x86_64`, whose `lock bts` takes no byte, and from 8 on `aarch64`;
-//! and [`MaskBitwise`] and [`BitTest`] for a pointer, whose tags they change.
+//! and [`MaskBitwise`] and [`BitTest`] for a pointer, whose tags they change. `aarch64` alone has
+//! [`FetchBitwise`] and [`MinMax`]: on `x86_64`, an `and`, `or` or `xor` that returns the value
+//! before, and a maximum or a minimum, are compare-exchange loops.
 //!
-//! On `aarch64` Linux, a read-modify-write is LSE's one instruction with `+lse` (Armv8.1); without
-//! it, an outline call runs that instruction where the CPU has LSE, and an LL/SC loop where it does
-//! not. Apple's CPUs all have LSE.
+//! On `aarch64` Linux gnu or musl without `+lse` (Armv8.1), the outline call runs LSE's one
+//! instruction where the CPU has LSE, and an LL/SC loop where it does not.
 //!
 //! # Model Checking
 //!

@@ -1,9 +1,28 @@
-//! Names the conditions atomix-core's items share, so each is written once.
+//! Refuses a target atomix does not build for, and names the conditions atomix-core's items
+//! share, so each is written once.
+
+use std::env;
 
 use cfg_aliases::cfg_aliases;
 
-/// Declares each alias, with the `check-cfg` that lets rustc know it.
+/// Refuses a target atomix does not build for, whatever its OS: another architecture, 32-bit
+/// pointers, or big-endian; on a supported one, declares each alias, with the `check-cfg` that lets
+/// rustc know it.
 fn main() {
+    let cfg = |name: &str| env::var(format!("CARGO_CFG_TARGET_{name}")).unwrap_or_default();
+    let (arch, pointer_width, endian) = (cfg("ARCH"), cfg("POINTER_WIDTH"), cfg("ENDIAN"));
+    // A big-endian `aarch64_be` target's architecture is `aarch64` too.
+    if !matches!(arch.as_str(), "aarch64" | "x86_64") || pointer_width != "64" || endian != "little"
+    {
+        // One line: cargo ends an instruction at its newline.
+        println!(
+            "cargo::error=atomix builds for `aarch64` and `x86_64`, little-endian with 64-bit \
+             pointers, not for `{}`: on another target, an operation it promises as one \
+             instruction could be a compare-exchange loop, as a 64-bit add is on 32-bit x86",
+            env::var("TARGET").unwrap_or_default()
+        );
+        return;
+    }
     cfg_aliases! {
         // A 16-byte compare-exchange: aarch64's, or x86_64's `cmpxchg16b`.
         wide: { any(target_arch = "aarch64", all(target_arch = "x86_64", target_feature = "cmpxchg16b")) },
