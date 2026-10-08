@@ -47,6 +47,11 @@ color       = "0e8a16"
 description = "atomix-rs: the facade's re-exports"
 paths       = ["crates/atomix/**"]
 
+[labels."area: derive"]
+color       = "5319e7"
+description = "atomix-derive and atomix-derive-impl: the derives, and what they refuse"
+paths       = ["crates/atomix/macros/**", "crates/atomix/tests/**/derive_*"]
+
 [labels."area: docs"]
 color       = "c5def5"
 description = "The book, the READMEs and the guides"
@@ -56,6 +61,11 @@ paths       = ["docs/**", "*.md", "crates/*/README.md"]
 color       = "bfd4f2"
 description = "The workflows and their configuration"
 paths       = [".github/**"]
+
+[labels."area: performance"]
+color       = "f9d0c4"
+description = "The benchmarks and their committed runs"
+paths       = ["crates/*/benches/**"]
 
 # GitHub's first labels: types say the kind, Discussions take questions, and closing says duplicate
 # or not planned.
