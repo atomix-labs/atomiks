@@ -208,8 +208,9 @@ const fn signed_place(bits: &mut u128) -> &mut i128 {
 mod aarch64 {
     //! Core's 16-byte atomic over the cell's bits.
     //!
-    //! Compare-exchange is `casp`, or without LSE an outline call (`__aarch64_cas16_*`); with
-    //! LSE2, the load and store are `ldp` and `stp`.
+    //! Compare-exchange is `casp`; without LSE, an outline call (`__aarch64_cas16_*`) where the
+    //! target has outline atomics, as Linux's do, and an LL/SC pair elsewhere. With LSE2, the load
+    //! and store are `ldp` and `stp`.
 
     use core::sync::atomic::{AtomicU128, Ordering as CoreOrdering};
 

@@ -2,7 +2,10 @@
 //! read-modify-writes a newtype takes from its field.
 //!
 //! atomix re-exports each under its `derive` feature: depend on `atomix-rs`, not on this crate.
-//! The logic is `atomix-derive-impl`'s; this crate renders its errors as the compiler's.
+//! The logic is `atomix-derive-impl`'s; this crate renders its errors as the compiler's. It needs a
+//! nightly Rust, as [atomix's Platforms][platforms] say.
+//!
+//! [platforms]: https://docs.rs/atomix-rs/latest/atomix/#platforms
 
 #![feature(allow_internal_unstable, proc_macro_def_site, proc_macro_diagnostic)]
 #![expect(

@@ -95,10 +95,6 @@ const impl<T: ?Sized + Pointee<Metadata = usize>> PointerMetadata<T> for usize {
 
 /// The alignment of a `T` whose tail is a slice or a `str`, in bytes.
 #[cfg(wide)]
-#[expect(
-    clippy::incompatible_msrv,
-    reason = "atomix builds with its pinned nightly alone, where `align_of_val_raw` is `const`"
-)]
 #[expect(unsafe_code, reason = "reads a slice-tailed type's alignment through a pointer to none")]
 const fn tail_alignment<T: ?Sized + Pointee<Metadata = usize>>() -> usize {
     let empty = ptr::from_raw_parts::<T>(ptr::null::<()>(), 0);

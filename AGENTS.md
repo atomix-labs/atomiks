@@ -49,17 +49,18 @@ behind its feature; zerocopy's are derives on the types themselves.
 `#[derive(Atom)]` and the capabilities' derives, and
 `crates/atomix/macros/derive-impl`, `atomix-derive-impl`, its logic; the derive
 is the facade's `derive` feature. Each crate inherits its version, edition,
-licence and lints from the root `Cargo.toml`, and builds for Linux and macOS, on
-aarch64 and x86_64. `atomix-lock` is yet to be written. The book is under
-`docs/`. The toolchain, with the four targets, is the nightly
-`rust-toolchain.toml` pins, which the crates need for their nightly features.
-The CPU floor is `.cargo/config.toml`'s: x86-64-v3, LSE on aarch64 Linux, and
-the M1 on macOS. The tools are the versions `.config/mise/` pins. The justfile's
-top section holds the repository's own recipes: the loom models, the lints for
-each target and CPU, the codegen fixture's format, and Miri.
-`.github/workflows/platforms.yml` is the repository's own: the tests and the
-loom models on arm64 Linux and on macOS, arm64 and x86_64, which `check.yml`, on
-x86_64 Linux, cannot run.
+licence and lints from the root `Cargo.toml`, and builds for aarch64 and x86_64,
+little-endian with 64-bit pointers, on any OS; `atomix-core`'s build script
+refuses any other target, and CI tests Linux and macOS. `atomix-lock` is yet to
+be written. The book is under `docs/`. The toolchain, with the four targets CI
+tests, is the nightly `rust-toolchain.toml` pins, which the crates need for
+their nightly features. The CPU floor is `.cargo/config.toml`'s: x86-64-v3, LSE
+on aarch64 Linux, and the M1 on macOS. The tools are the versions
+`.config/mise/` pins. The justfile's top section holds the repository's own
+recipes: the loom models, the lints for each target and CPU, the codegen
+fixture's format, and Miri. `.github/workflows/platforms.yml` is the
+repository's own: the tests and the loom models on arm64 Linux and on macOS,
+arm64 and x86_64, which `check.yml`, on x86_64 Linux, cannot run.
 
 ## Rules
 

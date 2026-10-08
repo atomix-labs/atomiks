@@ -15,4 +15,4 @@ logo = "https://raw.githubusercontent.com/atomix-labs/atomix/main/docs/src/media
 name = "atomix"
 repository = "atomix-labs/atomix"
 runner_labels = ""
-rust_version = "1.98"
+rust_version = "1.101"

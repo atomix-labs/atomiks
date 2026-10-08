@@ -5,7 +5,7 @@ error[E0277]: `u128` has no pure-read atomic load on this target
    |                                    ^^^^ this load would be a read-modify-write: it writes the line and faults on read-only pages
    |
    = help: the trait `Load` is not implemented for `u128`
-   = note: a 128-bit load is one instruction with FEAT_LSE2 (aarch64: `-C target-cpu=neoverse-v1` or newer) or AVX (x86_64: `-C target-cpu=x86-64-v3`)
+   = note: a 128-bit load is one instruction with FEAT_LSE2 (aarch64: `-C target-cpu` of a CPU with LSE2) or AVX (x86_64: `-C target-cpu=x86-64-v3`)
    = note: to accept a load that writes the cache line, call `load_rmw`
    = help: the following other types implement trait `Load`:
              i16

@@ -18,6 +18,10 @@
 //! 16 bytes: `HEAD.compare_exchange(pushed, popped, AcqRel, Acquire)` pops a derived Treiber
 //! stack's `Head`, a top node beside a `u64` version, with `lock cmpxchg16b`, or `caspal`.
 //!
+//! atomix-core needs a nightly Rust, and builds for `aarch64` and `x86_64`, little-endian with
+//! 64-bit pointers, on any OS: [atomix's Platforms][platforms] say which nightly, and what
+//! each target has.
+//!
 //! # Examples
 //! ```
 //! use core::num::NonZero;
@@ -46,6 +50,8 @@
 //! | `arbitrary-int` | `Atom`, `AtomOrd`, `FieldBitwise` and `FieldAdd` for `UInt` and `Int`      |
 //! | `deranged-05`   | `Atom`, `AtomOrd` and `From` with atomix's own for deranged 0.5's integers |
 //! | `loom`          | loom's types under `--cfg loom`; nothing without the cfg                   |
+//!
+//! [platforms]: https://docs.rs/atomix-rs/latest/atomix/#platforms
 
 // Where no atomic holds two words, no `DoubleWord` exists: its links lead to where one does.
 #![cfg_attr(
