@@ -386,6 +386,7 @@ use proc_macro::{Diagnostic, Level, Span, TokenStream};
 /// ```
 /// # extern crate atomix_core as atomix;
 /// # use atomix_derive::Atom;
+/// # #[cfg(any(target_arch = "aarch64", target_feature = "cmpxchg16b"))] {
 /// use core::ptr::NonNull;
 ///
 /// use atomix::Atom;
@@ -421,6 +422,7 @@ use proc_macro::{Diagnostic, Level, Span, TokenStream};
 /// assert_eq!(repr.second, target.as_ptr(), "and the second as it is");
 /// let repr = Link { next: Some(source), readers: 3 }.to_repr();
 /// assert_eq!((repr.first, repr.second), (source.as_ptr(), 3), "the count beside the pointer");
+/// # }
 /// ```
 ///
 /// ## Storing a Pointer Enum
