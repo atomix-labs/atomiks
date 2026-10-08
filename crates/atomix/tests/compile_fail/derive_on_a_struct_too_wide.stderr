@@ -1,4 +1,4 @@
-error[E0080]: evaluation panicked: `$CRATE::Wide` needs 129 bits, but an atomic word holds at most 128: narrow a field, or split the value
+error[E0080]: evaluation panicked: `Wide` needs 129 bits, but an atomic word holds at most 128: narrow a field, or split the value
  --> tests/compile_fail/derive_on_a_struct_too_wide.rs:7:8
   |
 6 | #[derive(Clone, Copy, Atom)]

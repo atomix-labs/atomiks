@@ -288,14 +288,14 @@ pub const fn narrowest_width(bits: u32) -> u32 {
     }
 }
 
-/// Refuses the build of `T`, a value `bits` bits wide, where no integer an atomic cell holds on
-/// this target is that wide.
+/// Refuses the build of the type `name`, a value `bits` bits wide, where no integer an atomic cell
+/// holds on this target is that wide.
 ///
 /// # Panics
 /// Where `bits` is past the widest such integer; in a constant, the build fails instead.
 #[inline]
 #[track_caller]
-pub const fn assert_width<T: ?Sized>(bits: u32) {
+pub const fn assert_width(name: &str, bits: u32) {
     if bits <= WIDEST {
         return;
     }
@@ -304,11 +304,11 @@ pub const fn assert_width<T: ?Sized>(bits: u32) {
     } else {
         " bits, but an atomic word holds at most 64: build with `-C target-cpu=x86-64-v2` or newer for 128"
     };
-    refuse_width::<T>(bits, &Message::new().text(advice));
+    refuse_width(name, bits, &Message::new().text(advice));
 }
 
-/// Refuses the build of `T`, a value `bits` bits wide, where the integer `R` it states as its repr
-/// is narrower.
+/// Refuses the build of the type `name`, a value `bits` bits wide, where the integer `R` it states
+/// as its repr is narrower.
 ///
 /// `R` is the integer stated, whether or not an atomic cell on this target holds it: where none
 /// does, [`assert_width`] refuses the type, and this, which reads `R`'s width alone, does not
@@ -318,7 +318,7 @@ pub const fn assert_width<T: ?Sized>(bits: u32) {
 /// Where `bits` is past `R`'s width; in a constant, the build fails instead.
 #[inline]
 #[track_caller]
-pub const fn assert_stated_width<T: ?Sized, R>(bits: u32) {
+pub const fn assert_stated_width<R>(name: &str, bits: u32) {
     // An integer's bits are its bytes', of which it has at most 16.
     let repr_bits = match u32::try_from(size_of::<R>()) {
         Ok(bytes) => bytes.saturating_mul(u8::BITS),
@@ -329,21 +329,33 @@ pub const fn assert_stated_width<T: ?Sized, R>(bits: u32) {
     }
     let has = Message::new().text("` has ").number(u128::from(repr_bits));
     let has = has.as_str();
-    refuse_width::<T>(
+    refuse_width(
+        name,
         bits,
         &Message::new().text(" bits, but its repr `").name(type_name::<R>(), has.len()).text(has),
     );
 }
 
-/// Refuses the build of `T`, a value `bits` bits wide, with `advice` after the bits: "`Wide` needs
-/// 129 bits, but …".
+/// [`assert_stated_width`], for `T`, an instance of a type with parameters, which only
+/// [`type_name`] names whole, its arguments among them.
 ///
-/// Cuts `T`'s name short where the rest would not fit after it.
+/// # Panics
+/// As [`assert_stated_width`].
+#[inline]
 #[track_caller]
-const fn refuse_width<T: ?Sized>(bits: u32, advice: &Message) -> ! {
+pub const fn assert_instance_stated_width<T: ?Sized, R>(bits: u32) {
+    assert_stated_width::<R>(type_name::<T>(), bits);
+}
+
+/// Refuses the build of the type `name`, a value `bits` bits wide, with `advice` after the bits:
+/// "`Wide` needs 129 bits, but …".
+///
+/// Cuts the name short where the rest would not fit after it.
+#[track_caller]
+const fn refuse_width(name: &str, bits: u32, advice: &Message) -> ! {
     let rest = Message::new().text("` needs ").number(u128::from(bits)).text(advice.as_str());
     let rest = rest.as_str();
-    refuse(&Message::new().text("`").name(type_name::<T>(), rest.len()).text(rest))
+    refuse(&Message::new().text("`").name(name, rest.len()).text(rest))
 }
 
 /// How many bits a fieldless enum needs for its `discriminants`, read as `i128`s.
@@ -636,9 +648,10 @@ mod tests {
     use super::{
         EnumLayout, EnumValidity, FieldLayout, PARTIAL, PackedField, PackedLayout, PackedValidity,
         PointerEnumLayout, PointerEnumValidity, PointerEnumVariant, SelectRepr, SelectValidity,
-        TOTAL, TOTAL_ZERO_NICHE, ValidityCode, Width, ZERO_NICHE, ZERO_VALID, assert_stated_width,
-        assert_width, discriminant_range, discriminant_validity_code, discriminant_width,
-        from_bits, from_bits_unchecked, narrowest_width, to_bits,
+        TOTAL, TOTAL_ZERO_NICHE, ValidityCode, Width, ZERO_NICHE, ZERO_VALID,
+        assert_instance_stated_width, assert_stated_width, assert_width, discriminant_range,
+        discriminant_validity_code, discriminant_width, from_bits, from_bits_unchecked,
+        narrowest_width, to_bits,
     };
     use crate::primitive::Primitive;
     use crate::range::ReprRange;
@@ -889,9 +902,6 @@ mod tests {
         assert_eq!(narrowest_width(64), 64, "64 bits");
     }
 
-    /// The value whose width each test checks, and which a refusal names.
-    struct Wide;
-
     #[cfg(wide)]
     #[test]
     fn a_target_with_128_bit_atomics_selects_and_holds_128_bits() {
@@ -899,7 +909,7 @@ mod tests {
         selects::<i128, i128>();
         assert_eq!(narrowest_width(65), 128, "past 64, in 128");
         assert_eq!(narrowest_width(200), 128, "and past 128, the widest, which is refused");
-        assert_width::<Wide>(128);
+        assert_width("Wide", 128);
     }
 
     #[cfg(not(wide))]
@@ -916,7 +926,7 @@ mod tests {
         expected = "Wide` needs 65 bits, but an atomic word holds at most 64: build with `-C target-cpu=x86-64-v2` or newer for 128"
     )]
     fn a_value_wider_than_this_targets_atomic_words_is_refused() {
-        assert_width::<Wide>(65);
+        assert_width("Wide", 65);
     }
 
     #[test]
@@ -924,19 +934,25 @@ mod tests {
         expected = "Wide` needs 129 bits, but an atomic word holds at most 128: narrow a field, or split the value"
     )]
     fn a_value_wider_than_any_atomic_word_is_refused() {
-        assert_width::<Wide>(129);
+        assert_width("Wide", 129);
     }
 
     #[test]
     fn a_value_as_wide_as_its_stated_repr_is_held() {
-        assert_stated_width::<Wide, u64>(64);
-        assert_stated_width::<Wide, u128>(128);
+        assert_stated_width::<u64>("Wide", 64);
+        assert_stated_width::<u128>("Wide", 128);
     }
 
     #[test]
     #[should_panic(expected = "Wide` needs 65 bits, but its repr `u64` has 64")]
     fn a_value_wider_than_its_stated_repr_is_refused() {
-        assert_stated_width::<Wide, u64>(65);
+        assert_stated_width::<u64>("Wide", 65);
+    }
+
+    #[test]
+    #[should_panic(expected = "Option<u8>` needs 65 bits, but its repr `u64` has 64")]
+    fn an_instance_wider_than_its_stated_repr_is_refused_by_its_whole_name() {
+        assert_instance_stated_width::<Option<u8>, u64>(65);
     }
 
     #[test]

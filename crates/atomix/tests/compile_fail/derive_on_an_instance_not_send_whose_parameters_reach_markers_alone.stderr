@@ -1,0 +1,93 @@
+error[E0277]: `*const u8` cannot be sent between threads safely
+  --> tests/compile_fail/derive_on_an_instance_not_send_whose_parameters_reach_markers_alone.rs:16:25
+   |
+16 |     let _ = Atomic::new(Handle::<*const u8> { index: 0, live: false, kind: PhantomData });
+   |             ----------- ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `*const u8` cannot be sent between threads safely
+   |             |
+   |             required by a bound introduced by this call
+   |
+   = help: within `Handle<*const u8>`, the trait `Send` is not implemented for `*const u8`
+help: the trait `Atom` is conditionally implemented for `Handle<T>`
+  --> tests/compile_fail/derive_on_an_instance_not_send_whose_parameters_reach_markers_alone.rs:8:23
+   |
+ 8 | #[derive(Clone, Copy, Atom)]
+   |                       ^^^^
+   |                       |
+   |                       unsatisfied requirement introduced here: `Handle<_>: Send`
+   |                       unsatisfied requirement introduced here: `Handle<_>: Sync`
+note: required because it appears within the type `PhantomData<*const u8>`
+  --> $RUST/core/src/marker.rs
+   |
+   | pub struct PhantomData<T: PointeeSized>;
+   |            ^^^^^^^^^^^
+note: required because it appears within the type `Handle<*const u8>`
+  --> tests/compile_fail/derive_on_an_instance_not_send_whose_parameters_reach_markers_alone.rs:12:5
+   |
+ 9 | struct Handle<T> {
+...
+12 |     kind: PhantomData<T>,
+   |     ^^^^^^^^^^^^^^^^^^^^ required by this field
+note: required for `Handle<*const u8>` to implement `Atom`
+  --> tests/compile_fail/derive_on_an_instance_not_send_whose_parameters_reach_markers_alone.rs:9:8
+   |
+ 8 | #[derive(Clone, Copy, Atom)]
+   |                       ----
+   |                       |
+   |                       type parameter would need to implement `Atom`
+   |                       in this derive macro expansion
+ 9 | struct Handle<T> {
+   |        ^^^^^^
+note: required by a bound in `atomix::Atomic::<T>::new`
+  --> $WORKSPACE/crates/atomix-core/src/atomic/mod.rs
+   |
+   | impl<T: Atom> Atomic<T> {
+...
+   |     pub const fn new(value: T) -> Self
+   |     where
+   |         T: const Atom,
+   |            ^^^^^^^^^^ required by this bound in `Atomic::<T>::new`
+   = note: this error originates in the derive macro `Atom` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: `*const u8` cannot be sent between threads safely
+  --> tests/compile_fail/derive_on_an_instance_not_send_whose_parameters_reach_markers_alone.rs:16:13
+   |
+16 |     let _ = Atomic::new(Handle::<*const u8> { index: 0, live: false, kind: PhantomData });
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `*const u8` cannot be sent between threads safely
+   |
+   = help: within `Handle<*const u8>`, the trait `Send` is not implemented for `*const u8`
+help: the trait `Atom` is conditionally implemented for `Handle<T>`
+  --> tests/compile_fail/derive_on_an_instance_not_send_whose_parameters_reach_markers_alone.rs:8:23
+   |
+ 8 | #[derive(Clone, Copy, Atom)]
+   |                       ^^^^
+   |                       |
+   |                       unsatisfied requirement introduced here: `Handle<_>: Send`
+   |                       unsatisfied requirement introduced here: `Handle<_>: Sync`
+note: required because it appears within the type `PhantomData<*const u8>`
+  --> $RUST/core/src/marker.rs
+   |
+   | pub struct PhantomData<T: PointeeSized>;
+   |            ^^^^^^^^^^^
+note: required because it appears within the type `Handle<*const u8>`
+  --> tests/compile_fail/derive_on_an_instance_not_send_whose_parameters_reach_markers_alone.rs:12:5
+   |
+ 9 | struct Handle<T> {
+...
+12 |     kind: PhantomData<T>,
+   |     ^^^^^^^^^^^^^^^^^^^^ required by this field
+note: required for `Handle<*const u8>` to implement `Atom`
+  --> tests/compile_fail/derive_on_an_instance_not_send_whose_parameters_reach_markers_alone.rs:9:8
+   |
+ 8 | #[derive(Clone, Copy, Atom)]
+   |                       ----
+   |                       |
+   |                       type parameter would need to implement `Atom`
+   |                       in this derive macro expansion
+ 9 | struct Handle<T> {
+   |        ^^^^^^
+note: required by a bound in `atomix::Atomic`
+  --> $WORKSPACE/crates/atomix-core/src/atomic/mod.rs
+   |
+   | pub struct Atomic<T: Atom> {
+   |                      ^^^^ required by this bound in `Atomic`
+   = note: this error originates in the derive macro `Atom` (in Nightly builds, run with -Z macro-backtrace for more info)

@@ -230,7 +230,7 @@ impl<'a> EnumCode<'a> {
         );
         let (layout, promises) =
             (self.layout.local(self.layout.name()), self.layout.local(&self.promises));
-        let validity = if !self.layout.is_generic() {
+        let validity = if !self.layout.is_laid_out_per_instance() {
             self.layout.selected_validity(&quote!(#promises.code()))
         } else if matches!(
             self.variants.first(),
@@ -431,7 +431,7 @@ impl<'a> EnumCode<'a> {
             decoded.push(checked);
             decoded_unchecked.push(unchecked);
         }
-        let to_tagged_self = if self.layout.is_generic() {
+        let to_tagged_self = if self.layout.is_laid_out_per_instance() {
             quote!(<Self as #atomix::Atom>::to_tagged_repr)
         } else {
             quote!(#private::to_tagged_repr::<Self>)

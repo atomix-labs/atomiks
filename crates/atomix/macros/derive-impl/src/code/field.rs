@@ -79,7 +79,8 @@ impl<'a> PackedFields<'a> {
         let atomix = self.atomix;
         let offsets = iter::once(self.start.clone())
             .chain(self.placements.iter().map(|before| quote!(#before.next_offset())));
-        self.iter().zip(offsets).map(move |((Field { ty, .. }, placement), offset)| {
+        self.iter().zip(offsets).map(move |((field, placement), offset)| {
+            let ty = laid_out_type(field);
             let placed = quote! {
                 #atomix::__private::PackedField::new(<#ty as #atomix::Atom>::REPRS, #offset)
             };
@@ -97,7 +98,8 @@ impl<'a> PackedFields<'a> {
     /// with its layout.
     pub(super) fn validity(&self) -> TokenStream {
         let atomix = self.atomix;
-        let fields = self.iter().map(|(Field { ty, .. }, placement)| {
+        let fields = self.iter().map(|(field, placement)| {
+            let ty = laid_out_type(field);
             quote!(.with_field::<<#ty as #atomix::Atom>::Validity>(#placement.layout()))
         });
         quote!(#atomix::__private::PackedValidity::EMPTY #(#fields)*)
@@ -159,28 +161,30 @@ impl<'a> PackedFields<'a> {
 
     /// The bits of `value`, `field`'s, as its repr's.
     ///
-    /// A concrete field's go through `__private`, whose bound is `const`, so the crate that derives
-    /// needs no `const_trait_impl`; a generic field's through the trait, the only calls that keep
-    /// the impl's `[const]` bound.
+    /// A field laid out alike in every instance, a marker among them, goes through `__private`,
+    /// whose bound is `const`, so the crate that derives needs no `const_trait_impl`; any other
+    /// through the trait, the only calls that keep the impl's `[const]` bound.
     fn field_bits<V: ToTokens>(&self, field: &Field, value: &V) -> TokenStream {
-        let (atomix, ty) = (self.atomix, &field.ty);
-        if field.is_generic {
+        let atomix = self.atomix;
+        let ty = codec_type(field);
+        if field.is_laid_out_per_instance() {
             let repr = quote!(<<#ty as #atomix::Atom>::Repr as #atomix::ExactBits>);
             quote!(#repr::to_bits(<#ty as #atomix::Atom>::to_repr(#value)))
         } else {
             // Located at the field's type, where a refusal of its repr points.
-            located_at(quote!(#atomix::__private::to_bits::<#ty>(#value)), ty.span())
+            located_at(quote!(#atomix::__private::to_bits::<#ty>(#value)), field.ty.span())
         }
     }
 
-    /// The value of `field` whose repr's bits are `bits`: `__private`'s `codec` where it is
-    /// concrete, else `Atom`'s `method` of the repr they are, as [`field_bits`](Self::field_bits)
-    /// says.
+    /// The value of `field` whose repr's bits are `bits`: `__private`'s `codec` where it is laid
+    /// out alike in every instance, else `Atom`'s `method` of the repr they are, as
+    /// [`field_bits`](Self::field_bits) says.
     pub(super) fn field_value(
         &self, field: &Field, bits: &TokenStream, codec: &str, method: &str,
     ) -> TokenStream {
-        let (atomix, ty) = (self.atomix, &field.ty);
-        if field.is_generic {
+        let atomix = self.atomix;
+        let ty = codec_type(field);
+        if field.is_laid_out_per_instance() {
             let method = Ident::new(method, Span::call_site());
             let repr = quote!(<<#ty as #atomix::Atom>::Repr as #atomix::Primitive>);
             quote!(<#ty as #atomix::Atom>::#method(#repr::from_bits(#bits)))
@@ -188,6 +192,30 @@ impl<'a> PackedFields<'a> {
             let codec = Ident::new(codec, Span::call_site());
             quote!(#atomix::__private::#codec::<#ty>(#bits))
         }
+    }
+}
+
+/// The type a layout reads `field`'s reprs of: its own, or a marker's, `PhantomData<()>`, which are
+/// every marker's, so that a constant names no parameter a marker does.
+///
+/// A marker's codecs take its own type, through `__private`, whose `const` bound every marker
+/// meets, so the crate that derives needs no `const_trait_impl` for one that names a parameter.
+fn laid_out_type(field: &Field) -> TokenStream {
+    if field.is_marker() {
+        quote!(::core::marker::PhantomData<()>)
+    } else {
+        field.ty.to_token_stream()
+    }
+}
+
+/// The type `field`'s codecs convert: its own, or for a marker core's `PhantomData` of what the
+/// field's value infers, so a field written `PhantomData` that is no marker, by an alias or
+/// `use … as`, fails to build rather than take a marker's layout.
+fn codec_type(field: &Field) -> TokenStream {
+    if field.is_marker() {
+        quote!(::core::marker::PhantomData<_>)
+    } else {
+        field.ty.to_token_stream()
     }
 }
 

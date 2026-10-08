@@ -110,27 +110,32 @@ use proc_macro::{Diagnostic, Level, Span, TokenStream};
 ///   one but zero, else `ZeroValid` or `ZeroNiche` as zero is one or not.
 /// - A packed struct or an enum with fields is `Total` where every pattern of its fields' bits
 ///   decodes and they fill the repr, else `ZeroValid`, `ZeroNiche` or `Partial`, by what its fields
-///   promise of zero. With parameters, a packed struct is `ZeroValid` where each field's zero
-///   decodes, an enum with fields where it states its discriminants and a unit variant's is 0,
-///   stated or implied; else `Partial`.
+///   promise of zero. With a parameter outside its markers, a packed struct is `ZeroValid` where
+///   each field's zero decodes, and with parameters, an enum with fields where it states its
+///   discriminants and a unit variant's is 0, stated or implied; else `Partial`.
 /// - A pointer word is what its fields promise, its pointers among them, and a pointer enum what
 ///   the variant its zero repr holds promises of zero; with parameters, a pointer word is
 ///   `ZeroValid` where each field's zero decodes, and a pointer enum where its first variant is a
 ///   unit and none states a discriminant; else `Partial`.
 ///
 /// # Generic Types
-/// A crate enables `#![feature(const_trait_impl)]` where the impl converts a field that names one
-/// of the type's parameters, a lifetime too: a newtype's field that holds the value, or any field
-/// of a packed struct or an enum with fields, a `PhantomData` among them. The impl converts such a
-/// field through `Atom`'s methods, `const` only where the field's impl is, and every other field
-/// through functions bounded `const`; so a newtype whose markers alone name its parameters, a
-/// zero-width struct, or a type whose `const` parameter no field names needs no gate.
+/// A crate enables `#![feature(const_trait_impl)]` where the impl converts a field, other than a
+/// `PhantomData` marker, that names one of the type's parameters, a lifetime too: a newtype's field
+/// that holds the value, or a field of a packed struct or an enum with fields. The impl converts
+/// such a field through `Atom`'s methods, `const` only where the field's impl is, and every other
+/// field, each marker among them, through functions bounded `const`, since every marker's impl is
+/// `const`, whatever it marks; so a newtype, a packed struct or an enum with fields whose markers
+/// alone name its parameters, or whose `const` parameter no field names, needs no gate, nor does a
+/// zero-width struct. A pointer word or a pointer enum that has parameters needs the gate even
+/// where its markers alone name them, since its impl reaches its tagged repr through `Atom`'s
+/// methods.
 ///
-/// A newtype takes its field's layout in each instance; a packed struct or an enum with fields that
-/// has parameters states its repr, which each instance is checked against as it is built, but a
-/// pointer word or a pointer enum, whose repr is its pointer's, need not state one: a pointer word
-/// of one pointer is one word in each instance, unless it states `repr = u128`. A fieldless enum
-/// takes no parameters.
+/// A newtype takes its field's layout in each instance, and a packed struct whose parameters no
+/// field other than a marker names is laid out once, as one without parameters is. Any other packed
+/// struct, or an enum with fields, that has parameters states its repr, which each instance is
+/// checked against as it is built, but a pointer word or a pointer enum, whose repr is its
+/// pointer's, need not state one: a pointer word of one pointer is one word in each instance,
+/// unless it states `repr = u128`. A fieldless enum takes no parameters.
 ///
 /// # Threads
 /// An `Atomic` may cross threads, so the type must be `Send` and `Sync`: checked beside the impl,

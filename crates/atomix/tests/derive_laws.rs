@@ -26,6 +26,7 @@ mod testing;
 mod tests {
     use core::any::type_name;
     use core::fmt::Debug;
+    use core::marker::PhantomData;
     use core::num::NonZero;
     use core::ptr::NonNull;
 
@@ -34,7 +35,7 @@ mod tests {
     use proptest::prelude::{Just, Strategy, any, prop_oneof};
     use proptest::sample::select;
     use proptest::test_runner::TestCaseError;
-    use proptest::{option, proptest};
+    use proptest::{option, prop_assert_eq, proptest};
 
     use crate::testing::atom::{repr_and_validity_are, with_every_byte};
     use crate::testing::law::{
@@ -167,6 +168,33 @@ mod tests {
         side: Side,
         /// Whether it may fill.
         live: bool,
+    }
+
+    /// A quote of some venue `V`, which a marker alone names: laid out as `Quote` is, in constants,
+    /// with no repr stated and no gate.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+    struct VenueQuote<V> {
+        /// How many.
+        quantity: u32,
+        /// Which side.
+        side: Side,
+        /// Whether it may fill.
+        live: bool,
+        /// The venue.
+        venue: PhantomData<fn() -> V>,
+    }
+
+    /// Two halves of a word on some venue `V`, which a marker alone names: every pattern of their
+    /// bits decodes and they fill the repr, so laid out once, it is `Total`, as one laid out per
+    /// instance could not promise.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+    struct VenueHalves<V> {
+        /// The low half.
+        low: u16,
+        /// The high half.
+        high: u16,
+        /// The venue.
+        venue: PhantomData<fn() -> V>,
     }
 
     /// A turn by thirds: its top field, a third, wraps both ways, so its range is every repr up to
@@ -844,6 +872,7 @@ mod tests {
         repr_and_validity_are::<TableSlot, *mut (), ZeroValid>();
         repr_and_validity_are::<GuardedLink, *mut Linked, ZeroNiche>();
         repr_and_validity_are::<GenericLink<u64>, *mut GenericNode<u64>, ZeroValid>();
+        repr_and_validity_are::<VenueHalves<u8>, u32, Total>();
         assert_eq!(Turn::REPRS, ReprRange::new(0, 0x1FF), "every repr up to the third's end");
         assert_eq!(Offer::Closed.to_repr(), 2, "and `Closed` above the side's 0 and 1");
     }
@@ -885,6 +914,7 @@ mod tests {
     #[test]
     fn none_takes_a_spare_repr_of_each_derived_value() {
         none_laws!(Side, Sign, Swing, Scale, Marker, Id, Flags, Step, SignedStep, Quote, Order);
+        none_laws!(VenueQuote<u8>, VenueQuote<()>);
         none_laws!(OwnerId, PriceMove, Lock<OwnerId>);
         none_laws!(NonZeroByte, Third, Turn, Entry, Slot, Reading, Fill, Offer, Shift, Signal);
         none_laws!(Wrap<Sign>, Pair<u32, bool>, Pair<NonZero<u8>, Sign>, Lock<u8>, Lock<Sign>);
@@ -941,7 +971,17 @@ mod tests {
             value_obeys_the_laws(step, bits)?;
             value_obeys_the_laws(signed, bits)?;
             value_obeys_the_laws(quote, bits)?;
+            let Quote { quantity, side, live } = quote;
+            let venue_quote = VenueQuote::<u8> { quantity, side, live, venue: PhantomData };
+            value_obeys_the_laws(venue_quote, bits)?;
+            prop_assert_eq!(
+                venue_quote.to_repr(),
+                quote.to_repr(),
+                "a marker's parameter moves no field"
+            );
             value_obeys_the_laws(halves, bits)?;
+            let Halves { low, high } = halves;
+            value_obeys_the_laws(VenueHalves::<u8> { low, high, venue: PhantomData }, bits)?;
             value_obeys_the_laws(order, bits)?;
             value_obeys_the_laws(entry, bits)?;
         }

@@ -1,4 +1,4 @@
-error[E0080]: evaluation panicked: `$CRATE::Quote` needs 33 bits, but its repr `u32` has 32
+error[E0080]: evaluation panicked: `Quote` needs 33 bits, but its repr `u32` has 32
  --> tests/compile_fail/derive_with_a_repr_narrower_than_the_fields.rs:7:15
   |
 6 | #[derive(Clone, Copy, Atom)]

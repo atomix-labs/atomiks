@@ -155,7 +155,7 @@ impl<'a> WordCode<'a> {
         let layout = self.layout.local(self.layout.name());
         let below_top = quote!(#atomix::__private::Reach<false>);
         let tag_sites = self.tag_fields.placements().iter().map(|placement| {
-            let reach = if self.layout.is_generic() {
+            let reach = if self.layout.is_laid_out_per_instance() {
                 below_top.clone()
             } else {
                 let alias = self.layout.repr_alias();
@@ -226,7 +226,7 @@ impl<'a> WordCode<'a> {
             format!("tag fields {named} need")
         };
         let check = quote!(#layout.assert_tags_fit::<#ident #ty_generics, #pointer>(#tags_named));
-        if self.layout.is_generic() { check } else { located_at(check, ident.span()) }
+        if self.layout.is_laid_out_per_instance() { check } else { located_at(check, ident.span()) }
     }
 
     /// `Atom` for the word, beside `items`: of its pointers' repr, or that beside an integer word,
@@ -237,7 +237,7 @@ impl<'a> WordCode<'a> {
         let private = quote!(#atomix::__private);
         let pointer = &self.pointer_type;
         let layout = self.layout.local(self.layout.name());
-        let validity = if self.layout.is_generic() {
+        let validity = if self.layout.is_laid_out_per_instance() {
             self.word.fields().collect::<Vec<_>>().into_iter().rev().fold(
                 quote!(#atomix::validity::ZeroValid),
                 |beside, Field { ty, .. }| {
@@ -271,7 +271,7 @@ impl<'a> WordCode<'a> {
                 quote!(<#private::Words<{ #word_count }> as #private::SelectPointerWordRepr<#pointer_repr>>::Repr)
             },
         };
-        let named = if self.layout.is_generic() {
+        let named = if self.layout.is_laid_out_per_instance() {
             repr.clone()
         } else {
             self.layout.repr_alias().to_token_stream()
@@ -329,7 +329,7 @@ impl<'a> WordCode<'a> {
         let tag_bits =
             self.tag_fields.encode(self.tag_fields.fields().iter().map(|field| field_read(field)));
         let to_tagged = self.pointer_codec("to_tagged_repr", "to_tagged_repr");
-        let to_tagged_self = if self.layout.is_generic() {
+        let to_tagged_self = if self.layout.is_laid_out_per_instance() {
             quote!(<Self as #atomix::Atom>::to_tagged_repr)
         } else {
             quote!(#private::to_tagged_repr::<Self>)

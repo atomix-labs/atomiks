@@ -11,17 +11,20 @@ use super::member_in_expansion;
 use super::projection::{FieldSite, ProjectionCode};
 use crate::model::{Field, Implementor};
 
-/// `Atom` for the packed struct of `fields`, in a block beside its layout: constants where it has
-/// no parameters, else a function each instance evaluates, the repr it states checked there; and
-/// its projection, the struct `fields()` lends, beside it.
+/// `Atom` for the packed struct of `fields`, in a block beside its layout: constants where every
+/// instance is laid out alike, else a function each instance evaluates, the repr it states checked
+/// there; and its projection, the struct `fields()` lends, beside it.
 ///
-/// A concrete struct's validity is what its fields promise of their bits; a generic one's, which
-/// no constant knows the layout of, promises only that zero decodes, and only where each field's
-/// does.
+/// A struct laid out once has the validity its fields promise of their bits; one laid out per
+/// instance, which no constant knows the layout of, promises only that zero decodes, and only where
+/// each field's does.
 pub(crate) fn packed(implementor: &Implementor, fields: &[Field], def_site: Span) -> TokenStream {
     let atomix = &implementor.atomix;
     let packed = PackedFields::new(atomix, fields, "placement", def_site);
     let mut layout = LayoutCode::new(implementor, def_site);
+    if !fields.iter().any(Field::is_laid_out_per_instance) {
+        layout = layout.laid_out_once();
+    }
     for (placement, placed) in packed.placed() {
         layout.push(placement, quote!(#atomix::__private::PackedField), placed);
     }
@@ -92,7 +95,7 @@ fn field_sites<'a>(
     let atomix = packed.atomix();
     let (name, alias) = (layout.name(), layout.repr_alias());
     packed.placements().iter().map(move |placement| {
-        let reach = if layout.is_generic() {
+        let reach = if layout.is_laid_out_per_instance() {
             quote!(#atomix::__private::Reach<false>)
         } else {
             let reaches_top = quote!(#atomix::__private::reaches_top::<#alias>(#placement));

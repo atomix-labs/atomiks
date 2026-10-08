@@ -1,5 +1,5 @@
 //! The code of a value laid out over packed fields: the locals that make its layout, constants
-//! beside its impl where the type has no parameters, else what a function evaluates for each
+//! beside its impl where every instance is laid out alike, else what a function evaluates for each
 //! instance, checked against the repr the type states; and the impl that reaches them.
 //!
 //! A value stored as a pointer has one more local, its pointees' alignment, which its code and its
@@ -38,6 +38,8 @@ pub(super) struct LayoutCode<'a> {
     /// The name of the function that lays an instance stored as a pointer out for its code, its
     /// alignment beside, after checking it, `lay_out_checked`.
     lay_out_checked: Ident,
+    /// Whether each instance lays itself out: where the type has parameters, unless laid out once.
+    is_laid_out_per_instance: bool,
 }
 
 /// What an `Atom` impl holds beside its layout's locals.
@@ -50,9 +52,11 @@ pub(super) struct AtomImpl {
     pub(super) validity: TokenStream,
     /// Its range, an expression of the locals as [`LayoutCode::local`] names them.
     pub(super) reprs: TokenStream,
-    /// Each check of the layout, an expression of the locals, located where its refusal points: a
-    /// constant beside a concrete type's impl, a statement of a generic one's `lay_out`, or, for a
-    /// value stored as a pointer, whose checks read the alignment, of its `lay_out_checked`.
+    /// Each check of the layout, an expression of the locals, located where its refusal points.
+    ///
+    /// It is a constant beside the impl of a type laid out once, a statement of `lay_out` for one
+    /// laid out per instance, or, for a value stored as a pointer, whose checks read the
+    /// alignment, of its `lay_out_checked`.
     pub(super) checks: Vec<TokenStream>,
     /// `to_repr` and the rest of its conversions.
     pub(super) conversions: TokenStream,
@@ -86,7 +90,13 @@ impl<'a> LayoutCode<'a> {
             repr_alias: name("Repr"),
             lay_out: name("lay_out"),
             lay_out_checked: name("lay_out_checked"),
+            is_laid_out_per_instance: !implementor.generics.params.is_empty(),
         }
+    }
+
+    /// The layout of a type whose parameters reach markers alone: laid out once, in constants.
+    pub(super) fn laid_out_once(self) -> Self {
+        Self { is_laid_out_per_instance: false, ..self }
     }
 
     /// The layout of a value stored as a pointer, whose pointer fields are of `pointers`: its
@@ -126,22 +136,21 @@ impl<'a> LayoutCode<'a> {
         self.locals.push((name.clone(), ty, value));
     }
 
-    /// The repr the type states where it has parameters, so that each instance lays itself out in
-    /// it; `None` where the type has none, so that its locals are constants.
+    /// The repr the type states where each instance lays itself out in it; `None` where every
+    /// instance is laid out alike, so that its locals are constants.
     ///
-    /// Parse refuses a packed struct or an enum with fields that has parameters but states no
+    /// Parse refuses a packed struct or an enum with fields laid out per instance that states no
     /// repr: no constant names an instance's layout, so no repr could be selected from it.
     pub(super) fn instance_repr(&self) -> Option<&'a Ident> {
-        self.implementor.repr.as_ref().filter(|_| self.is_generic())
+        self.implementor.repr.as_ref().filter(|_| self.is_laid_out_per_instance())
     }
 
-    /// Whether the type has parameters, so that each instance lays itself out, and its locals are
-    /// what `lay_out` computes for it rather than constants.
-    pub(super) fn is_generic(&self) -> bool {
-        !self.implementor.generics.params.is_empty()
+    /// Whether its locals are what `lay_out` computes for each instance, rather than constants.
+    pub(super) const fn is_laid_out_per_instance(&self) -> bool {
+        self.is_laid_out_per_instance
     }
 
-    /// Each local as a constant beside the impl, for a type without parameters.
+    /// Each local as a constant beside the impl, for a type laid out once.
     pub(super) fn constants(&self) -> TokenStream {
         let constants =
             self.locals.iter().map(|(name, ty, value)| quote!(const #name: #ty = #value;));
@@ -233,7 +242,7 @@ impl<'a> LayoutCode<'a> {
     /// from the instance's layout, the alignment too where it is stored as a pointer, those named
     /// in `unused` as `_`.
     pub(super) fn bind(&self, unused: &[&Ident]) -> Option<TokenStream> {
-        self.is_generic().then(|| {
+        self.is_laid_out_per_instance().then(|| {
             let alignment = self.alignment.is_some().then_some(&self.alignment_name);
             let names = self
                 .locals
@@ -248,19 +257,20 @@ impl<'a> LayoutCode<'a> {
 
     /// `Atom` for the type, as `atom` says, in a block beside its items and the layout.
     ///
-    /// A concrete type's locals are constants, each check a constant beside the impl, and its repr
-    /// the narrowest that holds the layout, or the one stated, or its pointer's; a generic type's
-    /// are what a function evaluates for each instance, which runs each check, and refuses one
-    /// wider than the repr stated. A generic value stored as a pointer runs its checks, which read
-    /// its alignment, in a second function, which only its conversions call. The type is checked
-    /// or bounded `Send` and `Sync`, as `thread_checks` and `thread_bounds` say, and each generic
-    /// one of `fields` bounded as `field_bounds` says. The block names its items at the derive's
+    /// The locals of a type laid out once are constants, each check a constant beside the impl,
+    /// and its repr the narrowest that holds the layout, or the one stated, or its pointer's; those
+    /// of a type laid out per instance are what a function evaluates for each instance, which runs
+    /// each check, and refuses one wider than the repr stated. Such a value stored as a pointer
+    /// runs its checks, which read its alignment, in a second function, which only its
+    /// conversions call. The type is checked or bounded `Send` and `Sync`, as `thread_checks`
+    /// and `thread_bounds` say, and each of `fields` laid out per instance bounded as
+    /// `field_bounds` says. The block names its items at the derive's
     /// definition site, so that the user's code reaches none of them.
     pub(super) fn implement<'f, F>(&self, fields: F, atom: AtomImpl) -> TokenStream
     where
         F: IntoIterator<Item = &'f Field, IntoIter: Clone>,
     {
-        let Implementor { ident, generics, atomix, repr: stated, .. } = self.implementor;
+        let Implementor { ident, generics, atomix, .. } = self.implementor;
         let AtomImpl { items, repr, validity, reprs, mut checks, conversions } = atom;
         let (alias, layout) = (&self.repr_alias, &self.name);
         let fields = fields.into_iter();
@@ -269,8 +279,8 @@ impl<'a> LayoutCode<'a> {
         let (impl_generics, ty_generics, _) = generics.split_for_impl();
         let instance = quote!(#ident #ty_generics);
         let private = quote!(#atomix::__private);
-        // A value stored as a pointer's tag width, and its alignment: a concrete type's constant,
-        // or the expression a generic one's impl evaluates.
+        // A value stored as a pointer's tag width, and its alignment: a constant where it is laid
+        // out once, or the expression the impl evaluates for each instance.
         let pointer_constants = |alignment: &TokenStream| match &repr {
             ImplRepr::Pointer { tag_width, .. } => Some(quote! {
                 const TAG_WIDTH: ::core::primitive::u32 = #tag_width;
@@ -278,13 +288,15 @@ impl<'a> LayoutCode<'a> {
             }),
             ImplRepr::Integer => None,
         };
-        // A generic type's repr: its pointer's, or the integer it states, checked to hold each
-        // instance; parse refuses one laid out in an integer that states none.
-        let generic_repr = match &repr {
-            ImplRepr::Pointer { ty, .. } => self.is_generic().then(|| (ty.clone(), None)),
+        // The repr of a type laid out per instance: its pointer's, or the integer it states,
+        // checked to hold each instance; parse refuses one laid out in an integer that states none.
+        let per_instance_repr = match &repr {
+            ImplRepr::Pointer { ty, .. } => {
+                self.is_laid_out_per_instance().then(|| (ty.clone(), None))
+            },
             ImplRepr::Integer => self.instance_repr().map(|stated| {
                 let integer = quote!(::core::primitive::#stated);
-                checks.push(repr::stated_width_assertion(
+                checks.push(repr::instance_stated_width_assertion(
                     atomix, &instance, &integer, stated, &width,
                 ));
                 let integer_check = repr::integer_check(self.implementor, stated);
@@ -292,7 +304,7 @@ impl<'a> LayoutCode<'a> {
                 (quote!(#alias), Some(quote!(type #alias = #selected; #integer_check)))
             }),
         };
-        if let Some((repr_type, repr_items)) = generic_repr {
+        if let Some((repr_type, repr_items)) = per_instance_repr {
             let functions = self.lay_out_functions(&checks, || {
                 field_bounds(atomix, fields.clone(), BoundSite::LayOut)
             });
@@ -324,20 +336,9 @@ impl<'a> LayoutCode<'a> {
             |alignment| quote!(const #alignment_name: #private::PointeeAlignment = #alignment;),
         );
         let pointer_constants = pointer_constants(&quote!(#alignment_name));
-        let (repr_type, repr_checks) = match (repr, stated) {
-            (ImplRepr::Pointer { ty, .. }, _) => (ty, None),
-            (ImplRepr::Integer, None) => {
-                (repr::narrowest(atomix, &width), Some(repr::width_check(atomix, ident, &width)))
-            },
-            (ImplRepr::Integer, Some(stated)) => {
-                let integer_check = repr::integer_check(self.implementor, stated);
-                let integer = quote!(::core::primitive::#stated);
-                let width_check = repr::stated_width_check(atomix, ident, &integer, stated, &width);
-                (repr::selected_from(atomix, stated), Some(quote!(#integer_check #width_check)))
-            },
-        };
+        let (repr_type, repr_checks) = self.constant_repr(repr, &width);
         let constants = self.constants();
-        let where_clause = where_clause(self.implementor, []);
+        let where_clause = where_clause(self.implementor, thread_bounds(self.implementor, fields));
         quote! {
             #thread_checks
             const _: () = {
@@ -348,7 +349,7 @@ impl<'a> LayoutCode<'a> {
                 #repr_checks
                 #(const _: () = #checks;)*
                 #[automatically_derived]
-                const unsafe impl #atomix::Atom for #ident #where_clause {
+                const unsafe impl #impl_generics #atomix::Atom for #instance #where_clause {
                     type Repr = #alias;
                     type Validity = #validity;
                     const REPRS: #atomix::ReprRange<#alias> = #reprs;
@@ -359,10 +360,31 @@ impl<'a> LayoutCode<'a> {
         }
     }
 
-    /// The local `name`: itself where the type has no parameters, else as `lay_out` computes it
-    /// for the instance `Self` is.
+    /// The repr of a type laid out once, `width` bits wide, and the checks that refuse it where
+    /// that repr cannot hold it: its pointer's, with none, or the narrowest integer that holds
+    /// `width` bits, or the one stated.
+    fn constant_repr(
+        &self, repr: ImplRepr, width: &TokenStream,
+    ) -> (TokenStream, Option<TokenStream>) {
+        let Implementor { ident, atomix, repr: stated, .. } = self.implementor;
+        match (repr, stated) {
+            (ImplRepr::Pointer { ty, .. }, _) => (ty, None),
+            (ImplRepr::Integer, None) => {
+                (repr::narrowest(atomix, width), Some(repr::width_check(atomix, ident, width)))
+            },
+            (ImplRepr::Integer, Some(stated)) => {
+                let integer_check = repr::integer_check(self.implementor, stated);
+                let integer = quote!(::core::primitive::#stated);
+                let width_check = repr::stated_width_check(atomix, ident, &integer, stated, width);
+                (repr::selected_from(atomix, stated), Some(quote!(#integer_check #width_check)))
+            },
+        }
+    }
+
+    /// The local `name`: itself where the layout's locals are constants, else as `lay_out`
+    /// computes it for the instance `Self` is.
     pub(super) fn local(&self, name: &Ident) -> TokenStream {
-        if self.is_generic() { self.instance_local(name) } else { quote!(#name) }
+        if self.is_laid_out_per_instance() { self.instance_local(name) } else { quote!(#name) }
     }
 
     /// The local `name` of the instance `Self` is, as the function that lays it out computes it.

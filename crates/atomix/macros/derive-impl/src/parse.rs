@@ -177,11 +177,17 @@ fn shape(
             if fields.iter().any(|field| field.is_pointer) {
                 Some(pointer_word_shape(fields, generics, repr, errors))
             } else {
-                repr_stated_where_generic(
+                // A parameter that a field other than a marker names lays each instance out apart.
+                let per_instance_parameter = generics.params.iter().find(|param| {
+                    let mut laid_out =
+                        fields.iter().filter(|field| field.is_laid_out_per_instance());
+                    laid_out.any(|field| is_named_in(param, field.ty.to_token_stream()))
+                });
+                repr_stated_where_laid_out_per_instance(
                     Shape::Packed(fields),
-                    generics,
+                    per_instance_parameter.map(Spanned::span),
                     repr,
-                    "a struct of several fields",
+                    "a struct of several fields derives `Atom` with a parameter outside its markers",
                     errors,
                 )
             }
@@ -200,21 +206,19 @@ fn shape(
     }
 }
 
-/// `shape`, that of a type of `generics` whose instances lay out their fields by their reprs, and
-/// which `#[atom]` states `repr` of; `None` where it has parameters but states no repr, which adds
-/// an error naming the shape as `noun`.
-fn repr_stated_where_generic(
-    shape: Shape, generics: &Generics, repr: Option<&Ident>, noun: &str,
+/// `shape`, that of a type `#[atom]` states `repr` of; `None` where its instances lay out their
+/// fields by reprs only each knows, as the parameters at `per_instance_parameters_span` make them,
+/// but it states no repr, which adds an error there that `refused`, the shape and what it derives
+/// with, opens.
+fn repr_stated_where_laid_out_per_instance(
+    shape: Shape, per_instance_parameters_span: Option<Span>, repr: Option<&Ident>, refused: &str,
     errors: &mut Vec<DeriveError>,
 ) -> Option<Shape> {
-    if generics.params.is_empty() || repr.is_some() {
+    let Some(span) = per_instance_parameters_span.filter(|_| repr.is_none()) else {
         return Some(shape);
-    }
+    };
     errors.push(
-        DeriveError::new(
-            generics.span(),
-            format!("{noun} derives `Atom` with parameters only where it states its repr"),
-        )
+        DeriveError::new(span, format!("{refused} only where it states its repr"))
         .note(
             None,
             "each instance lays its fields out by their reprs, so how many bits it needs is known only once they are"
@@ -231,12 +235,11 @@ fn repr_stated_where_generic(
 /// A struct's shape, by how many of its fields are not `PhantomData` markers: packed where several
 /// are, a newtype where one is, zero-width where none is. A unit struct is zero-width.
 fn struct_shape(fields: Vec<Field>, is_unit: bool) -> Shape {
-    if fields.iter().filter(|field| !is_marker(&field.ty)).count() > 1 {
+    if fields.iter().filter(|field| !field.is_marker()).count() > 1 {
         return Shape::Packed(fields);
     }
     let mut fields = fields.into_iter().peekable();
-    let markers_before: Vec<Field> =
-        iter::from_fn(|| fields.next_if(|field| is_marker(&field.ty))).collect();
+    let markers_before: Vec<Field> = iter::from_fn(|| fields.next_if(Field::is_marker)).collect();
     let Some(value) = fields.next() else {
         return Shape::ZeroWidth(if is_unit {
             ZeroWidth::Unit
@@ -286,7 +289,14 @@ fn enum_shape(
             return Some(pointer_enum_shape(EnumWithFields { integer, variants }, repr, errors));
         }
         let shape = Shape::EnumWithFields(EnumWithFields { integer, variants });
-        return repr_stated_where_generic(shape, generics, repr, "an enum with fields", errors);
+        let per_instance_parameters_span = (!generics.params.is_empty()).then(|| generics.span());
+        return repr_stated_where_laid_out_per_instance(
+            shape,
+            per_instance_parameters_span,
+            repr,
+            "an enum with fields derives `Atom` with parameters",
+            errors,
+        );
     }
     if !generics.params.is_empty() {
         errors.push(
@@ -382,7 +392,7 @@ fn fields(
             refuse_atom_other_than_ptr(&field, errors);
             refuse_default(&field, errors);
             refuse_place(&field.ty, &member, owner, projects, errors);
-            let is_generic = names_a_parameter(field.ty.to_token_stream(), generics);
+            let is_generic = names_a_parameter(&field.ty.to_token_stream(), generics);
             let is_marked = field.attrs.iter().any(is_pointer_mark);
             let is_pointer = is_marked || is_pointer(&field.ty);
             let is_wide_pointer = pointee(&field.ty).is_some_and(is_unsized);
@@ -819,15 +829,18 @@ fn refuse_atom(attrs: &[Attribute], place: &str, note: &str, errors: &mut Vec<De
     }));
 }
 
-/// Whether `tokens`, a type, name one of `generics`' parameters: a lifetime, a type or a const.
-fn names_a_parameter(tokens: TokenStream, generics: &Generics) -> bool {
+/// Whether `tokens`, a type, names one of `generics`' parameters, a lifetime, a type or a const.
+fn names_a_parameter(tokens: &TokenStream, generics: &Generics) -> bool {
+    generics.params.iter().any(|param| is_named_in(param, tokens.clone()))
+}
+
+/// Whether `param` is named in `tokens`, a type.
+fn is_named_in(param: &GenericParam, tokens: TokenStream) -> bool {
     let mut after_apostrophe = false;
     tokens.into_iter().any(|token| {
         let named = match &token {
-            TokenTree::Group(group) => names_a_parameter(group.stream(), generics),
-            TokenTree::Ident(ident) => {
-                generics.params.iter().any(|param| is_named(param, ident, after_apostrophe))
-            },
+            TokenTree::Group(group) => is_named_in(param, group.stream()),
+            TokenTree::Ident(ident) => is_named(param, ident, after_apostrophe),
             TokenTree::Punct(_) | TokenTree::Literal(_) => false,
         };
         after_apostrophe = matches!(&token, TokenTree::Punct(punct) if punct.as_char() == '\'');
@@ -845,7 +858,7 @@ fn is_named(param: &GenericParam, ident: &Ident, is_lifetime: bool) -> bool {
 }
 
 /// Whether `ty` is written as a `PhantomData`.
-fn is_marker(ty: &Type) -> bool {
+pub(crate) fn is_marker(ty: &Type) -> bool {
     last_segment(ty).is_some_and(|segment| segment.ident == "PhantomData")
 }
 
@@ -1133,7 +1146,7 @@ mod tests {
         assert_eq!(
             refusals(quote! { struct Pair<A, B> { first: A, second: B } }),
             [
-                "a struct of several fields derives `Atom` with parameters only where it states its repr"
+                "a struct of several fields derives `Atom` with a parameter outside its markers only where it states its repr"
             ],
             "with none stated"
         );
@@ -1141,6 +1154,17 @@ mod tests {
             packed(quote! { #[atom(repr = u64)] struct Pair<A, B> { first: A, second: B } }),
             ["first", "second"],
             "but read where it does"
+        );
+    }
+
+    #[test]
+    fn a_struct_of_several_fields_whose_parameters_reach_markers_alone_states_no_repr() {
+        assert_eq!(
+            packed(quote! {
+                struct Handle<T, const N: usize> { index: u32, live: bool, kind: PhantomData<T> }
+            }),
+            ["index", "live", "kind"],
+            "laid out once, as one without parameters is"
         );
     }
 

@@ -6,6 +6,7 @@ use proc_macro2::Span;
 use syn::{Attribute, Expr, Generics, Ident, Member, Path, Type, Visibility};
 
 use crate::errors::DeriveError;
+use crate::parse::is_marker;
 
 /// A type's definition, as read: what an impl for the type names, and its shape, or each error
 /// that refuses the type.
@@ -226,7 +227,7 @@ pub(crate) struct Field {
     /// Its type, with the user's spans.
     pub(crate) ty: Type,
     /// Whether its type names a parameter of the type, so that an impl bounds it in its where
-    /// clause rather than checking it once beside the impl.
+    /// clause rather than checking it once beside the impl, unless it is a marker.
     pub(crate) is_generic: bool,
     /// Whether it is written as a raw pointer, a `NonNull` or an `Option` of one, or
     /// marked `#[atom(ptr)]`, which need not be `Send` or `Sync`: `Atom` promises such a
@@ -235,4 +236,19 @@ pub(crate) struct Field {
     /// Whether it is written as a pointer to a value of no size known at compile time, a slice, a
     /// `str` or a trait object, whose pointer holds its metadata beside its address: two words.
     pub(crate) is_wide_pointer: bool,
+}
+
+impl Field {
+    /// Whether it is written as a `PhantomData` marker, whose reprs are every marker's, whatever
+    /// it marks: a layout reads them as `PhantomData<()>`'s, so a marker that names a parameter
+    /// leaves the layout the same for every instance.
+    pub(crate) fn is_marker(&self) -> bool {
+        is_marker(&self.ty)
+    }
+
+    /// Whether each instance lays it out by reprs only that instance knows: it names a parameter,
+    /// and is no marker.
+    pub(crate) fn is_laid_out_per_instance(&self) -> bool {
+        self.is_generic && !self.is_marker()
+    }
 }
