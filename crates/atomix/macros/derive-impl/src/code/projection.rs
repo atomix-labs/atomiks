@@ -341,7 +341,7 @@ fn field_index(index: usize) -> Literal {
 
 /// A field's name, or its index in a tuple struct, as a doc or a message shows it: `type` for
 /// `r#type`.
-pub(super) fn member_shown(member: &Member) -> String {
+pub(crate) fn member_shown(member: &Member) -> String {
     match member {
         Member::Named(named) => named.unraw().to_string(),
         Member::Unnamed(unnamed) => unnamed.index.to_string(),
@@ -349,7 +349,7 @@ pub(super) fn member_shown(member: &Member) -> String {
 }
 
 /// `tokens` as source writes them, for a doc: `RangedI8<-5, 5>`, not `RangedI8 < - 5 , 5 >`.
-fn shown<T: ToTokens>(tokens: &T) -> String {
+pub(crate) fn shown<T: ToTokens>(tokens: &T) -> String {
     let mut text = String::new();
     // Whether the token before joins the next without a space: an opening `<`, a path's `::`, a
     // reference's `&`, a lifetime's `'`, a sign.

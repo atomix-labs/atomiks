@@ -1,4 +1,4 @@
-error[E0080]: evaluation panicked: `Option<atomix_core::ranged::RangedU8<0, u8::MAX>>`: its range holds every repr of `u8`, so `None` has none left: use a type with a spare repr, such as `NonZero<u64>`
+error[E0080]: evaluation panicked: `Option<atomix_core::ranged::RangedU8<0, u8::MAX>>`: its range holds every repr of `u8`, so `None` has none left: each `Option` takes a spare repr, so hold a type with one per `Option`, such as `NonZero<u64>` for one, or `RangedU64<2>` for two
  --> src/atom/option.rs
   |
   |             None => <T::Repr as Primitive>::from_bits(const { none_repr::<T>() }),

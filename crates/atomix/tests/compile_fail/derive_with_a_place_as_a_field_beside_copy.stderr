@@ -1,0 +1,33 @@
+error: the field `seq` is an atomic, a place, but `Pair` derives a value that one atomic holds
+ --> tests/compile_fail/derive_with_a_place_as_a_field_beside_copy.rs:8:10
+  |
+8 |     seq: AtomicU64,
+  |          ^^^^^^^^^
+  |
+  = note: a value is `Copy`, and copying a place would split it in two
+  = help: make the field its value, `seq: u64`, and share `Atomic<Pair>`, whose `fields().seq` is the field's place; or keep the atomics side by side in a struct that derives no `Atom`
+
+error[E0204]: the trait `Copy` cannot be implemented for this type
+ --> tests/compile_fail/derive_with_a_place_as_a_field_beside_copy.rs:7:8
+  |
+6 | #[derive(Clone, Copy, Atom)]
+  |                 ---- in this derive macro expansion
+7 | struct Pair {
+  |        ^^^^
+8 |     seq: AtomicU64,
+  |     -------------- this field does not implement `Copy`
+
+error[E0277]: the trait bound `atomix::Atomic<u64>: Clone` is not satisfied
+ --> tests/compile_fail/derive_with_a_place_as_a_field_beside_copy.rs:8:5
+  |
+6 | #[derive(Clone, Copy, Atom)]
+  |          ----- in this derive macro expansion
+7 | struct Pair {
+8 |     seq: AtomicU64,
+  |     ^^^^^^^^^^^^^^ the trait `Clone` is not implemented for `atomix::Atomic<u64>`
+  |
+note: required by a bound in `std::clone::AssertParamIsClone`
+ --> $RUST/core/src/clone.rs
+  |
+  | pub struct AssertParamIsClone<T: Clone + PointeeSized> {
+  |                                  ^^^^^ required by this bound in `AssertParamIsClone`

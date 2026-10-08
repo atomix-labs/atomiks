@@ -13,6 +13,9 @@ pub(crate) struct Input {
     pub(crate) implementor: Implementor,
     /// Its shape, or why it is refused.
     pub(crate) shape: Result<Shape, Vec<DeriveError>>,
+    /// Whether a field is written as a place, an atomic, a cell or a lock, which no `Copy` type
+    /// holds: a refused type's stub impl then asks `Copy` so that it raises no error of its own.
+    pub(crate) holds_a_place: bool,
 }
 
 /// What an impl for the type names: the type, and what `#[atom(…)]` states of it.

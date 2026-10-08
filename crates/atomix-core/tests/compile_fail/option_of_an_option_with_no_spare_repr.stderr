@@ -1,10 +1,10 @@
-error[E0080]: evaluation panicked: `Option<u64>`: its range holds every repr of `u64`, so `None` has none left: each `Option` takes a spare repr, so hold a type with one per `Option`, such as `NonZero<u64>` for one, or `RangedU64<2>` for two
+error[E0080]: evaluation panicked: `Option<core::option::Option<core::num::nonzero::NonZero<u64>>>`: its range holds every repr of `u64`, so `None` has none left: each `Option` takes a spare repr, so hold a type with one per `Option`, such as `NonZero<u64>` for one, or `RangedU64<2>` for two
  --> src/atom/option.rs
   |
   |             None => <T::Repr as Primitive>::from_bits(const { none_repr::<T>() }),
-  |                                                               ^^^^^^^^^^^^^^^^ evaluation of `atomix_core::atom::option::<impl atomix_core::Atom for std::option::Option<u64>>::to_repr::{constant#0}` failed inside this call
+  |                                                               ^^^^^^^^^^^^^^^^ evaluation of `atomix_core::atom::option::<impl atomix_core::Atom for std::option::Option<std::option::Option<std::num::NonZero<u64>>>>::to_repr::{constant#0}` failed inside this call
   |
-note: inside `atomix_core::atom::option::none_repr::<u64>`
+note: inside `atomix_core::atom::option::none_repr::<Option<NonZero<u64>>>`
  --> src/atom/option.rs
   |
   | /         refuse_option::<T>(
@@ -14,7 +14,7 @@ note: inside `atomix_core::atom::option::none_repr::<u64>`
   | |                 .text(rest),
   | |         );
   | |_________^
-note: inside `atomix_core::atom::option::refuse_option::<u64>`
+note: inside `atomix_core::atom::option::refuse_option::<Option<NonZero<u64>>>`
  --> src/atom/option.rs
   |
   | /     refuse(
@@ -31,9 +31,3 @@ note: erroneous constant encountered
   |
   |             None => <T::Repr as Primitive>::from_bits(const { none_repr::<T>() }),
   |                                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-note: the above error was encountered while instantiating `fn atomix_core::atom::option::<impl Atom for Option<u64>>::to_repr`
- --> src/atomic/mod.rs
-  |
-  |             cell: T::Validity::wrap::<T::Repr>(value.to_repr().into_cell()),
-  |                                                ^^^^^^^^^^^^^^^

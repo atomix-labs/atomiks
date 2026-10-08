@@ -1,0 +1,49 @@
+error[E0277]: `atomix_core::Atomic<u64>` is an atomic, a place a value lives in, not a value an atomic holds
+ --> tests/compile_fail/atomic_of_an_atomic.rs:7:13
+  |
+7 | fn read(_: &Atomic<AtomicU64>) {}
+  |             ^^^^^^^^^^^^^^^^^ an atomic, not a value
+  |
+  = help: the trait `atomix_core::__private::NotAnAtomic` is not implemented for `atomix_core::Atomic<u64>`
+  = note: store its value instead, `Atomic<u64>` for `Atomic<AtomicU64>`; for a place inside a value, derive `Atom` for a struct of values, whose atomic lends each field as a place through `fields()`
+  = note: to keep several atomics together, put them side by side in a struct; to point at one, store a `NonNull` to it
+help: the trait `Atom` is conditionally implemented for `atomix_core::Atomic<T>`
+ --> src/atomic/mod.rs
+  |
+  | / unsafe impl<T: Atom> Atom for Atomic<T>
+  | | where
+  | |     Self: NotAnAtomic,
+  | |___________-----------^
+  |             |
+  |             unsatisfied requirement introduced here: `atomix_core::Atomic<_>: atomix_core::__private::NotAnAtomic`
+  = note: required for `atomix_core::Atomic<u64>` to implement `Atom`
+note: required by a bound in `atomix_core::Atomic`
+ --> src/atomic/mod.rs
+  |
+  | pub struct Atomic<T: Atom> {
+  |                      ^^^^ required by this bound in `Atomic`
+
+error[E0277]: `atomix_core::Atomic<u64>` is an atomic, a place a value lives in, not a value an atomic holds
+  --> tests/compile_fail/atomic_of_an_atomic.rs:10:14
+   |
+10 | static SLOT: Atomic<Option<AtomicU64>> = Atomic::new(None);
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^ an atomic, not a value
+   |
+   = help: the trait `atomix_core::__private::NotAnAtomic` is not implemented for `atomix_core::Atomic<u64>`
+   = note: store its value instead, `Atomic<u64>` for `Atomic<AtomicU64>`; for a place inside a value, derive `Atom` for a struct of values, whose atomic lends each field as a place through `fields()`
+   = note: to keep several atomics together, put them side by side in a struct; to point at one, store a `NonNull` to it
+help: the trait `Atom` is conditionally implemented for `Option<T>`
+  --> src/atom/option.rs
+   |
+   | const unsafe impl<T: [const] Atom> Atom for Option<T> {
+   | ^^^^^^^^^^^^^^^^^^^^^------------^^^^^^^^^^^^^^^^^^^^
+   |                      |
+   |                      unsatisfied requirement introduced here: `_: Atom`
+   = note: required for `atomix_core::Atomic<u64>` to implement `Atom`
+   = note: 1 redundant requirement hidden
+   = note: required for `Option<atomix_core::Atomic<u64>>` to implement `Atom`
+note: required by a bound in `atomix_core::Atomic`
+  --> src/atomic/mod.rs
+   |
+   | pub struct Atomic<T: Atom> {
+   |                      ^^^^ required by this bound in `Atomic`

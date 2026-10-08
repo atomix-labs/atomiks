@@ -1,9 +1,10 @@
-//! A pointer word or a pointer enum held in an atomic inside the node it points to, as a lock-free
-//! list's, stack's and table's nodes hold their links: each derives, since its layout reads its
-//! pointer's tag width and never the node's alignment, which the node's own layout, holding the
-//! atomic, decides. Two threads run a Harris list's delete, a mark then an unlink, beside an insert
-//! before the node deleted, and a Treiber stack's pushes beside its pops, under Miri with strict
-//! provenance, reading every node through the pointer decoded.
+//! A pointer word, a pointer enum or a newtype over a pointer held in an atomic inside the node it
+//! points to, as a lock-free list's, stack's, queue's and table's nodes hold their links: each
+//! derives, since its layout reads its pointer's tag width and never the node's alignment, which
+//! the node's own layout, holding the atomic, decides. Two threads run a Harris list's delete, a
+//! mark then an unlink, beside an insert before the node deleted, and a Treiber stack's pushes
+//! beside its pops, under Miri with strict provenance, reading every node through the pointer
+//! decoded.
 
 #![cfg(feature = "derive")]
 // Loom's `Atomic::new` is not `const`, and its cells exist only inside a model.
@@ -206,6 +207,19 @@ mod tests {
     }
 
     impl<T> Copy for GenericSlot<T> {}
+
+    /// A queue's node, which holds the link to the next: a newtype over a pointer in its own
+    /// pointee, whose impl bounds the pointer by what it assumes of it.
+    struct QueueNode {
+        /// Its value.
+        value: u64,
+        /// The next node, where there is one.
+        next: Atomic<Option<NextNode>>,
+    }
+
+    /// The link to a queue's next node.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Atom)]
+    struct NextNode(NonNull<QueueNode>);
 
     /// A pointer to `node`, boxed on the heap, whose provenance is the box's; `free` frees it.
     fn boxed<T>(node: T) -> NonNull<T> {
@@ -497,6 +511,20 @@ mod tests {
         };
         let held = (bucket.value, node(next).value, node(next).slot.load(Acquire));
         assert_eq!(held, (1, 2, inline), "the value, read through the bucket's slot");
+        free(last);
+    }
+
+    #[test]
+    fn a_newtype_over_a_pointer_in_its_own_pointee_links_nodes() {
+        let last = boxed(QueueNode { value: 2, next: Atomic::new(None) });
+        let first = QueueNode { value: 1, next: Atomic::new(None) };
+        first.next.store(Some(NextNode(last)), Release);
+        let Some(NextNode(next)) = first.next.load(Acquire) else {
+            panic!("the next node, not {:?}", first.next.load(Acquire));
+        };
+        let values = (first.value, node(next).value, node(next).next.load(Acquire));
+        assert_eq!(values, (1, 2, None), "the value, read through the first node's link");
+        assert_eq!(size_of::<Atomic<Option<NextNode>>>(), size_of::<usize>(), "a pointer's word");
         free(last);
     }
 }

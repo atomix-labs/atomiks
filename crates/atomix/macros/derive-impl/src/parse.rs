@@ -3,7 +3,7 @@
 use core::iter;
 
 use proc_macro2::{Span, TokenStream, TokenTree};
-use quote::ToTokens;
+use quote::{ToTokens, quote};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::{
@@ -12,6 +12,7 @@ use syn::{
     Path, PathArguments, PathSegment, Token, Type, TypeGroup, TypeParen, parse2,
 };
 
+use crate::code::{member_shown, shown};
 use crate::errors::DeriveError;
 use crate::model::{
     EnumRepr, EnumWithFields, Field, Fieldless, Implementor, Input, Newtype, PointerWord, Shape,
@@ -30,6 +31,7 @@ pub(crate) fn input(input: TokenStream) -> Result<Input, Vec<DeriveError>> {
         })?;
     let mut errors = Vec::new();
     let (atomix, repr) = options(&attrs, &mut errors);
+    let holds_a_place = holds_a_place(&data);
     let shape = shape(&ident, &generics, &attrs, repr.as_ref(), data, &mut errors);
     let projection_attributes =
         attrs.iter().filter(|attr| is_projection_attribute(attr)).cloned().collect();
@@ -38,7 +40,7 @@ pub(crate) fn input(input: TokenStream) -> Result<Input, Vec<DeriveError>> {
         Some(shape) if errors.is_empty() => Ok(shape),
         _ => Err(errors),
     };
-    Ok(Input { implementor, shape })
+    Ok(Input { implementor, shape, holds_a_place })
 }
 
 /// Whether a packed struct's projection takes `attr` as the struct does: `#[non_exhaustive]`,
@@ -164,7 +166,8 @@ fn shape(
     match data {
         Data::Struct(data) => {
             let is_unit = matches!(data.fields, Fields::Unit);
-            let shape = struct_shape(fields(data.fields, generics, errors), is_unit);
+            let fields = fields(data.fields, generics, Owner::Struct(ident), errors);
+            let shape = struct_shape(fields, is_unit);
             let Shape::Packed(fields) = shape else {
                 return Some(shape);
             };
@@ -265,7 +268,12 @@ fn enum_shape(
             .into_iter()
             .map(|variant| Variant {
                 is_written_as_unit: matches!(variant.fields, Fields::Unit),
-                fields: fields(variant.fields, generics, errors),
+                fields: fields(
+                    variant.fields,
+                    generics,
+                    Owner::Variant(ident, &variant.ident),
+                    errors,
+                ),
                 discriminant: variant.discriminant.map(|(_, discriminant)| discriminant),
                 ident: variant.ident,
             })
@@ -354,17 +362,23 @@ fn disagreement(stated: &Ident, named: &Ident, stored_as: &str, agreeing: &str) 
     .help(format!("state `repr = {agreeing}`, or leave it out"))
 }
 
-/// Each of `fields`, a struct's or a variant's, as an impl reads it; each refusal adds an error.
+/// Each of `fields`, those of `owner`, a struct or a variant, as an impl reads it; each refusal
+/// adds an error.
 ///
 /// A field marked `#[atom(ptr)]` is a pointer its type does not show.
-fn fields(fields: Fields, generics: &Generics, errors: &mut Vec<DeriveError>) -> Vec<Field> {
+fn fields(
+    fields: Fields, generics: &Generics, owner: Owner<'_>, errors: &mut Vec<DeriveError>,
+) -> Vec<Field> {
     let members: Vec<Member> = fields.members().collect();
+    let projects = matches!(owner, Owner::Struct(_))
+        && fields.iter().filter(|field| !is_marker(&field.ty)).count() > 1;
     fields
         .into_iter()
         .zip(members)
         .map(|(field, member)| {
             refuse_atom_other_than_ptr(&field, errors);
             refuse_default(&field, errors);
+            refuse_place(&field.ty, &member, owner, projects, errors);
             let is_generic = names_a_parameter(field.ty.to_token_stream(), generics);
             let is_marked = field.attrs.iter().any(is_pointer_mark);
             let is_pointer = is_marked || is_pointer(&field.ty);
@@ -382,6 +396,158 @@ fn fields(fields: Fields, generics: &Generics, errors: &mut Vec<DeriveError>) ->
             }
         })
         .collect()
+}
+
+/// What holds a field: a struct, or a variant of an enum, each named.
+#[derive(Clone, Copy, Debug)]
+enum Owner<'a> {
+    /// The struct of this name.
+    Struct(&'a Ident),
+    /// The variant named second, of the enum named first.
+    Variant(&'a Ident, &'a Ident),
+}
+
+/// The atomics a field may be written as with no type argument, each beside the value it holds:
+/// atomix's aliases, and core's, loom's and portable-atomic's types of those names.
+const CONCRETE_ATOMICS: [(&str, &str); 17] = [
+    ("AtomicBool", "bool"),
+    ("AtomicU8", "u8"),
+    ("AtomicU16", "u16"),
+    ("AtomicU32", "u32"),
+    ("AtomicU64", "u64"),
+    ("AtomicU128", "u128"),
+    ("AtomicUsize", "usize"),
+    ("AtomicI8", "i8"),
+    ("AtomicI16", "i16"),
+    ("AtomicI32", "i32"),
+    ("AtomicI64", "i64"),
+    ("AtomicI128", "i128"),
+    ("AtomicIsize", "isize"),
+    ("AtomicF16", "f16"),
+    ("AtomicF32", "f32"),
+    ("AtomicF64", "f64"),
+    ("AtomicF128", "f128"),
+];
+
+/// The atomics a field may be written as with a type argument: atomix's and core's `Atomic<T>`
+/// and `AtomicPtr<T>`, atomix's `AtomicField<P>`, and crossbeam's `AtomicCell<T>`.
+const GENERIC_ATOMICS: [&str; 4] = ["Atomic", "AtomicField", "AtomicCell", "AtomicPtr"];
+
+/// The cells a field may be written as, each with a type argument: core's, whose names the other
+/// crates' take.
+const CELLS: [&str; 6] =
+    ["Cell", "RefCell", "OnceCell", "LazyCell", "UnsafeCell", "SyncUnsafeCell"];
+
+/// The locks a field may be written as, each with a type argument: std's, whose names the other
+/// crates' take.
+const LOCKS: [&str; 5] = ["Mutex", "RwLock", "OnceLock", "LazyLock", "ReentrantLock"];
+
+/// A field's type written as a place: an atomic, a cell or a lock, which shared code changes in
+/// place, and which no `Copy` value holds.
+#[derive(Debug)]
+struct Place {
+    /// The name it is written as: `AtomicU64`, `Cell`.
+    name: String,
+    /// Whether it is an atomic, rather than a cell or a lock.
+    is_atomic: bool,
+    /// The value it holds, where its name tells: `u64` of `AtomicU64`, `T` of `Cell<T>`.
+    value: Option<TokenStream>,
+}
+
+/// `ty` as a place, where its path's last segment names one: an atomic alias with no type
+/// argument, or a generic atomic, a cell or a lock with one.
+///
+/// It reads the name as written, as `is_pointer` does: an alias of one, or one renamed by
+/// `use … as`, reads as no place, and a value of the user's that takes one of these names reads as
+/// one, so a field that holds such a value names it otherwise, by an alias or `use … as`.
+fn place(ty: &Type) -> Option<Place> {
+    let segment = last_segment(ty)?;
+    let name = segment.ident.to_string();
+    let argument = type_argument(segment);
+    if let Some((_, value)) = CONCRETE_ATOMICS.iter().find(|(atomic, _)| segment.ident == atomic) {
+        let value = Ident::new(value, segment.ident.span());
+        return segment.arguments.is_none().then(|| Place {
+            name,
+            is_atomic: true,
+            value: Some(value.into_token_stream()),
+        });
+    }
+    let argument = argument?;
+    if GENERIC_ATOMICS.iter().any(|atomic| segment.ident == atomic) {
+        let value = match name.as_str() {
+            "AtomicPtr" => Some(quote!(*mut #argument)),
+            "AtomicField" => None,
+            _ => Some(argument.to_token_stream()),
+        };
+        return Some(Place { name, is_atomic: true, value });
+    }
+    let is_cell = CELLS.iter().any(|cell| segment.ident == cell);
+    let is_lock = LOCKS.iter().any(|lock| segment.ident == lock);
+    (is_cell || is_lock).then(|| Place {
+        name,
+        is_atomic: false,
+        value: Some(argument.to_token_stream()),
+    })
+}
+
+/// Whether a field of `data` is written as a place, which no `Copy` type holds, so that a stub
+/// impl asks `Copy` only where the type has it.
+fn holds_a_place(data: &Data) -> bool {
+    let is_place = |field: &FieldDefinition| place(&field.ty).is_some();
+    match data {
+        Data::Struct(data) => data.fields.iter().any(is_place),
+        Data::Enum(data) => data.variants.iter().flat_map(|variant| &variant.fields).any(is_place),
+        Data::Union(_) => false,
+    }
+}
+
+/// Adds an error where `ty`, the type of `owner`'s field `member`, is written as a place: a
+/// derived atom is a value one atomic holds, and its fields are values. `projects` says whether
+/// `owner` is a struct whose atomic lends each field's place.
+fn refuse_place(
+    ty: &Type, member: &Member, owner: Owner<'_>, projects: bool, errors: &mut Vec<DeriveError>,
+) {
+    let Some(Place { name: written, is_atomic, value }) = place(ty) else {
+        return;
+    };
+    let name = member_shown(member);
+    let (field, atom) = match owner {
+        Owner::Struct(ident) => (format!("the field `{name}`"), ident),
+        Owner::Variant(ident, variant) => (format!("`{variant}`'s field `{name}`"), ident),
+    };
+    let kind = if is_atomic { "an atomic".to_owned() } else { format!("a `{written}`") };
+    let field_advice = match (value.as_ref().map(shown), member) {
+        (Some(value), Member::Named(_)) => format!("make the field its value, `{name}: {value}`"),
+        (Some(value), Member::Unnamed(_)) => format!("make the field its value, `{value}`"),
+        (None, _) => "make the field its value".to_owned(),
+    };
+    let sharing_advice = if projects {
+        format!(", and share `Atomic<{atom}>`, whose `fields().{name}` is the field's place")
+    } else {
+        format!(", and share `Atomic<{atom}>`")
+    };
+    let places = if is_atomic { "atomics" } else { "places" };
+    let refusal = DeriveError::new(
+        ty.span(),
+        format!("{field} is {kind}, a place, but `{atom}` derives a value that one atomic holds"),
+    )
+    .note(None, "a value is `Copy`, and copying a place would split it in two".to_owned());
+    // A value of the user's may take a cell's or a lock's name, as a grid's `Cell<T>`.
+    let refusal = if is_atomic {
+        refusal
+    } else {
+        refusal.note(
+            None,
+            format!(
+                "a value of your own named `{written}` derives once the field names it otherwise, \
+                 by an alias or `use … as`"
+            ),
+        )
+    };
+    errors.push(refusal.help(format!(
+        "{field_advice}{sharing_advice}; or keep the {places} side by side in a struct that \
+         derives no `Atom`"
+    )));
 }
 
 /// Whether `attr` is `#[atom(ptr)]`, the mark of a pointer its field's type does not show.
@@ -1149,6 +1315,39 @@ mod tests {
             ["a field takes `#[atom(ptr)]` alone"],
             "or on a variant's field"
         );
+    }
+
+    #[test]
+    fn a_field_written_as_a_place_is_refused() {
+        let message = |field: &str, kind: &str, atom: &str| {
+            format!(
+                "{field} is {kind}, a place, but `{atom}` derives a value that one atomic holds"
+            )
+        };
+        assert_eq!(
+            refusals(quote! { struct Pair { seq: core::sync::atomic::AtomicU64, live: bool } }),
+            [message("the field `seq`", "an atomic", "Pair")],
+            "core's alias, by its path's last segment"
+        );
+        assert_eq!(
+            refusals(quote! { struct Seq(Atomic<u32>); }),
+            [message("the field `0`", "an atomic", "Seq")],
+            "the generic atomic, in a newtype"
+        );
+        assert_eq!(
+            refusals(quote! { enum Slot { Empty, Full { lap: Cell<u32> } } }),
+            [message("`Full`'s field `lap`", "a `Cell`", "Slot")],
+            "a cell, in a variant"
+        );
+        for value in [
+            quote! { struct Tile { number: AtomicNumber, cell: Cell } },
+            quote! { struct Tile { cell: grid::Cell, count: AtomicU64<u8> } },
+        ] {
+            assert!(
+                read(value).shape.is_ok(),
+                "a value named near a place, or with arguments no place takes"
+            );
+        }
     }
 
     #[test]

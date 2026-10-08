@@ -66,7 +66,7 @@ impl Capability {
 /// macro's definition site, where no name of the user's resolves in their place.
 #[must_use]
 pub fn expand_atom(input: TokenStream, def_site: Span) -> Expansion {
-    let Input { implementor, shape } = match parse::input(input) {
+    let Input { implementor, shape, holds_a_place } = match parse::input(input) {
         Ok(input) => input,
         Err(errors) => return Expansion::refused(errors, TokenStream::new()),
     };
@@ -92,6 +92,9 @@ pub fn expand_atom(input: TokenStream, def_site: Span) -> Expansion {
         Ok(Shape::PointerEnum(enumeration)) => {
             Expansion::written(code::pointer_enum(&implementor, &enumeration, def_site))
         },
+        Err(errors) if holds_a_place => {
+            Expansion::refused(errors, code::stub_of_a_type_holding_a_place(&implementor))
+        },
         Err(errors) => Expansion::refused(errors, code::stub(&implementor)),
     }
 }
@@ -100,10 +103,10 @@ pub fn expand_atom(input: TokenStream, def_site: Span) -> Expansion {
 #[must_use]
 pub fn expand_capability(input: TokenStream, capability: Capability) -> Expansion {
     match parse::input(input) {
-        Ok(Input { implementor, shape: Ok(Shape::Newtype(newtype)) }) => {
+        Ok(Input { implementor, shape: Ok(Shape::Newtype(newtype)), .. }) => {
             Expansion::written(code::capability(&implementor, &newtype, capability))
         },
-        Ok(Input { implementor, shape: Ok(_) }) => {
+        Ok(Input { implementor, shape: Ok(_), .. }) => {
             Expansion::refused(vec![not_a_newtype(&implementor, capability)], TokenStream::new())
         },
         Ok(Input { shape: Err(errors), .. }) | Err(errors) => {
@@ -152,9 +155,13 @@ mod tests {
     #[test]
     fn a_concrete_newtype_converts_through_the_codecs() {
         let expected = quote! {
+            const _: () = ::atomix::__private::assert_atom::<u64>();
             const _: () = ::atomix::__private::assert_send_and_sync::<Seq>();
             #[automatically_derived]
-            const unsafe impl ::atomix::Atom for Seq {
+            const unsafe impl ::atomix::Atom for Seq
+            where
+                for<'__atomix> u64: const ::atomix::Atom
+            {
                 type Repr = <u64 as ::atomix::Atom>::Repr;
                 type Validity = <u64 as ::atomix::Atom>::Validity;
                 const REPRS: ::atomix::ReprRange< <u64 as ::atomix::Atom>::Repr > =
@@ -242,6 +249,7 @@ mod tests {
         });
         let code = written(&id);
         let checks = quote! {
+            const _: () = renamed::__private::assert_atom::<u32>();
             const _: () = renamed::__private::assert_send_and_sync::<Id>();
             const _: () = renamed::__private::assert_repr::<u32, ::core::primitive::u32>();
         };
@@ -265,7 +273,7 @@ mod tests {
         let concrete = quote! {
             const _: () = ::atomix::__private::assert_atom_add::<u64>();
             #[automatically_derived]
-            impl ::atomix::AtomAdd for Seq {}
+            impl ::atomix::AtomAdd for Seq where for<'__atomix> u64: ::atomix::AtomAdd {}
         };
         let seq = expand_capability(quote! { struct Seq(u64); }, Capability::Add);
         assert_eq!(written(&seq), concrete.to_string(), "checked beside it for a concrete field");
@@ -1332,6 +1340,16 @@ mod tests {
         assert_eq!(code, "", "no capability");
         let (_, code) = refused(derive_atom(quote! { fn seq() {} }));
         assert_eq!(code, "", "nor a stub where nothing names a type");
+    }
+
+    #[test]
+    fn a_type_that_holds_a_place_gets_a_stub_that_asks_copy_under_a_binder() {
+        let (_, code) = refused(derive_atom(quote! { struct Seq(AtomicU64); }));
+        let bound = quote!(for<'__atomix> Self: ::core::marker::Copy).to_string();
+        assert!(
+            code.contains(&bound),
+            "no type that holds a place is `Copy` but by an error: {code}"
+        );
     }
 
     #[test]
