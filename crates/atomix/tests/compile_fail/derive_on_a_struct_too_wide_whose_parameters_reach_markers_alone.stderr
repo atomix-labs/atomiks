@@ -1,9 +1,9 @@
 error[E0080]: evaluation panicked: `Wide` needs 129 bits, but an atomic word holds at most 128: narrow a field, or split the value
- --> tests/compile_fail/derive_on_an_enum_too_wide.rs:7:6
+ --> tests/compile_fail/derive_on_a_struct_too_wide_whose_parameters_reach_markers_alone.rs:9:8
   |
-6 | #[derive(Clone, Copy, Atom)]
+8 | #[derive(Clone, Copy, Atom)]
   |                       ---- in this derive macro expansion
-7 | enum Wide {
-  |      ^^^^ evaluation of `_::_` failed here
+9 | struct Wide<T> {
+  |        ^^^^ evaluation of `_::_` failed here
   |
   = note: this error originates in the derive macro `Atom` (in Nightly builds, run with -Z macro-backtrace for more info)

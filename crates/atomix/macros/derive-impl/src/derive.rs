@@ -300,7 +300,7 @@ mod tests {
             const _: () = ::atomix::__private::assert_send_and_sync::<Sign>();
             const _: () = {
                 type Repr = <::core::primitive::i8 as ::atomix::__private::SelectRepr>::Repr;
-                const _: () = ::atomix::__private::assert_width::<Sign>(::core::primitive::i8::BITS);
+                const _: () = ::atomix::__private::assert_width("Sign", ::core::primitive::i8::BITS);
                 const discriminant_0: Repr = Sign::Minus as Repr;
                 const discriminant_1: Repr = Sign::Flat as Repr;
                 const discriminant_2: Repr = Sign::Plus as Repr;
@@ -373,8 +373,9 @@ mod tests {
     fn a_stated_repr_is_checked_to_be_held_and_to_hold_each_discriminant() {
         let stated = quote! {
             type Repr = <::core::primitive::u32 as ::atomix::__private::SelectRepr>::Repr;
-            const _: () = ::atomix::__private::assert_width::<Phase>(::core::primitive::u32::BITS);
-            const _: () = ::atomix::__private::assert_stated_width::<Phase, ::core::primitive::u32>(
+            const _: () = ::atomix::__private::assert_width("Phase", ::core::primitive::u32::BITS);
+            const _: () = ::atomix::__private::assert_stated_width::<::core::primitive::u32>(
+                "Phase",
                 ::atomix::__private::discriminant_width([
                     Phase::Pre as ::core::primitive::i128,
                     Phase::Open as ::core::primitive::i128
@@ -390,7 +391,8 @@ mod tests {
     fn a_c_enum_is_stored_as_cs_int_checked_to_hold_each_discriminant() {
         let c_int = quote! {
             type Repr = <::core::ffi::c_int as ::atomix::__private::SelectRepr>::Repr;
-            const _: () = ::atomix::__private::assert_stated_width::<Mode, ::core::ffi::c_int>(
+            const _: () = ::atomix::__private::assert_stated_width::<::core::ffi::c_int>(
+                "Mode",
                 ::atomix::__private::discriminant_width([
                     Mode::Off as ::core::primitive::i128,
                     Mode::On as ::core::primitive::i128
@@ -530,7 +532,7 @@ mod tests {
                     ::atomix::__private::Width<{ ::atomix::__private::narrowest_width(layout.width()) }>
                     as ::atomix::__private::SelectRepr
                 >::Repr;
-                const _: () = ::atomix::__private::assert_width::<Step>(layout.width());
+                const _: () = ::atomix::__private::assert_width("Step", layout.width());
                 #[automatically_derived]
                 const unsafe impl ::atomix::Atom for Step {
                     type Repr = Repr;
@@ -738,9 +740,9 @@ mod tests {
     fn a_packed_struct_is_checked_against_the_repr_it_states() {
         let stated = quote! {
             type Repr = <::core::primitive::u32 as ::atomix::__private::SelectRepr>::Repr;
-            const _: () = ::atomix::__private::assert_width::<Quote>(::core::primitive::u32::BITS);
+            const _: () = ::atomix::__private::assert_width("Quote", ::core::primitive::u32::BITS);
             const _: () =
-                ::atomix::__private::assert_stated_width::<Quote, ::core::primitive::u32>(layout.width());
+                ::atomix::__private::assert_stated_width::<::core::primitive::u32>("Quote", layout.width());
         };
         let quote =
             derive_atom(quote! { #[atom(repr = u32)] struct Quote { quantity: u8, live: bool } });
@@ -772,7 +774,7 @@ mod tests {
                 let placement_1 = ::atomix::__private::PackedField::new(<u8 as ::atomix::Atom>::REPRS, placement_0.next_offset());
                 let placement_2 = ::atomix::__private::PackedField::new(<B as ::atomix::Atom>::REPRS, placement_1.next_offset());
                 let layout = ::atomix::__private::PackedLayout::new(&[placement_0, placement_1, placement_2]);
-                ::atomix::__private::assert_stated_width::<Pair<A, B>, ::core::primitive::u64>(
+                ::atomix::__private::assert_instance_stated_width::<Pair<A, B>, ::core::primitive::u64>(
                     layout.width()
                 );
                 (placement_0, placement_1, placement_2, layout,)
@@ -843,7 +845,7 @@ mod tests {
                     ::atomix::__private::Width<{ ::atomix::__private::narrowest_width(layout.width()) }>
                     as ::atomix::__private::SelectRepr
                 >::Repr;
-                const _: () = ::atomix::__private::assert_width::<Slot>(layout.width());
+                const _: () = ::atomix::__private::assert_width("Slot", layout.width());
                 #[automatically_derived]
                 const unsafe impl ::atomix::Atom for Slot {
                     type Repr = Repr;
@@ -1003,7 +1005,7 @@ mod tests {
                 let placement_2_0 = ::atomix::__private::PackedField::new(<O as ::atomix::Atom>::REPRS, 0);
                 let variant_2 = ::atomix::__private::PackedLayout::new(&[placement_2_0]);
                 let layout = ::atomix::__private::EnumLayout::niche_or_tagged(2, variant_2, discriminant_2);
-                ::atomix::__private::assert_stated_width::<Lock<O>, ::core::primitive::u64>(
+                ::atomix::__private::assert_instance_stated_width::<Lock<O>, ::core::primitive::u64>(
                     layout.width()
                 );
                 (placement_2_0, variant_2, layout,)

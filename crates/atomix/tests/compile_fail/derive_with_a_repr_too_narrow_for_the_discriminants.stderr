@@ -1,4 +1,4 @@
-error[E0080]: evaluation panicked: `$CRATE::Swing` needs 9 bits, but its repr `u8` has 8
+error[E0080]: evaluation panicked: `Swing` needs 9 bits, but its repr `u8` has 8
  --> tests/compile_fail/derive_with_a_repr_too_narrow_for_the_discriminants.rs:7:15
   |
 6 | #[derive(Clone, Copy, Atom)]
