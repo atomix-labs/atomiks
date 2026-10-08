@@ -121,6 +121,11 @@ pub fn bit0_test_and_set(atomic: &Atomic<Bits>) -> bool {
 }
 
 #[unsafe(no_mangle)]
+pub fn bit0_test_and_set_in_some(atomic: &Atomic<Bits>) -> Option<bool> {
+    Some(atomic.fields().low.test_and_set(AcqRel))
+}
+
+#[unsafe(no_mangle)]
 pub fn bit0_test_and_clear(atomic: &Atomic<Bits>) -> bool {
     atomic.fields().low.test_and_clear(AcqRel)
 }

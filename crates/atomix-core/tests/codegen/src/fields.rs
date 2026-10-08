@@ -134,6 +134,16 @@ pub fn field_test_and_set(atomic: &Atomic<Order>) -> bool {
 }
 
 #[unsafe(no_mangle)]
+pub fn field_test_and_set_in_some(atomic: &Atomic<Order>) -> Option<bool> {
+    Some(atomic.fields().live.test_and_set(AcqRel))
+}
+
+#[unsafe(no_mangle)]
+pub fn field_test_and_set_through_map(atomic: Option<&Atomic<Order>>) -> Option<bool> {
+    atomic.map(|atomic| atomic.fields().live.test_and_set(AcqRel))
+}
+
+#[unsafe(no_mangle)]
 pub fn field_load(atomic: &Atomic<Order>) -> bool {
     atomic.fields().live.load(Acquire)
 }
@@ -324,4 +334,14 @@ pub fn ends64_top_test_and_clear(atomic: &Atomic<Ends64>) -> bool {
 #[unsafe(no_mangle)]
 pub fn ends64_top_test_and_toggle(atomic: &Atomic<Ends64>) -> bool {
     atomic.fields().top.test_and_toggle(AcqRel)
+}
+
+#[unsafe(no_mangle)]
+pub fn ends64_low_test_and_clear_in_some(atomic: &Atomic<Ends64>) -> Option<bool> {
+    Some(atomic.fields().low.test_and_clear(AcqRel))
+}
+
+#[unsafe(no_mangle)]
+pub fn ends64_top_test_and_toggle_in_some(atomic: &Atomic<Ends64>) -> Option<bool> {
+    Some(atomic.fields().top.test_and_toggle(AcqRel))
 }
