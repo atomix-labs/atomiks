@@ -1,0 +1,20 @@
+[package]
+name    = "atomix-core-codegen"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[features]
+default         = []
+aarch64-only    = []
+aarch64-refused = []
+x86-64-refused  = []
+
+[dependencies]
+# external
+arbitrary-int = { version = "2.2.0", default-features = false }
+deranged      = { version = "0.5.8", default-features = false }
+# internal
+atomix-core = { path = "../..", features = ["arbitrary-int", "deranged-05"] }
+
+[workspace]

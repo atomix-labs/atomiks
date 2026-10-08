@@ -7,7 +7,7 @@ multiple-versions = "deny"
 wildcards = "deny"
 allow-wildcard-paths = true
 skip = [
-    { crate = "syn@2", reason = "zerocopy-derive 0.8, behind `zerocopy-08`, is still on syn 2; atomiks-derive, behind `derive`, is on syn 3" },
+    { crate = "syn@2", reason = "zerocopy-derive 0.8, behind `zerocopy-08`, is still on syn 2; atomix-derive, behind `derive`, is on syn 3" },
 ]
 
 # Crates with a better choice, each naming it: the house policy, `strict`.

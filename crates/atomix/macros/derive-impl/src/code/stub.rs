@@ -1,0 +1,36 @@
+//! The `Atom` impl written in place of a refused one.
+
+use proc_macro2::TokenStream;
+use quote::quote;
+
+use crate::model::Implementor;
+
+/// An `Atom` impl that compiles whatever the type is, written beside the errors that refuse the
+/// type's own, so that each use of the type as an atom raises no error of its own.
+///
+/// It is never run: the build fails with the errors beside it. Were one missing, its decode would
+/// panic rather than claim, as `None`, that its one repr holds no value.
+pub(crate) fn stub(implementor: &Implementor) -> TokenStream {
+    let Implementor { ident, generics, atomix, .. } = implementor;
+    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+    let predicates = where_clause.into_iter().flat_map(|clause| &clause.predicates);
+    quote! {
+        #[automatically_derived]
+        const unsafe impl #impl_generics #atomix::Atom for #ident #ty_generics
+        where
+            #(#predicates,)*
+            Self: ::core::marker::Copy,
+        {
+            type Repr = ::core::primitive::u8;
+            const REPRS: #atomix::ReprRange<::core::primitive::u8> = #atomix::ReprRange::new(0, 0);
+            #[inline]
+            fn to_repr(self) -> ::core::primitive::u8 {
+                0
+            }
+            #[inline]
+            fn from_repr(_: ::core::primitive::u8) -> ::core::option::Option<Self> {
+                ::core::panic!("`#[derive(Atom)]` refused this type")
+            }
+        }
+    }
+}

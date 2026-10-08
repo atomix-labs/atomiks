@@ -1,42 +1,44 @@
 <!-- >>> devset: project >>> -->
 <!-- dprint-ignore-start -->
 
-<h1 align="center">atomiks</h1>
+<h1 align="center">atomix</h1>
 
 <p align="center">Typed atomics for any value that fits one atomic, and the locks built on them.</p>
 
 <p align="center">
-  <a href="https://github.com/atomix-labs/atomiks/actions/workflows/check.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/atomix-labs/atomiks/check.yml?branch=main&amp;style=flat-square&amp;label=check"></a>
-  <a href="https://atomix-labs.github.io/atomiks/"><img alt="Book" src="https://img.shields.io/badge/book-read-blue?style=flat-square"></a>
+  <a href="https://github.com/atomix-labs/atomix/actions/workflows/check.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/atomix-labs/atomix/check.yml?branch=main&amp;style=flat-square&amp;label=check"></a>
+  <a href="https://atomix-labs.github.io/atomix/"><img alt="Book" src="https://img.shields.io/badge/book-read-blue?style=flat-square"></a>
   <a href="https://github.com/atomix-labs/devset"><img alt="managed with devset" src="https://img.shields.io/badge/managed_with-devset-0969da?style=flat-square&amp;logo=data:image/svg%2bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+PHRpdGxlPmRldnNldDwvdGl0bGU+PHBhdGggZmlsbD0iI2YwZjZmYyIgZD0ibTE2IDMgMTMgNi41TDE2IDE2IDMgOS41WiIvPjxwYXRoIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2YwZjZmYyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiBzdHJva2Utd2lkdGg9IjIuNSIgZD0ibTMgMTYgMTMgNi41TDI5IDE2TTMgMjIuNSAxNiAyOWwxMy02LjUiLz48L3N2Zz4K"></a>
 </p>
 
 <!-- dprint-ignore-end -->
 <!-- <<< devset: project <<< -->
 
-atomiks is a workspace of Rust crates for sharing state between threads. The
-`atomiks` crate gives any value that fits one atomic a typed atomic: integers,
-plain or held to a range, `NonZero`s, `char`s, floats, pointers, `Option`s that
-spend a spare bit pattern on `None`, and the structs and enums `#[derive(Atom)]`
-packs into one atomic, with orderings checked at compile time and every
-operation the instruction its name promises. One instruction on the whole word
-changes one field of a packed struct alone: `QUOTE.fields().live.set(Release)`
-is a `lock or`, or an `ldset`. A pointer keeps small fields as tags in the low
-bits its pointee's alignment leaves clear, and keeps its provenance:
-`HEAD.fields().closed.test_and_set(AcqRel)` closes a Treiber stack's head with a
-`lock bts`, or an `ldsetal`. Two pointers, or one beside a counter or a slice's
-length, share a 16-byte atomic, which exposes each pointer's provenance:
-`HEAD.compare_exchange(pushed, popped, AcqRel, Acquire)` pops a Treiber stack's
-head, a top node beside a `u64` version, with a `lock cmpxchg16b`, or a
-`caspal`. It works with serde, zerocopy, bytemuck, arbitrary, arbitrary-int and
-deranged, each behind a feature. `atomiks-core` holds the typed atomic,
-`atomiks-derive` the derive, and `atomiks` re-exports both, the derive under its
-`derive` feature; all build for Linux and macOS, on aarch64 and x86_64. atomiks
-is in early development, and no crate is released yet.
+atomix is a workspace of Rust crates for sharing state between threads. Its
+facade, `atomix-rs`, gives any value that fits one atomic a typed atomic:
+integers, plain or held to a range, `NonZero`s, `char`s, floats, pointers,
+`Option`s that spend a spare bit pattern on `None`, and the structs and enums
+`#[derive(Atom)]` packs into one atomic, with orderings checked at compile time
+and every operation the instruction its name promises. One instruction on the
+whole word changes one field of a packed struct alone:
+`QUOTE.fields().live.set(Release)` is a `lock or`, or an `ldset`. A pointer
+keeps small fields as tags in the low bits its pointee's alignment leaves clear,
+and keeps its provenance: `HEAD.fields().closed.test_and_set(AcqRel)` closes a
+Treiber stack's head with a `lock bts`, or an `ldsetal`. Two pointers, or one
+beside a counter or a slice's length, share a 16-byte atomic, which exposes each
+pointer's provenance: `HEAD.compare_exchange(pushed, popped, AcqRel, Acquire)`
+pops a Treiber stack's head, a top node beside a `u64` version, with a `lock
+cmpxchg16b`, or a `caspal`. It works with serde, zerocopy, bytemuck, arbitrary,
+arbitrary-int and deranged, each behind a feature. `atomix-core` holds the typed
+atomic, `atomix-derive` the derive, and the facade re-exports both, the derive
+under its `derive` feature; all build for Linux and macOS, on aarch64 and
+x86_64. A crate depends on `atomix-rs`, since crates.io's `atomix` is an
+unrelated 2017 placeholder, and imports it as `atomix`: `use atomix::{Atom,
+Atomic};`. atomix is in early development, and no crate is released yet.
 
 ## Documentation
 
-- [The book][book]: what atomiks is, and how to use it.
+- [The book][book]: what atomix is, and how to use it.
 - [CHANGELOG.md][changelog]: what changed in each release.
 
 ## Contributing
@@ -49,8 +51,8 @@ first.
 Either [the MIT License][mit] or [the Apache License, Version 2.0][apache], at
 your option.
 
-[book]: https://atomix-labs.github.io/atomiks/
-[changelog]: https://github.com/atomix-labs/atomiks/blob/main/CHANGELOG.md
-[contributing]: https://github.com/atomix-labs/atomiks/blob/main/CONTRIBUTING.md
-[mit]: https://github.com/atomix-labs/atomiks/blob/main/LICENSE-MIT
-[apache]: https://github.com/atomix-labs/atomiks/blob/main/LICENSE-APACHE
+[book]: https://atomix-labs.github.io/atomix/
+[changelog]: https://github.com/atomix-labs/atomix/blob/main/CHANGELOG.md
+[contributing]: https://github.com/atomix-labs/atomix/blob/main/CONTRIBUTING.md
+[mit]: https://github.com/atomix-labs/atomix/blob/main/LICENSE-MIT
+[apache]: https://github.com/atomix-labs/atomix/blob/main/LICENSE-APACHE

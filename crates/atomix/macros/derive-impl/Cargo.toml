@@ -1,0 +1,18 @@
+[package]
+name                   = "atomix-derive-impl"
+description            = "the logic of atomix's derives: reads a type's definition, and writes its impls or the errors that refuse it."
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+authors.workspace      = true
+repository.workspace   = true
+
+[lints]
+workspace = true
+
+[dependencies]
+# external
+proc-macro2 = { workspace = true }
+quote       = { workspace = true }
+syn         = { workspace = true }

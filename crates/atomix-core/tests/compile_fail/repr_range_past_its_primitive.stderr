@@ -1,0 +1,17 @@
+error[E0080]: evaluation panicked: `ReprRange::<u8>::new(0, 300)`: the end is above the repr's largest bits, 255
+  --> tests/compile_fail/repr_range_past_its_primitive.rs:14:34
+   |
+14 |     const REPRS: ReprRange<u8> = ReprRange::new(0, 300);
+   |                                  ^^^^^^^^^^^^^^^^^^^^^^ evaluation of `<Never as atomix_core::Atom>::REPRS` failed here
+
+note: erroneous constant encountered
+ --> src/atom/option.rs
+  |
+  |         if T::REPRS.contains(0) {
+  |            ^^^^^^^^
+
+note: erroneous constant encountered
+ --> src/atom/option.rs
+  |
+  |             None => <T::Repr as Primitive>::from_bits(const { none_repr::<T>() }),
+  |                                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^

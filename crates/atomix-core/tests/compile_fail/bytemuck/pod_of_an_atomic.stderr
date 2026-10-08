@@ -1,0 +1,22 @@
+error[E0277]: the trait bound `atomix_core::Atomic<u64>: NoUninit` is not satisfied
+  --> tests/compile_fail/bytemuck/pod_of_an_atomic.rs:11:23
+   |
+11 |     lends_its_bytes::<AtomicU64>();
+   |                       ^^^^^^^^^ the trait `Pod` is not implemented for `atomix_core::Atomic<u64>`
+   |
+   = help: the following other types implement trait `Pod`:
+             ()
+             ManuallyDrop<T>
+             Option<T>
+             PhantomData<T>
+             PhantomPinned
+             Wrapping<T>
+             [T; 0]
+             [T; 1024]
+           and $N others
+   = note: required for `atomix_core::Atomic<u64>` to implement `NoUninit`
+note: required by a bound in `lends_its_bytes`
+  --> tests/compile_fail/bytemuck/pod_of_an_atomic.rs:8:29
+   |
+ 8 | const fn lends_its_bytes<T: NoUninit>() {}
+   |                             ^^^^^^^^ required by this bound in `lends_its_bytes`

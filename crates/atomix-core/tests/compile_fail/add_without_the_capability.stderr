@@ -1,0 +1,28 @@
+error[E0277]: `bool` has no atomic add
+ --> tests/compile_fail/add_without_the_capability.rs:8:28
+  |
+8 |     AtomicBool::new(false).fetch_add(true, Relaxed);
+  |                            ^^^^^^^^^ `fetch_add` and `fetch_sub` need `AtomAdd`
+  |
+  = help: the trait `AtomAdd` is not implemented for `bool`
+  = note: for your own newtype over a value that has it, derive it: `#[derive(AtomAdd)]`
+  = note: to change the value in a compare-exchange loop, call `update`
+  = help: the following other types implement trait `AtomAdd`:
+            Wrapping<T>
+            i16
+            i32
+            i64
+            i8
+            isize
+            u16
+            u32
+          and $N others
+note: required by a bound in `atomix_core::atomic::capability::<impl atomix_core::Atomic<T>>::fetch_add`
+ --> src/atomic/capability.rs
+  |
+  | impl<T: Atom> Atomic<T> {
+...
+  |     pub fn fetch_add<O: RmwOrdering>(&self, delta: T::Repr, order: O) -> T
+  |     where
+  |         T: AtomAdd,
+  |            ^^^^^^^ required by this bound in `atomix_core::atomic::capability::<impl Atomic<T>>::fetch_add`

@@ -1,4 +1,4 @@
-# Working in `atomiks`
+# Working in `atomix`
 
 What an agent needs to work here: what the repository is, how to check a change,
 and the rules a change keeps.
@@ -37,18 +37,20 @@ with the profile, on `devset update`. Never edit `.devset/`.
 
 ## The Repository
 
-A Cargo workspace of crates under `crates/`: `atomiks-core` holds the typed
+A Cargo workspace of crates under `crates/`: `atomix-core` holds the typed
 atomic (`Atom`, `Atomic`, the orderings, validity, the primitives, the fences,
 the cell and the loom seam) and the ranged integers, each on a pattern-type
-field; the facade `atomiks` re-exports both. `atomiks-core`'s `src/interop/`
-holds the integrations with other crates, a file per crate, each behind its
-feature; zerocopy's are derives on the types themselves.
-`crates/atomiks/macros/derive`, `atomiks-derive`, is the proc macro of
+field; the facade re-exports both. It is published as `atomix-rs`, since
+crates.io's `atomix` is an unrelated 2017 placeholder; its library is `atomix`,
+so a `cargo -p` names `atomix-rs` and code names `atomix`. `atomix-core`'s
+`src/interop/` holds the integrations with other crates, a file per crate, each
+behind its feature; zerocopy's are derives on the types themselves.
+`crates/atomix/macros/derive`, `atomix-derive`, is the proc macro of
 `#[derive(Atom)]` and the capabilities' derives, and
-`crates/atomiks/macros/derive-impl`, `atomiks-derive-impl`, its logic; the
-derive is `atomiks`' `derive` feature. Each crate inherits its version, edition,
+`crates/atomix/macros/derive-impl`, `atomix-derive-impl`, its logic; the derive
+is the facade's `derive` feature. Each crate inherits its version, edition,
 licence and lints from the root `Cargo.toml`, and builds for Linux and macOS, on
-aarch64 and x86_64. `atomiks-lock` is yet to be written. The book is under
+aarch64 and x86_64. `atomix-lock` is yet to be written. The book is under
 `docs/`. The toolchain, with the four targets, is the nightly
 `rust-toolchain.toml` pins, which the crates need for their nightly features.
 The CPU floor is `.cargo/config.toml`'s: x86-64-v3, LSE on aarch64 Linux, and
@@ -71,13 +73,13 @@ What a change here keeps, beyond what the checks hold it to.
   is one macro or helper.
 - Imports, never paths: neither a body nor an attribute names `core::`,
   `crate::` or another crate's path. A doc link may.
-- A cfg that repeats is one alias in `crates/atomiks-core/build.rs`, as `wide`
+- A cfg that repeats is one alias in `crates/atomix-core/build.rs`, as `wide`
   is. rustdoc names an alias as it is written, so `lib.rs` hides each alias a
   public item uses from the badges, and a public type writes its condition out
   in a `doc(cfg)`.
 - Every name is whole words, never a fragment such as `at`, `by` or `held`.
 - The facade has no code of its own: it re-exports each item by name, and an
-  item `atomiks-core` makes public is re-exported in the same change.
+  item `atomix-core` makes public is re-exported in the same change.
 - An operation exists only where the target runs it without a compare-exchange
   loop, and a loop is `update`, by name; what each lowers to is pinned in
   `tests/codegen.rs`. Each takes core's name and meaning, `fetch_add` to
@@ -104,7 +106,7 @@ What a change here keeps, beyond what the checks hold it to.
   `wrapping_byte_sub`, `map_addr`, `mask`, or `AtomicPtr`'s `fetch_or`,
   `fetch_and` and `fetch_xor`; one that is no pointer's, a unit's or a value's,
   is `without_provenance`; and no integer is cast to a pointer, nor a provenance
-  exposed. Two words, a `DoubleWord`, are the one place atomiks exposes a
+  exposed. Two words, a `DoubleWord`, are the one place atomix exposes a
   provenance, in its cell alone, since no Rust operation keeps one through a
   16-byte atomic: each pointer stored is exposed, and each loaded takes an
   exposed provenance back. Its cell lends no place, having no `RawAccess`, so
@@ -136,7 +138,7 @@ What a change here keeps, beyond what the checks hold it to.
   integer replaces should a nightly break it; `DynMetadata`'s layout, its vtable
   pointer, which `transmute` reads, as core's own `vtable_ptr` does, and writes
   back, since the compiler hard-codes it: `transmute` refuses a change of its
-  size, and `crates/atomiks-core/tests/double_words.rs` calls through a trait
+  size, and `crates/atomix-core/tests/double_words.rs` calls through a trait
   object's pointer read back; and `const_eval_select`, whose four callers read
   in a constant no address of a pointer with provenance, three null's alone and
   `exposed_address` that of a pointer made of an integer, a tagged null, by a
@@ -153,12 +155,12 @@ What a change here keeps, beyond what the checks hold it to.
 
 - Headings are in Title Case, `# Crate Features`, and a crate page's example
   sits under `# Examples`, as an item's does.
-- An item's example in `atomiks-core` names `atomiks`, the crate a user depends
-  on, through a hidden `# extern crate atomiks_core as atomiks;`: the facade's
-  pages show it as it is written. A derive's example in `atomiks-derive` does
-  too, and imports the derive with a hidden `# use atomiks_derive::Atom;`, so
-  its doctests run every example the facade shows. Only `atomiks-core`'s own
-  page names `atomiks_core`.
+- An item's example in `atomix-core` names `atomix`, the library a user imports,
+  through a hidden `# extern crate atomix_core as atomix;`: the facade's pages
+  show it as it is written. A derive's example in `atomix-derive` does too, and
+  imports the derive with a hidden `# use atomix_derive::Atom;`, so its doctests
+  run every example the facade shows. Only `atomix-core`'s own page names
+  `atomix_core`.
 - Siblings are documented alike: every alias, validity and ordering has the same
   sections, and each feature's row reads the same on every page that lists it.
 
@@ -167,21 +169,21 @@ What a change here keeps, beyond what the checks hold it to.
 - A change to unsafe code, a primitive or a cell runs `just miri`, Miri on
   aarch64 Linux and macOS, x86_64 and x86-64-v2, which CI runs only each night.
 - A change to an ordering, a fence or a cell adds or updates its model in
-  `crates/atomiks-core/tests/model.rs`, which `just check-loom` runs.
+  `crates/atomix-core/tests/model.rs`, which `just check-loom` runs.
 - What the types refuse has a fixture in
-  `crates/atomiks-core/tests/compile_fail/`, what aarch64 Linux's floor alone
+  `crates/atomix-core/tests/compile_fail/`, what aarch64 Linux's floor alone
   refuses one under its `aarch64_without_lse2/`, and what the derive refuses one
-  in `crates/atomiks/tests/compile_fail/`, under its `aarch64/` where `x86_64`
+  in `crates/atomix/tests/compile_fail/`, under its `aarch64/` where `x86_64`
   adds notes. What x86_64 without `cmpxchg16b` refuses, which trybuild's floor
   cannot build, the codegen fixtures' `x86-64-refused` probes pin. A new
-  toolchain may reword a message; `TRYBUILD=overwrite cargo test -p atomiks-core
-  --test trybuild`, and `TRYBUILD=overwrite cargo test -p atomiks --features
+  toolchain may reword a message; `TRYBUILD=overwrite cargo test -p atomix-core
+  --test trybuild`, and `TRYBUILD=overwrite cargo test -p atomix-rs --features
   derive --test compiled trybuild` for the derive's, write it again, to be read
   before it is committed.
 - The checks of a value's repr, validity and decodes, the `Atom` laws, and the
   reading of a codegen fixture's assembly live once in
-  `crates/atomiks-core/tests/testing/`, which the facade's tests reach by path:
-  `crates/atomiks/tests/derive_laws.rs` holds each derived shape to the laws a
+  `crates/atomix-core/tests/testing/`, which the facade's tests reach by path:
+  `crates/atomix/tests/derive_laws.rs` holds each derived shape to the laws a
   built-in keeps.
 
 <!-- >>> devset: cargo-deny >>> -->

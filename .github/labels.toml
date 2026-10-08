@@ -39,13 +39,13 @@ description = "Opened by a workflow"
 
 [labels."area: core"]
 color       = "1d76db"
-description = "atomiks-core: the atomic, its values, orderings and primitives"
-paths       = ["crates/atomiks-core/**"]
+description = "atomix-core: the atomic, its values, orderings and primitives"
+paths       = ["crates/atomix-core/**"]
 
 [labels."area: facade"]
 color       = "0e8a16"
-description = "atomiks: the facade's re-exports"
-paths       = ["crates/atomiks/**"]
+description = "atomix-rs: the facade's re-exports"
+paths       = ["crates/atomix/**"]
 
 [labels."area: docs"]
 color       = "c5def5"

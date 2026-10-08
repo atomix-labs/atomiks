@@ -12,7 +12,7 @@ tag = "v0.21.2"
 [[profiles]]
 name = "agents"
 rev = "2307168ae8027249630bd5532b185b5edfc96814"
-digest = "aeb2b9fa04f9c116364ef418dd66c644f2da803e595bcd017ae4aa5bef16b49e"
+digest = "d8f237cdbeaaecd5a0cb07844ea4709a1318108d2ef5e6025c4a2062463150a2"
 
 [profiles.source]
 git = "https://github.com/atomix-labs/atxp"
@@ -26,7 +26,7 @@ security = ["default"]
 [[profiles]]
 name = "cargo-workspace"
 rev = "2307168ae8027249630bd5532b185b5edfc96814"
-digest = "91850ce4207a80a448f7a9d8e7ec7909ddaa29d201dde42d2ce19be1b8b045f8"
+digest = "4c448a5e86f86844e9c92750d28c1b83c56fc2a8211238b849e08fa6272becea"
 
 [profiles.source]
 git = "https://github.com/atomix-labs/atxp"
@@ -164,7 +164,7 @@ tag = "v0.21.2"
 [[profiles]]
 name = "git-changelog"
 rev = "2307168ae8027249630bd5532b185b5edfc96814"
-digest = "dbe32a04369d7cd74020dcf503f5d4bac74fc434b843855cc5800afedd212aaf"
+digest = "d90482d58a999c7a34e8d623a38aaecb5d5da8e0fe381bccb0dbb13cb3bd2e09"
 
 [profiles.source]
 git = "https://github.com/atomix-labs/atxp"
@@ -246,7 +246,7 @@ tag = "v0.21.2"
 [[profiles]]
 name = "github-labels"
 rev = "2307168ae8027249630bd5532b185b5edfc96814"
-digest = "fe9dfdb4a527b24d6e2ee435b96f5f1a723d530b402d4ba7d1f5443a4979328c"
+digest = "7abd95f51d629ccf293f6b7214f5cbd4b0336353c14f60fd35f61a575dbe5bb2"
 
 [profiles.source]
 git = "https://github.com/atomix-labs/atxp"
@@ -264,7 +264,7 @@ tag = "v0.21.2"
 [[profiles]]
 name = "github-templates"
 rev = "2307168ae8027249630bd5532b185b5edfc96814"
-digest = "3684ee859de091d7d91282462aba40e796f0cd47d9624d7286b85eb8859be391"
+digest = "42ded30c2dd43587dfe8c33e83a1e6158ea475f14261312ed4e6afbd09ecfb37"
 
 [profiles.source]
 git = "https://github.com/atomix-labs/atxp"
@@ -330,7 +330,7 @@ tag = "v0.21.2"
 [[profiles]]
 name = "mdbook"
 rev = "2307168ae8027249630bd5532b185b5edfc96814"
-digest = "932bb689e100e04336e9ad1da46fd8dda80a61d2c25e87ed4632b5082d0bb968"
+digest = "0acdc82e087db36bd64759b5ba32145d5546f5adbc1ee7e132976fa8a5cd4382"
 
 [profiles.source]
 git = "https://github.com/atomix-labs/atxp"
@@ -346,7 +346,7 @@ pages = ["default"]
 [[profiles]]
 name = "project"
 rev = "2307168ae8027249630bd5532b185b5edfc96814"
-digest = "3405c07b03cfcc9c1810e9930654b27d12e44f114d4166acbadd159531d04229"
+digest = "7f19ba323508dc5d65a4c400cc634ff0950dc1a4f9265d8d8d7ec0f18471cbc6"
 
 [profiles.source]
 git = "https://github.com/atomix-labs/atxp"
@@ -411,7 +411,7 @@ strict = ["rust/strict"]
 [[profiles]]
 name = "setup"
 rev = "2307168ae8027249630bd5532b185b5edfc96814"
-digest = "d5740c0593d9d5de3885ae354a3e6e9988f6e32ee966cd840b4817d211f32b4f"
+digest = "3ab0266e8476a86fde5d055ce2bcc80ead518f4d864c451fbc6974a2fac89fb9"
 
 [profiles.source]
 git = "https://github.com/atomix-labs/atxp"

@@ -1,0 +1,26 @@
+error[E0277]: `atomix_core::ordering::Release` is not a load ordering
+ --> tests/compile_fail/load_with_release.rs:8:36
+  |
+8 |     let _ = AtomicU64::new(0).load(Release);
+  |                               ---- ^^^^^^^ expected `Relaxed`, `Acquire` or `SeqCst` from `atomix::ordering`
+  |                               |
+  |                               required by a bound introduced by this call
+  |
+  = help: the trait `LoadOrdering` is not implemented for `atomix_core::ordering::Release`
+  = note: `Release` and `AcqRel` order a store, and a load has none
+help: the following other types implement trait `LoadOrdering`
+ --> src/ordering.rs
+  |
+  | impl LoadOrdering for Relaxed {}
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `atomix_core::ordering::Relaxed`
+  | impl LoadOrdering for Acquire {}
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `atomix_core::ordering::Acquire`
+  | impl LoadOrdering for SeqCst {}
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `atomix_core::ordering::SeqCst`
+note: required by a bound in `atomix_core::Atomic::<T>::load`
+ --> src/atomic/mod.rs
+  |
+  | impl<T: Atom> Atomic<T> {
+...
+  |     pub fn load<O: LoadOrdering>(&self, order: O) -> T
+  |                    ^^^^^^^^^^^^ required by this bound in `Atomic::<T>::load`

@@ -6,7 +6,7 @@ failure-output = "immediate-final"
 path = "junit.xml"
 
 # trybuild builds each crate's fixtures under one `target/tests/trybuild/`: one suite at a time.
-# atomiks-core's suite is its test `trybuild`; the facade's, the module `trybuild` of its test
+# atomix-core's suite is its test `trybuild`; the facade's, the module `trybuild` of its test
 # `compiled`.
 [test-groups]
 trybuild = { max-threads = 1 }

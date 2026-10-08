@@ -1,0 +1,61 @@
+[package]
+name                   = "atomix-rs"
+description            = "typed atomics for any value that fits one atomic, and the locks built on them."
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+authors.workspace      = true
+repository.workspace   = true
+
+[package.metadata.cargo-shear]
+ignored-paths = ["tests/compile_fail/*.rs", "tests/compile_pass/*.rs"]
+
+[package.metadata.docs.rs]
+features = [
+    "arbitrary",
+    "arbitrary-int",
+    "bytemuck",
+    "deranged-05",
+    "derive",
+    "serde",
+    "zerocopy-08",
+]
+
+[features]
+default       = []
+arbitrary     = ["atomix-core/arbitrary"]
+arbitrary-int = ["atomix-core/arbitrary-int"]
+bytemuck      = ["atomix-core/bytemuck"]
+deranged-05   = ["atomix-core/deranged-05"]
+derive        = ["dep:atomix-derive"]
+loom          = ["atomix-core/loom"]
+serde         = ["atomix-core/serde"]
+zerocopy-08   = ["atomix-core/zerocopy-08"]
+
+[lints]
+workspace = true
+
+[lib]
+name = "atomix"
+
+[dependencies]
+# internal
+atomix-core   = { workspace = true }
+atomix-derive = { path = "macros/derive", version = "=0.1.0", optional = true }
+
+[dev-dependencies]
+# external
+arbitrary     = { workspace = true }
+arbitrary-int = { workspace = true }
+bytemuck      = { workspace = true, features = ["derive"] }
+deranged      = { workspace = true }
+proptest      = { workspace = true }
+serde         = { workspace = true, features = ["derive"] }
+serde_json    = { workspace = true }
+trybuild      = { workspace = true }
+zerocopy      = { workspace = true }
+
+[target.'cfg(any())'.dependencies]
+# internal
+atomix-derive = { path = "macros/derive", version = "=0.1.0" }

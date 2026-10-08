@@ -34,8 +34,8 @@ jobs:
           persist-credentials: false
       - run: cargo test --workspace --all-features --locked
       - run: >-
-          cargo test -p atomiks-core --features loom --test model --locked
+          cargo test -p atomix-core --features loom --test model --locked
           --config 'target."cfg(all())".rustflags=["--cfg","loom"]' --target-dir target/loom
       - run: >-
-          cargo test -p atomiks --features derive,loom --test model --locked
+          cargo test -p atomix-rs --features derive,loom --test model --locked
           --config 'target."cfg(all())".rustflags=["--cfg","loom"]' --target-dir target/loom

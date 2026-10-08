@@ -1,0 +1,31 @@
+error[E0080]: evaluation panicked: `$CRATE::Slot<u64>`: `Slot::Inline`'s fields need 64 bits, but above the 3 low bits that hold its tags and its pointers' alignment, a word holds 61: narrow the fields
+  --> tests/compile_fail/derive_on_a_pointer_enum_generic_instance_with_data_too_wide.rs:11:23
+   |
+11 | #[derive(Clone, Copy, Atom)]
+   |                       ^^^^ evaluation of `_::<impl atomix::Atom for Slot<u64>>::to_tagged_repr::{constant#0}` failed inside this call
+   |
+note: inside `lay_out_checked::<u64>`
+  --> tests/compile_fail/derive_on_a_pointer_enum_generic_instance_with_data_too_wide.rs:13:5
+   |
+11 | #[derive(Clone, Copy, Atom)]
+   |                       ---- in this derive macro expansion
+12 | enum Slot<T> {
+13 |     Inline(u64),
+   |     ^^^^^^ the failure occurred here
+   = note: this error originates in the derive macro `Atom` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+note: erroneous constant encountered
+  --> tests/compile_fail/derive_on_a_pointer_enum_generic_instance_with_data_too_wide.rs:11:23
+   |
+11 | #[derive(Clone, Copy, Atom)]
+   |                       ^^^^
+   |
+   = note: this note originates in the derive macro `Atom` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+note: the above error was encountered while instantiating `fn _::<impl Atom for Slot<u64>>::to_tagged_repr`
+  --> tests/compile_fail/derive_on_a_pointer_enum_generic_instance_with_data_too_wide.rs:11:23
+   |
+11 | #[derive(Clone, Copy, Atom)]
+   |                       ^^^^
+   |
+   = note: this note originates in the derive macro `Atom` (in Nightly builds, run with -Z macro-backtrace for more info)

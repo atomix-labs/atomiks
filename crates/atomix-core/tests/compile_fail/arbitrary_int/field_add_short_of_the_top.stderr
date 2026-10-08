@@ -1,0 +1,19 @@
+error[E0277]: `atomix_core::Field<Short, 1, UInt<u64, 61>>` does not end at its container's top bit
+  --> tests/compile_fail/arbitrary_int/field_add_short_of_the_top.rs:26:74
+   |
+26 |     Atomic::new(Short { live: true, count: u61::new(1) }).fields().count.fetch_add(1, Relaxed);
+   |                                                                          ^^^^^^^^^ a carry out of this field would reach the bits above it
+   |
+   = help: the trait `TopField` is not implemented for `atomix_core::Field<Short, 1, UInt<u64, 61>>`
+   = note: only the field that ends at the repr's top bit adds in place, its carry leaving the word: make it the last field, of a width that fills the repr
+   = note: a field of a generic struct, or of a field, adds in place nowhere: no constant knows where it ends
+   = note: to add to another field, call `update`
+note: required by a bound in `AtomicField::<P>::fetch_add`
+  --> src/atomic/field/mod.rs
+   |
+   | impl<P: FieldPath> AtomicField<P> {
+...
+   |     pub fn fetch_add<O: RmwOrdering>(
+...
+   |         P: TopField,
+   |            ^^^^^^^^ required by this bound in `AtomicField::<P>::fetch_add`
