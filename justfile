@@ -49,13 +49,42 @@ check-codegen-fmt:
 fix-codegen-fmt:
     rustfmt crates/atomix-core/tests/codegen/src/lib.rs crates/atomix/tests/codegen/src/lib.rs
 
+# Every target rustup ships at tier 1 or 2 that the build script admits, but those with no OS: each
+# `aarch64` and `x86_64` one with 64-bit pointers, and `arm64ec`.
+hosted_targets := "aarch64-apple-darwin aarch64-apple-ios aarch64-apple-ios-macabi aarch64-apple-ios-sim aarch64-apple-tvos aarch64-apple-tvos-sim aarch64-apple-visionos aarch64-apple-visionos-sim aarch64-apple-watchos aarch64-apple-watchos-sim aarch64-linux-android aarch64-pc-windows-gnullvm aarch64-pc-windows-msvc aarch64-unknown-freebsd aarch64-unknown-fuchsia aarch64-unknown-linux-gnu aarch64-unknown-linux-musl aarch64-unknown-linux-ohos aarch64-unknown-uefi arm64ec-pc-windows-msvc x86_64-apple-darwin x86_64-apple-ios x86_64-apple-ios-macabi x86_64-fortanix-unknown-sgx x86_64-linux-android x86_64-pc-solaris x86_64-pc-windows-gnu x86_64-pc-windows-gnullvm x86_64-pc-windows-msvc x86_64-unknown-freebsd x86_64-unknown-fuchsia x86_64-unknown-illumos x86_64-unknown-linux-gnu x86_64-unknown-linux-gnuasan x86_64-unknown-linux-gnumsan x86_64-unknown-linux-gnutsan x86_64-unknown-linux-musl x86_64-unknown-linux-ohos x86_64-unknown-netbsd x86_64-unknown-redox x86_64-unknown-uefi"
+
+# And those with no OS, which have no `std` for `arbitrary`.
+bare_metal_targets := "aarch64-unknown-none aarch64-unknown-none-softfloat x86_64-unknown-none"
+
+# Each target builds at its own CPU, as a dependent builds it: an empty `RUSTFLAGS` replaces the
+# floor. What differs between targets is their defaults, which change with the toolchain, not with
+# atomix's code. `rust-toolchain.toml` cannot list every target for every runner, so the recipe
+# adds them.
+
+# Builds the facade, with every feature it can, and each codegen fixture, for every target.
+[metadata("rust")]
+nightly-targets:
+    #!/usr/bin/env bash
+    set -uo pipefail
+    rustup target add {{ hosted_targets }} {{ bare_metal_targets }} || exit
+    export RUSTFLAGS=
+    # Each build runs whether one before it failed, and `--keep-going` builds every target of one.
+    status=0
+    cargo build -p atomix-rs --lib --all-features --locked --keep-going --target-dir target/targets {{ prepend("--target ", hosted_targets) }} || status=1
+    cargo build -p atomix-rs --lib --features arbitrary-int,bytemuck,deranged-05,derive,serde,zerocopy-08 --locked --keep-going --target-dir target/targets {{ prepend("--target ", bare_metal_targets) }} || status=1
+    for fixture in atomix-core atomix; do
+        cargo build --release --keep-going --manifest-path "crates/$fixture/tests/codegen/Cargo.toml" --config "resolver.lockfile-path='target/targets/$fixture-codegen/Cargo.lock'" --target-dir target/targets {{ prepend("--target ", hosted_targets + " " + bare_metal_targets) }} || status=1
+    done
+    exit "$status"
+
 # macOS's aarch64 floor has LSE2, whose 128-bit load is `ldp`; Linux's floor reads with a
 # compare-exchange. x86_64's floor has AVX; x86-64-v2's 128-bit load is a compare-exchange. x86_64
-# macOS builds as x86_64 Linux does.
+# macOS builds as x86_64 Linux does. Windows does too, but runs through Miri's shims of Windows,
+# which no other run reaches. Each target is a `nightly-*` recipe of its own, so the nightly runs
+# them side by side.
 
-# Runs every feature's tests under Miri on aarch64 Linux and macOS, and on x86_64 with the floor and
-# x86-64-v2: each target is a `nightly-*` recipe of its own, so the nightly runs them side by side.
-miri: nightly-miri-aarch64-linux nightly-miri-aarch64-macos nightly-miri-x86-64 nightly-miri-x86-64-v2
+# Runs every feature's tests under Miri on each target a `nightly-miri-*` recipe names.
+miri: nightly-miri-aarch64-linux nightly-miri-aarch64-macos nightly-miri-x86-64 nightly-miri-x86-64-v2 nightly-miri-x86-64-windows
 
 [metadata("rust")]
 nightly-miri-aarch64-linux: (_miri "aarch64-unknown-linux-gnu")
@@ -68,6 +97,9 @@ nightly-miri-x86-64: (_miri "x86_64-unknown-linux-gnu")
 
 [metadata("rust")]
 nightly-miri-x86-64-v2: (_miri "x86_64-unknown-linux-gnu" "x86-64-v2")
+
+[metadata("rust")]
+nightly-miri-x86-64-windows: (_miri "x86_64-pc-windows-msvc")
 
 # Runs every feature's tests under Miri on `target`, built for `cpu` where one is named, in a target
 # directory of its own.

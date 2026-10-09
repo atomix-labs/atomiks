@@ -368,9 +368,11 @@
 //! any OS or none, and for `arm64ec`, the `aarch64` code Windows runs beside `x86_64` code; its
 //! build script refuses any other target, where an operation it promises as one instruction could
 //! be a compare-exchange loop, as a 64-bit add is on 32-bit x86. CI runs the tests on Linux, macOS
-//! and Windows. It needs a nightly Rust, `nightly-2026-09-28` or newer, for `const_trait_impl`,
-//! pattern types and the other unstable features its crates enable; that nightly's
-//! version, 1.101, is its `rust-version`.
+//! and Windows, and each night builds for every target rustup ships that the build script admits,
+//! those for Android, Apple's other systems, FreeBSD, NetBSD, illumos, Solaris, Fuchsia, Redox,
+//! UEFI and bare metal among them. It needs a nightly Rust, `nightly-2026-09-28` or newer, for
+//! `const_trait_impl`, pattern types and the other unstable features its crates enable; that
+//! nightly's version, 1.101, is its `rust-version`.
 //!
 //! What an operation lowers to depends on the features a target turns on, which
 //! `rustc --print cfg --target <triple>` lists, not on its OS; what a target's default lacks, a
