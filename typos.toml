@@ -9,7 +9,8 @@ extend-exclude = [".devset/", "*.lock", "*.min.css", "*.min.js", "vendor/"]
 extend-ignore-identifiers-re = ["^[0-9a-f]{7,40}$"]
 
 [default.extend-words]
-# aarch64's `and` that sets the flags, and x86_64's shift of a 32-bit register, as the codegen pins
-# name them.
+# aarch64's `and` that sets the flags, x86_64's shift of a 32-bit register, and COFF's `.seh_`
+# unwind directives, as the codegen pins name them.
 ands = "ands"
+seh  = "seh"
 shll = "shll"
