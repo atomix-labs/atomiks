@@ -19,8 +19,8 @@
 //! stack's `Head`, a top node beside a `u64` version, with `lock cmpxchg16b`, or `caspal`.
 //!
 //! atomix-core needs a nightly Rust, and builds for `aarch64` and `x86_64`, little-endian with
-//! 64-bit pointers, on any OS: [atomix's Platforms][platforms] say which nightly, and what
-//! each target has.
+//! 64-bit pointers, on any OS, and for Windows' `arm64ec`: [atomix's Platforms][platforms] say
+//! which nightly, and what each target has.
 //!
 //! # Examples
 //! ```
@@ -99,7 +99,7 @@
 )]
 // No badge names `loom` or an alias `build.rs` declares: a loom build is a model of this one, not
 // a target of its own, and an item writes out an alias's condition where its badge needs one.
-#![doc(auto_cfg(hide(loom, wide, wide_load_store)))]
+#![doc(auto_cfg(hide(loom, aarch64_code, wide, wide_load_store)))]
 
 #[cfg(all(loom, not(feature = "loom")))]
 compile_error!(concat!(
@@ -137,6 +137,7 @@ pub mod validity;
 #[cfg(wide)]
 #[doc(cfg(any(
     target_arch = "aarch64",
+    target_arch = "arm64ec",
     all(target_arch = "x86_64", target_feature = "cmpxchg16b")
 )))]
 pub use crate::atom::VtablePointer;
@@ -149,6 +150,7 @@ pub use crate::atomic::{
 #[cfg(wide)]
 #[doc(cfg(any(
     target_arch = "aarch64",
+    target_arch = "arm64ec",
     all(target_arch = "x86_64", target_feature = "cmpxchg16b")
 )))]
 pub use crate::atomic::{AtomicI128, AtomicU128};
@@ -157,6 +159,7 @@ pub use crate::fence::{compiler_fence, fence};
 #[cfg(wide)]
 #[doc(cfg(any(
     target_arch = "aarch64",
+    target_arch = "arm64ec",
     all(target_arch = "x86_64", target_feature = "cmpxchg16b")
 )))]
 pub use crate::primitive::DoubleWord;

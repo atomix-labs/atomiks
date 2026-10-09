@@ -488,7 +488,7 @@ mod tests {
         free(block);
     }
 
-    #[cfg(target_arch = "aarch64")]
+    #[cfg(aarch64_code)]
     #[test]
     fn each_fetch_form_returns_the_word_before() {
         let block = block(8);

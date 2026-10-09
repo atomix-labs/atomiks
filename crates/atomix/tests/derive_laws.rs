@@ -1142,6 +1142,7 @@ mod tests {
     /// pointers, a slice's pointer, and each shape in its own pointee.
     #[cfg(any(
         target_arch = "aarch64",
+        target_arch = "arm64ec",
         all(target_arch = "x86_64", target_feature = "cmpxchg16b")
     ))]
     mod double_words {

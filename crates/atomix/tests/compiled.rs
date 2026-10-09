@@ -25,7 +25,7 @@ mod trybuild {
         cases.pass("tests/compile_pass/*.rs");
         cases.compile_fail("tests/compile_fail/*.rs");
         // A refusal whose notes `x86_64` adds to, which `aarch64`'s message alone pins.
-        if cfg!(target_arch = "aarch64") {
+        if cfg!(any(target_arch = "aarch64", target_arch = "arm64ec")) {
             cases.compile_fail("tests/compile_fail/aarch64/*.rs");
         }
     }

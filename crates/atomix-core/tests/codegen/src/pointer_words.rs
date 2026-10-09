@@ -195,7 +195,7 @@ pub fn pointer_place_load(atomic: &Atomic<Guarded>) -> Link {
     atomic.fields().link.load(Acquire)
 }
 
-#[cfg(any(target_arch = "aarch64", feature = "aarch64-only"))]
+#[cfg(any(target_arch = "aarch64", target_arch = "arm64ec", feature = "aarch64-only"))]
 #[unsafe(no_mangle)]
 pub fn tag_fetch_or(atomic: &Atomic<Link>) -> Link {
     atomic.fields().deleted.fetch_or(true, AcqRel)

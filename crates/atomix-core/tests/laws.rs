@@ -21,14 +21,14 @@ mod tests {
     use core::num::{NonZero, Saturating, Wrapping};
     use core::ptr::{self, NonNull};
 
-    #[cfg(target_arch = "aarch64")]
+    #[cfg(aarch64_code)]
     use atomix_core::ordering::Relaxed;
     use atomix_core::validity::{Partial, Total, TotalZeroNiche, ZeroValid};
     use atomix_core::{
         Atom, ExactBits, Primitive, RangedI8, RangedI16, RangedI32, RangedI64, RangedIsize,
         RangedU8, RangedU16, RangedU32, RangedU64, RangedUsize,
     };
-    #[cfg(target_arch = "aarch64")]
+    #[cfg(aarch64_code)]
     use atomix_core::{AtomOrd, Atomic, Load, MinMax};
     #[cfg(wide)]
     use atomix_core::{RangedI128, RangedU128};
@@ -75,7 +75,7 @@ mod tests {
 
     /// The order law for `a` and `b` through the atomic maximum and minimum, which compare reprs:
     /// each keeps what `Ord`'s does, and returns the value before.
-    #[cfg(target_arch = "aarch64")]
+    #[cfg(aarch64_code)]
     fn atomics_order_as_ord<T: AtomOrd + Debug>(a: T, b: T) -> Result<(), TestCaseError>
     where
         T::Repr: Load + MinMax,
@@ -113,7 +113,7 @@ mod tests {
     /// Checks the atomic order law on the low bits of `$bits` and `$other` as each integer type.
     ///
     /// The same law runs on its `NonZero`, `Wrapping` and `Saturating`.
-    #[cfg(target_arch = "aarch64")]
+    #[cfg(aarch64_code)]
     macro_rules! atomic_order_laws {
         ($bits:expr, $other:expr; $($int:ty),+) => {$({
             let (a, b): ($int, $int) = ($bits.wrapping_cast(), $other.wrapping_cast());
@@ -129,14 +129,14 @@ mod tests {
     /// Every law on `bits` and `other` for each integer of 64 bits or fewer.
     fn narrow_integer_laws(bits: u128, other: u128) -> Result<(), TestCaseError> {
         integer_laws!(bits, other; u8, u16, u32, u64, usize, i8, i16, i32, i64, isize);
-        #[cfg(target_arch = "aarch64")]
+        #[cfg(aarch64_code)]
         atomic_order_laws!(bits, other; u8, u16, u32, u64, usize, i8, i16, i32, i64, isize);
         Ok(())
     }
 
     /// The atomic order law for the low bits of `bits` and `other` as `T`'s reprs, where both
     /// decode.
-    #[cfg(target_arch = "aarch64")]
+    #[cfg(aarch64_code)]
     fn ranged_atomics_order_as_ord<T: AtomOrd + Debug>(
         bits: u128, other: u128,
     ) -> Result<(), TestCaseError>
@@ -156,7 +156,7 @@ mod tests {
     macro_rules! ranged_laws {
         ($bits:expr, $other:expr; $($ranged:ty),+ $(,)?) => {$(
             ranged_integer_laws::<Partial, $ranged>($bits, $other)?;
-            #[cfg(target_arch = "aarch64")]
+            #[cfg(aarch64_code)]
             ranged_atomics_order_as_ord::<$ranged>($bits, $other)?;
         )+};
     }
@@ -216,7 +216,7 @@ mod tests {
             round_trips(letter)?;
             round_trips(Some(letter))?;
             reprs_order_as_ord(letter, other)?;
-            #[cfg(target_arch = "aarch64")]
+            #[cfg(aarch64_code)]
             atomics_order_as_ord(letter, other)?;
         }
         Ok(())

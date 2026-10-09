@@ -299,6 +299,7 @@ mod tests {
     /// What a 128-bit repr holds, where an atomic word does.
     #[cfg(any(
         target_arch = "aarch64",
+        target_arch = "arm64ec",
         all(target_arch = "x86_64", target_feature = "cmpxchg16b")
     ))]
     mod wide {

@@ -11,7 +11,11 @@
 #![cfg(feature = "derive")]
 // Loom's `Atomic::new` is not `const`, and its cells exist only inside a model.
 #![cfg(not(loom))]
-#![cfg(any(target_arch = "aarch64", all(target_arch = "x86_64", target_feature = "cmpxchg16b")))]
+#![cfg(any(
+    target_arch = "aarch64",
+    target_arch = "arm64ec",
+    all(target_arch = "x86_64", target_feature = "cmpxchg16b")
+))]
 #![feature(const_trait_impl)]
 
 // atomix-core's, by its path; its `//!` says why.

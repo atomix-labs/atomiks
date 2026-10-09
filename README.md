@@ -43,10 +43,10 @@ cargo add --git https://github.com/atomix-labs/atomix atomix-rs --features deriv
 The package is `atomix-rs`, since crates.io's `atomix` is an unrelated
 placeholder, and the library it adds is `atomix`: `use atomix::Atomic;`. atomix
 needs a nightly Rust, `nightly-2026-09-28` or newer, and builds for `aarch64`
-and `x86_64`, little-endian with 64-bit pointers, on any OS; CI tests it on
-Linux and macOS. It is `no_std`. Some operations need a CPU feature a target's
-default lacks, such as `cmpxchg16b` for two words on `x86_64` Linux, which a
-flag adds: [Platforms][platforms] lists each.
+and `x86_64`, little-endian with 64-bit pointers, on any OS, and for Windows'
+`arm64ec`; CI tests it on Linux and macOS. It is `no_std`. Some operations need
+a CPU feature a target's default lacks, such as `cmpxchg16b` for two words on
+`x86_64` Linux, which a flag adds: [Platforms][platforms] lists each.
 
 ## Quick Start
 

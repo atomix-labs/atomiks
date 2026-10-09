@@ -397,7 +397,11 @@ use proc_macro::{Diagnostic, Level, Span, TokenStream};
 /// ```
 /// # extern crate atomix_core as atomix;
 /// # use atomix_derive::Atom;
-/// # #[cfg(any(target_arch = "aarch64", target_feature = "cmpxchg16b"))] {
+/// # #[cfg(any(
+/// #     target_arch = "aarch64",
+/// #     target_arch = "arm64ec",
+/// #     target_feature = "cmpxchg16b",
+/// # ))] {
 /// use core::ptr::NonNull;
 ///
 /// use atomix::Atom;
@@ -578,7 +582,7 @@ pub fn derive_atom_add(input: TokenStream) -> TokenStream {
 /// static HIGH: Atomic<Price> = Atomic::new(Price(0));
 ///
 /// // `fetch_max` exists where it is one instruction: on `aarch64`, not `x86_64`.
-/// #[cfg(target_arch = "aarch64")]
+/// #[cfg(any(target_arch = "aarch64", target_arch = "arm64ec"))]
 /// {
 ///     HIGH.fetch_max(Price(10_100), Relaxed);
 ///     HIGH.fetch_max(Price(10_050), Relaxed);

@@ -25,12 +25,13 @@ check-loom:
 # `RUSTFLAGS`, which replaces the floor. docs.rs builds the docs at x86-64, where an item of 128 bits
 # or two words does not exist, so they build there too, each link resolving.
 
-# Lints every crate for aarch64 and x86_64 on Linux and macOS, and x86_64 with x86-64-v2 and x86-64;
-# builds the docs for x86-64.
+# Lints every crate for aarch64 and x86_64 on Linux and macOS, for arm64ec, and for x86_64 with
+# x86-64-v2 and x86-64; builds the docs for x86-64.
 [metadata("rust")]
 check-targets:
     cargo clippy --workspace --all-targets --all-features --target aarch64-unknown-linux-gnu -- -D warnings
     cargo clippy --workspace --all-targets --all-features --target aarch64-apple-darwin -- -D warnings
+    cargo clippy --workspace --all-targets --all-features --target arm64ec-pc-windows-msvc -- -D warnings
     cargo clippy --workspace --all-targets --all-features --target x86_64-unknown-linux-gnu -- -D warnings
     cargo clippy --workspace --all-targets --all-features --target x86_64-apple-darwin -- -D warnings
     RUSTFLAGS='-C target-cpu=x86-64-v2' cargo clippy --workspace --all-targets --all-features --target x86_64-unknown-linux-gnu --target-dir target/x86-64-v2 -- -D warnings

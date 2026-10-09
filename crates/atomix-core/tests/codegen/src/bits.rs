@@ -2,7 +2,7 @@
 //! cleared or inverted, its value before returned, discarded, or put in an `Option`, where LLVM's
 //! own test of a `fetch_or` would be a compare-exchange loop.
 
-#[cfg(any(target_arch = "aarch64", feature = "aarch64-only"))]
+#[cfg(any(target_arch = "aarch64", target_arch = "arm64ec", feature = "aarch64-only"))]
 use atomix_core::AtomicU8;
 use atomix_core::ordering::AcqRel;
 use atomix_core::{AtomicI32, AtomicI64, AtomicIsize, AtomicU16, AtomicU32, AtomicU64};
@@ -112,7 +112,7 @@ pub fn isize_bit_set(atomic: &AtomicIsize, bit: u32) -> bool {
     atomic.bit_set(bit, AcqRel)
 }
 
-#[cfg(any(target_arch = "aarch64", feature = "aarch64-only"))]
+#[cfg(any(target_arch = "aarch64", target_arch = "arm64ec", feature = "aarch64-only"))]
 #[unsafe(no_mangle)]
 pub fn u8_bit_set(atomic: &AtomicU8, bit: u32) -> bool {
     atomic.bit_set(bit, AcqRel)

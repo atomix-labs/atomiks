@@ -178,7 +178,7 @@
 //! ```
 //! # #[cfg(all(
 //! #     feature = "derive",
-//! #     any(target_arch = "aarch64", target_feature = "cmpxchg16b"),
+//! #     any(target_arch = "aarch64", target_arch = "arm64ec", target_feature = "cmpxchg16b"),
 //! # ))] {
 //! use core::ptr::NonNull;
 //!
@@ -365,11 +365,12 @@
 //! # Platforms
 //!
 //! atomix builds for every `aarch64` and `x86_64` target with 64-bit pointers, little-endian, on
-//! any OS or none; its build script refuses any other target, where an operation it promises as one
-//! instruction could be a compare-exchange loop, as a 64-bit add is on 32-bit x86. CI runs the
-//! tests on Linux and macOS. It needs a nightly Rust, `nightly-2026-09-28` or newer, for
-//! `const_trait_impl`, pattern types and the other unstable features its crates enable; that
-//! nightly's version, 1.101, is its `rust-version`.
+//! any OS or none, and for `arm64ec`, the `aarch64` code Windows runs beside `x86_64` code; its
+//! build script refuses any other target, where an operation it promises as one instruction could
+//! be a compare-exchange loop, as a 64-bit add is on 32-bit x86. CI runs the tests on Linux and
+//! macOS. It needs a nightly Rust, `nightly-2026-09-28` or newer, for `const_trait_impl`,
+//! pattern types and the other unstable features its crates enable; that nightly's
+//! version, 1.101, is its `rust-version`.
 //!
 //! What an operation lowers to depends on the features a target turns on, which
 //! `rustc --print cfg --target <triple>` lists, not on its OS; what a target's default lacks, a
@@ -381,6 +382,7 @@
 //! | `aarch64` simulators, Mac Catalyst | LSE                             | yes                    | a CPU with LSE2       |
 //! | `aarch64` Linux gnu, musl          | an outline call; `+lse` for LSE | yes                    | a CPU with LSE2       |
 //! | `aarch64` elsewhere                | an LL/SC loop; `+lse` for LSE   | yes                    | a CPU with LSE2       |
+//! | `arm64ec`                          | an LL/SC loop; `+lse` for LSE   | yes                    | a CPU with LSE2       |
 //! | `x86_64` Apple, Windows, Fuchsia   | one instruction                 | yes, with `cmpxchg16b` | `x86-64-v3`, for AVX  |
 //! | `x86_64` elsewhere                 | one instruction                 | `x86-64-v2`            | `x86-64-v3`, for AVX  |
 //!
@@ -445,14 +447,19 @@
 
 // Where no atomic holds two words, no `DoubleWord` exists: its links lead to where one does.
 #![cfg_attr(
-    not(any(target_arch = "aarch64", all(target_arch = "x86_64", target_feature = "cmpxchg16b"))),
+    not(any(
+        target_arch = "aarch64",
+        target_arch = "arm64ec",
+        all(target_arch = "x86_64", target_feature = "cmpxchg16b")
+    )),
     doc = "[`DoubleWord`]: #platforms"
 )]
 #![no_std]
 #![feature(doc_cfg)]
-// No badge names `loom` or atomix-core's alias `wide`: a loom build is a model of this one, not a
-// target of its own, and the 128-bit atomics write out the condition `wide` stands for.
-#![doc(auto_cfg(hide(loom, wide)))]
+// No badge names `loom` or atomix-core's aliases `aarch64_code` and `wide`: a loom build is a model
+// of this one, not a target of its own, and an item writes out an alias's condition where its badge
+// needs one.
+#![doc(auto_cfg(hide(loom, aarch64_code, wide)))]
 
 #[doc(hidden)]
 pub use atomix_core::__private;
@@ -470,6 +477,7 @@ pub use atomix_core::{
 };
 #[cfg(any(
     target_arch = "aarch64",
+    target_arch = "arm64ec",
     all(target_arch = "x86_64", target_feature = "cmpxchg16b")
 ))]
 pub use atomix_core::{AtomicI128, AtomicU128, DoubleWord, VtablePointer};

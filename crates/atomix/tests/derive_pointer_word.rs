@@ -309,7 +309,7 @@ mod tests {
         free(page);
     }
 
-    #[cfg(target_arch = "aarch64")]
+    #[cfg(any(target_arch = "aarch64", target_arch = "arm64ec"))]
     #[test]
     fn a_tags_fetch_forms_return_the_word_before() {
         let page = page(4);

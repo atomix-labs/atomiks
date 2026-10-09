@@ -272,7 +272,7 @@ mod tests {
         each_bit_returns_itself_before!(ends: low, middle, top);
     }
 
-    #[cfg(target_arch = "aarch64")]
+    #[cfg(aarch64_code)]
     #[test]
     fn each_bit_of_8_bits_returns_itself_before() {
         let ends8 = Atomic::new(Ends8 { low: false, between: RangedU8::MAX, top: false });
@@ -303,7 +303,7 @@ mod tests {
         assert_eq!(canonical(&quote), Quote { live: false, flags: 0, ..first }, "the owner kept");
     }
 
-    #[cfg(target_arch = "aarch64")]
+    #[cfg(aarch64_code)]
     #[test]
     fn each_fetch_form_returns_the_container_before() {
         let first = Quote { quantity: 3, owner: OWNER, live: false, flags: 0b1010 };
