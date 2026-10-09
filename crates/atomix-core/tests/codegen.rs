@@ -9,7 +9,7 @@
 //!
 //! A field's operation is its whole word's, its operand confined to the field: one LSE
 //! instruction on `aarch64`, one `lock` instruction on `x86_64`, where a bit's test is `lock bts`
-//! and its kin at every position, the lowest and the top bit's position in a register. A field of
+//! and its kin with the position an immediate, wherever the bit goes, an `Option` too. A field of
 //! an arbitrary-int integer lowers as a built-in integer's does. A pointer word's tag lowers as a
 //! field does, on the pointer itself; its load masks the tags off with an `and`, and the load of a
 //! word through its pointer's place masks the outer word's tags off alone. A word's store tests its
@@ -20,10 +20,11 @@
 //! node's pointer, which it reads from the node, and saves a frame record once, for its refusal.
 //!
 //! An atomic's bit chosen at run time is `ldset` and its kin on `aarch64`, and `lock bts` and its
-//! kin on `x86_64`, after the `and` that keeps a memory `bts` within the word. A constant bit, at
-//! either end or past the width too, is the same on `x86_64` with its position moved into a
-//! register; `aarch64` folds it into the mask it moves, and tests the bit with a shift or a mask.
-//! A bit whose value is discarded is `ldset` with no test, or `lock or`.
+//! kin on `x86_64`, after the `and` that keeps a memory `bts` within the word, wherever the bit
+//! goes, an `Option` too. A constant bit, at either end or past the width too, is the same on
+//! `x86_64` with its position, taken modulo the width, moved into a register; `aarch64` folds it
+//! into the mask it moves, and tests the bit with a shift or a mask. A bit whose value is discarded
+//! is `ldset` with no test, and still `lock bts` on `x86_64`, whose `asm!` LLVM keeps.
 //!
 //! A double word, two pointers or a slice's pointer and length, lowers as a 128-bit integer does,
 //! each pointer's exposure no instruction: its load and store are `ldp` and `stp` with LSE2, and
@@ -87,6 +88,8 @@ mod tests {
         ("field_toggle", Only(&["mov", "ldeorl", "ret"])),
         ("field_store", InOrder(&["tbz", "ldsetl", "ldclrl"])),
         ("field_test_and_set", Only(&["mov", "ldsetal", "ubfx", "ret"])),
+        ("field_test_and_set_in_some", Only(&["mov", "ldsetal", "ubfx", "ret"])),
+        ("field_test_and_set_through_map", InOrder(&["ldsetal", "ubfx"])),
         ("flags_or", Only(&["and", "lsl", "ldsetl", "ret"])),
         ("flags_and", Only(&["mov", "bic", "ldclrl", "ret"])),
         ("flags_xor", Only(&["and", "lsl", "ldeorl", "ret"])),
@@ -120,6 +123,8 @@ mod tests {
         ("ends64_top_test_and_set", Only(&["mov", "ldsetal", "lsr", "ret"])),
         ("ends64_top_test_and_clear", Only(&["mov", "ldclral", "lsr", "ret"])),
         ("ends64_top_test_and_toggle", Only(&["mov", "ldeoral", "lsr", "ret"])),
+        ("ends64_low_test_and_clear_in_some", Only(&["mov", "ldclral", "and", "ret"])),
+        ("ends64_top_test_and_toggle_in_some", Only(&["mov", "ldeoral", "lsr", "ret"])),
         ("u64_bit_set", Only(&["mov", "lsl", "ldsetal", "tst", "cset", "ret"])),
         ("u64_bit_clear", Only(&["mov", "lsl", "ldclral", "tst", "cset", "ret"])),
         ("u64_bit_toggle", Only(&["mov", "lsl", "ldeoral", "tst", "cset", "ret"])),
@@ -129,15 +134,24 @@ mod tests {
         ("u64_bit_clear_63", Only(&["mov", "ldclral", "lsr", "ret"])),
         ("u64_bit_set_64", Only(&["mov", "ldsetal", "and", "ret"])),
         ("u64_bit_set_discarded", Only(&["mov", "lsl", "ldsetal", "ret"])),
+        ("u64_bit_set_in_some", Only(&["mov", "lsl", "ldsetal", "lsr", "and", "ret"])),
+        ("u64_bit_clear_in_some", Only(&["mov", "lsl", "ldclral", "lsr", "and", "ret"])),
+        ("u64_bit_toggle_in_some", Only(&["mov", "lsl", "ldeoral", "lsr", "and", "ret"])),
+        ("u64_bit_set_63_in_some", Only(&["mov", "ldsetal", "lsr", "ret"])),
+        ("u64_bit_set_through_map", InOrder(&["lsl", "ldsetal", "lsr", "and"])),
         ("u32_bit_set", Only(&["mov", "lsl", "ldsetal", "tst", "cset", "ret"])),
         ("u32_bit_set_31", Only(&["mov", "ldsetal", "lsr", "ret"])),
         ("u16_bit_set", InOrder(&["and", "lsl", "ldsetalh", "tst", "cset"])),
+        ("u16_bit_set_in_some", InOrder(&["and", "lsl", "ldsetalh", "lsr", "and"])),
+        ("i32_bit_set", Only(&["mov", "lsl", "ldsetal", "tst", "cset", "ret"])),
         ("i64_bit_set", Only(&["mov", "lsl", "ldsetal", "tst", "cset", "ret"])),
+        ("isize_bit_set", Only(&["mov", "lsl", "ldsetal", "tst", "cset", "ret"])),
         ("u8_bit_set", InOrder(&["and", "lsl", "ldsetalb", "tst", "cset"])),
         ("tag_set", Only(&["mov", "ldsetl", "ret"])),
         ("tag_clear", Only(&["mov", "ldclrl", "ret"])),
         ("tag_toggle", Only(&["mov", "ldeorl", "ret"])),
         ("bit0_test_and_set", Only(&["mov", "ldsetal", "and", "ret"])),
+        ("bit0_test_and_set_in_some", Only(&["mov", "ldsetal", "and", "ret"])),
         ("bit0_test_and_clear", Only(&["mov", "ldclral", "and", "ret"])),
         ("bit0_test_and_toggle", Only(&["mov", "ldeoral", "and", "ret"])),
         ("bit1_test_and_set", Only(&["mov", "ldsetal", "ubfx", "ret"])),
@@ -358,6 +372,8 @@ mod tests {
         ("field_toggle", Only(&["movabsq", "lock xorq", "retq"])),
         ("field_store", InOrder(&["testl", "lock orq", "lock andq"])),
         ("field_test_and_set", Only(&["lock btsq", "setb", "retq"])),
+        ("field_test_and_set_in_some", Only(&["lock btsq", "setb", "retq"])),
+        ("field_test_and_set_through_map", InOrder(&["lock btsq", "setb"])),
         ("field_load", Only(&["movq", "shrq", "andl", "retq"])),
         ("flags_load", Only(&["movq", "shrq", "retq"])),
         ("quantity_load", Only(&["movq", "retq"])),
@@ -375,44 +391,42 @@ mod tests {
         ("top_fetch_add_count", Only(&["movabsq", "lock xaddq", "shrq", "retq"])),
         ("u61_top_fetch_add_references", Only(&["movl", "lock xaddq", "shrq", "retq"])),
         ("u4_flags_or", Only(&["andl", "lock orw", "retq"])),
-        ("ends16_low_test_and_set", Only(&["xorl", "andl", "lock btsw", "setb", "retq"])),
-        (
-            "ends16_middle_test_and_set",
-            Only(&["xorl", "lock btsw", "setb", "shll", "testw", "setne", "retq"]),
-        ),
-        ("ends16_top_test_and_set", Only(&["movl", "andl", "lock btsw", "setb", "retq"])),
-        ("ends32_low_test_and_set", Only(&["xorl", "andl", "lock btsl", "setb", "retq"])),
+        ("ends16_low_test_and_set", Only(&["lock btsw", "setb", "retq"])),
+        ("ends16_middle_test_and_set", Only(&["lock btsw", "setb", "retq"])),
+        ("ends16_top_test_and_set", Only(&["lock btsw", "setb", "retq"])),
+        ("ends32_low_test_and_set", Only(&["lock btsl", "setb", "retq"])),
         ("ends32_middle_test_and_set", Only(&["lock btsl", "setb", "retq"])),
-        ("ends32_top_test_and_set", Only(&["movl", "andl", "lock btsl", "setb", "retq"])),
-        ("ends64_low_test_and_set", Only(&["xorl", "andl", "lock btsq", "setb", "retq"])),
-        (
-            "ends64_middle_test_and_set",
-            Only(&["xorl", "lock btsq", "setb", "shlq", "setne", "retq"]),
-        ),
-        (
-            "ends64_middle_test_and_clear",
-            Only(&["xorl", "lock btrq", "setb", "shlq", "setne", "retq"]),
-        ),
-        (
-            "ends64_middle_test_and_toggle",
-            Only(&["xorl", "lock btcq", "setb", "shlq", "setne", "retq"]),
-        ),
-        ("ends64_top_test_and_set", Only(&["movl", "andl", "lock btsq", "setb", "retq"])),
-        ("ends64_top_test_and_clear", Only(&["movl", "andl", "lock btrq", "setb", "retq"])),
-        ("ends64_top_test_and_toggle", Only(&["movl", "andl", "lock btcq", "setb", "retq"])),
+        ("ends32_top_test_and_set", Only(&["lock btsl", "setb", "retq"])),
+        ("ends64_low_test_and_set", Only(&["lock btsq", "setb", "retq"])),
+        ("ends64_middle_test_and_set", Only(&["lock btsq", "setb", "retq"])),
+        ("ends64_middle_test_and_clear", Only(&["lock btrq", "setb", "retq"])),
+        ("ends64_middle_test_and_toggle", Only(&["lock btcq", "setb", "retq"])),
+        ("ends64_top_test_and_set", Only(&["lock btsq", "setb", "retq"])),
+        ("ends64_top_test_and_clear", Only(&["lock btrq", "setb", "retq"])),
+        ("ends64_top_test_and_toggle", Only(&["lock btcq", "setb", "retq"])),
+        ("ends64_low_test_and_clear_in_some", Only(&["lock btrq", "setb", "retq"])),
+        ("ends64_top_test_and_toggle_in_some", Only(&["lock btcq", "setb", "retq"])),
         ("u64_bit_set", Only(&["andl", "lock btsq", "setb", "retq"])),
         ("u64_bit_clear", Only(&["andl", "lock btrq", "setb", "retq"])),
         ("u64_bit_toggle", Only(&["andl", "lock btcq", "setb", "retq"])),
-        ("u64_bit_set_0", Only(&["xorl", "andl", "lock btsq", "setb", "retq"])),
-        ("u64_bit_set_5", Only(&["movl", "andl", "lock btsq", "setb", "retq"])),
-        ("u64_bit_set_63", Only(&["movl", "andl", "lock btsq", "setb", "retq"])),
-        ("u64_bit_clear_63", Only(&["movl", "andl", "lock btrq", "setb", "retq"])),
-        ("u64_bit_set_64", Only(&["movl", "andl", "lock btsq", "setb", "retq"])),
-        ("u64_bit_set_discarded", Only(&["movl", "shlxq", "lock orq", "retq"])),
+        ("u64_bit_set_0", Only(&["xorl", "lock btsq", "setb", "retq"])),
+        ("u64_bit_set_5", Only(&["movl", "lock btsq", "setb", "retq"])),
+        ("u64_bit_set_63", Only(&["movl", "lock btsq", "setb", "retq"])),
+        ("u64_bit_clear_63", Only(&["movl", "lock btrq", "setb", "retq"])),
+        ("u64_bit_set_64", Only(&["xorl", "lock btsq", "setb", "retq"])),
+        ("u64_bit_set_discarded", Only(&["andl", "lock btsq", "setb", "retq"])),
+        ("u64_bit_set_in_some", Only(&["andl", "lock btsq", "setb", "retq"])),
+        ("u64_bit_clear_in_some", Only(&["andl", "lock btrq", "setb", "retq"])),
+        ("u64_bit_toggle_in_some", Only(&["andl", "lock btcq", "setb", "retq"])),
+        ("u64_bit_set_63_in_some", Only(&["movl", "lock btsq", "setb", "retq"])),
+        ("u64_bit_set_through_map", InOrder(&["andl", "lock btsq", "setb"])),
         ("u32_bit_set", Only(&["andl", "lock btsl", "setb", "retq"])),
-        ("u32_bit_set_31", Only(&["movl", "andl", "lock btsl", "setb", "retq"])),
+        ("u32_bit_set_31", Only(&["movl", "lock btsl", "setb", "retq"])),
         ("u16_bit_set", Only(&["andl", "lock btsw", "setb", "retq"])),
+        ("u16_bit_set_in_some", Only(&["andl", "lock btsw", "setb", "retq"])),
+        ("i32_bit_set", Only(&["andl", "lock btsl", "setb", "retq"])),
         ("i64_bit_set", Only(&["andl", "lock btsq", "setb", "retq"])),
+        ("isize_bit_set", Only(&["andl", "lock btsq", "setb", "retq"])),
         (
             "word_load",
             Only(&[
@@ -430,9 +444,10 @@ mod tests {
         ("tag_toggle", Only(&["lock xorq", "retq"])),
         ("tag_load", Only(&["movq", "andb", "retq"])),
         ("tag_update", Retry(&["lock cmpxchgq"])),
-        ("bit0_test_and_set", Only(&["xorl", "andl", "lock btsq", "setb", "retq"])),
-        ("bit0_test_and_clear", Only(&["xorl", "andl", "lock btrq", "setb", "retq"])),
-        ("bit0_test_and_toggle", Only(&["xorl", "andl", "lock btcq", "setb", "retq"])),
+        ("bit0_test_and_set", Only(&["lock btsq", "setb", "retq"])),
+        ("bit0_test_and_set_in_some", Only(&["lock btsq", "setb", "retq"])),
+        ("bit0_test_and_clear", Only(&["lock btrq", "setb", "retq"])),
+        ("bit0_test_and_toggle", Only(&["lock btcq", "setb", "retq"])),
         ("bit1_test_and_set", Only(&["lock btsq", "setb", "retq"])),
         ("bit1_test_and_clear", Only(&["lock btrq", "setb", "retq"])),
         ("bit1_test_and_toggle", Only(&["lock btcq", "setb", "retq"])),

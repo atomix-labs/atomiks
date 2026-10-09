@@ -6,6 +6,8 @@ use core::marker::Destruct;
 use core::panic::RefUnwindSafe;
 use core::sync::atomic::Ordering as CoreOrdering;
 
+use crate::atomic::FieldPath;
+
 #[cfg(wide)]
 mod double;
 mod narrow;
@@ -346,6 +348,10 @@ pub impl(crate) trait MaskBitwise: CompareExchange {
 /// generic code over a field states it; an atomic's `bit_set`, `bit_clear` and `bit_toggle` ask
 /// it of their own repr.
 ///
+/// On `x86_64` each is an `asm!`, so it stays one instruction wherever the bit goes: LLVM widens
+/// its own test of a `fetch_or` into a shift where the bit lands in an `Option`, and loses
+/// `lock bts` to a compare-exchange loop.
+///
 /// # Examples
 /// [`#[derive(Atom)]`'s example][generic] states it in generic code over a field.
 ///
@@ -363,7 +369,57 @@ pub impl(crate) trait MaskBitwise: CompareExchange {
     label = "this would be a compare-exchange loop",
     note = "to accept a compare-exchange loop, call `update`"
 )]
-pub impl(crate) trait BitTest: MaskBitwise {}
+pub impl(crate) trait BitTest: MaskBitwise {
+    /// Turns on the bit at `position`, modulo `BITS`, and returns it before.
+    #[doc(hidden)]
+    #[inline]
+    fn test_and_set_bit(cell: &Self::Cell, position: u32, order: CoreOrdering) -> bool {
+        let bit = Self::bit(position);
+        has_bit(Self::fetch_or_mask(cell, bit, order), bit)
+    }
+    /// Turns off the bit at `position`, modulo `BITS`, and returns it before.
+    #[doc(hidden)]
+    #[inline]
+    fn test_and_clear_bit(cell: &Self::Cell, position: u32, order: CoreOrdering) -> bool {
+        let bit = Self::bit(position);
+        let others = Self::Mask::from_bits(!bit.to_bits());
+        has_bit(Self::fetch_and_mask(cell, others, order), bit)
+    }
+    /// Inverts the bit at `position`, modulo `BITS`, and returns it before.
+    #[doc(hidden)]
+    #[inline]
+    fn test_and_toggle_bit(cell: &Self::Cell, position: u32, order: CoreOrdering) -> bool {
+        let bit = Self::bit(position);
+        has_bit(Self::fetch_xor_mask(cell, bit, order), bit)
+    }
+    /// Turns on the bit of `P`, a one-bit field of a container whose repr is `Self`, and returns
+    /// it before: [`test_and_set_bit`](Self::test_and_set_bit) at a position the compiler knows.
+    #[doc(hidden)]
+    #[inline]
+    fn test_and_set_field<P: FieldPath>(cell: &Self::Cell, order: CoreOrdering) -> bool {
+        Self::test_and_set_bit(cell, P::OFFSET, order)
+    }
+    /// Turns off the bit of `P`, as [`test_and_set_field`](Self::test_and_set_field) turns it on:
+    /// [`test_and_clear_bit`](Self::test_and_clear_bit) at a position the compiler knows.
+    #[doc(hidden)]
+    #[inline]
+    fn test_and_clear_field<P: FieldPath>(cell: &Self::Cell, order: CoreOrdering) -> bool {
+        Self::test_and_clear_bit(cell, P::OFFSET, order)
+    }
+    /// Inverts the bit of `P`, as [`test_and_set_field`](Self::test_and_set_field) turns it on:
+    /// [`test_and_toggle_bit`](Self::test_and_toggle_bit) at a position the compiler knows.
+    #[doc(hidden)]
+    #[inline]
+    fn test_and_toggle_field<P: FieldPath>(cell: &Self::Cell, order: CoreOrdering) -> bool {
+        Self::test_and_toggle_bit(cell, P::OFFSET, order)
+    }
+}
+
+/// Whether the bit of `mask` is set in `value`.
+#[inline]
+fn has_bit<R: MaskBitwise>(value: R, mask: R::Mask) -> bool {
+    value.packed_bits() & mask.to_bits() != 0
+}
 
 /// A primitive whose and, or, xor and not return the value before without a compare-exchange
 /// loop: `ldclr`, `ldset` and `ldeor` on `aarch64` (without LSE, an outline call or an LL/SC pair).

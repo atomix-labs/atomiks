@@ -7,12 +7,9 @@
 //! need the target's [`BitTest`]: both have it from 16 bits, and `aarch64` from 8.
 
 use super::Atomic;
-use super::field::{bit_mask, has_bit};
 use crate::atom::{Atom, AtomAdd, AtomBitwise, AtomOrd};
 use crate::ordering::RmwOrdering;
-use crate::primitive::{
-    BitTest, Bitwise, ExactBits, FetchAdd, FetchBitwise, MaskBitwise, MinMax, Primitive,
-};
+use crate::primitive::{BitTest, Bitwise, FetchAdd, FetchBitwise, MinMax};
 
 impl<T: Atom> Atomic<T> {
     /// Adds `delta` to the repr, wrapping, and returns the value before.
@@ -225,8 +222,7 @@ impl<T: Atom> Atomic<T> {
         T::Repr: BitTest,
     {
         let _ = order;
-        let mask = bit_mask::<T::Repr>(bit);
-        has_bit(T::Repr::fetch_or_mask(self.primitive_cell(), mask, O::CORE), mask)
+        T::Repr::test_and_set_bit(self.primitive_cell(), bit, O::CORE)
     }
 
     /// Turns bit `bit` of the repr off, and returns it before: `lock btr` on `x86_64`, `ldclr` on
@@ -255,9 +251,7 @@ impl<T: Atom> Atomic<T> {
         T::Repr: BitTest,
     {
         let _ = order;
-        let mask = bit_mask::<T::Repr>(bit);
-        let others = <T::Repr as MaskBitwise>::Mask::from_bits(!mask.to_bits());
-        has_bit(T::Repr::fetch_and_mask(self.primitive_cell(), others, O::CORE), mask)
+        T::Repr::test_and_clear_bit(self.primitive_cell(), bit, O::CORE)
     }
 
     /// Inverts bit `bit` of the repr, and returns it before: `lock btc` on `x86_64`, `ldeor` on
@@ -287,7 +281,6 @@ impl<T: Atom> Atomic<T> {
         T::Repr: BitTest,
     {
         let _ = order;
-        let mask = bit_mask::<T::Repr>(bit);
-        has_bit(T::Repr::fetch_xor_mask(self.primitive_cell(), mask, O::CORE), mask)
+        T::Repr::test_and_toggle_bit(self.primitive_cell(), bit, O::CORE)
     }
 }

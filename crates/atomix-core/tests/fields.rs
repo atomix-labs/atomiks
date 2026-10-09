@@ -257,8 +257,8 @@ mod tests {
         each_bit_stores!(ends: low, middle, top);
     }
 
-    // `x86_64`'s `lock bts` takes 16 bits or more, and there the lowest and top bits' positions go
-    // through an empty `asm!`, so each width runs its own instruction.
+    // `x86_64`'s `lock bts` takes 16 bits or more, an `asm!` of each width with the field's
+    // position its immediate, so each width runs its own instruction.
     #[test]
     fn each_bit_of_16_bits_or_more_returns_itself_before_wherever_it_lies() {
         let (below, above) = (RangedU8::MAX, RangedU8::MAX);

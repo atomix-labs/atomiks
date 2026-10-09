@@ -108,21 +108,22 @@ What a change here keeps, beyond what the checks hold it to.
   integer word beside its pointer. In one word, they keep the pointer's
   provenance strictly: an address changes only through `wrapping_byte_add`,
   `wrapping_byte_sub`, `map_addr`, `mask`, or `AtomicPtr`'s `fetch_or`,
-  `fetch_and` and `fetch_xor`; one that is no pointer's, a unit's or a value's,
-  is `without_provenance`; and no integer is cast to a pointer, nor a provenance
-  exposed. Two words, a `DoubleWord`, are the one place atomix exposes a
-  provenance, in its cell alone, since no Rust operation keeps one through a
-  16-byte atomic: each pointer stored is exposed, and each loaded takes an
-  exposed provenance back. Its cell lends no place, having no `RawAccess`, so
-  its atomic operations alone reach it. Under Miri the cell is a lock around
-  plain copies, which keeps each pointer's own provenance, so strict-provenance
-  Miri checks every pointer those operations read back, though not their
-  orderings, which the lock makes stronger. A pointer word projects as a packed
-  struct does, its pointer a place whose `load` reads it through the word.
-  Neither's `Validity`, `REPRS` or `TAG_WIDTH`, nor the layout they come from,
-  one word or two, reads a pointee's alignment, since a type's layout may read
-  them: only code and the checks read `POINTEE_ALIGNMENT`, so a node can hold an
-  atomic of the word that points to it.
+  `fetch_and` and `fetch_xor`, which a bit's test writes on `x86_64` as `lock
+  bts`, `btr` and `btc` in an `asm!`; one that is no pointer's, a unit's or a
+  value's, is `without_provenance`; and no integer is cast to a pointer, nor a
+  provenance exposed. Two words, a `DoubleWord`, are the one place atomix
+  exposes a provenance, in its cell alone, since no Rust operation keeps one
+  through a 16-byte atomic: each pointer stored is exposed, and each loaded
+  takes an exposed provenance back. Its cell lends no place, having no
+  `RawAccess`, so its atomic operations alone reach it. Under Miri the cell is a
+  lock around plain copies, which keeps each pointer's own provenance, so
+  strict-provenance Miri checks every pointer those operations read back, though
+  not their orderings, which the lock makes stronger. A pointer word projects as
+  a packed struct does, its pointer a place whose `load` reads it through the
+  word. Neither's `Validity`, `REPRS` or `TAG_WIDTH`, nor the layout they come
+  from, one word or two, reads a pointee's alignment, since a type's layout may
+  read them: only code and the checks read `POINTEE_ALIGNMENT`, so a node can
+  hold an atomic of the word that points to it.
 - A function that can be `const` is, and a trait whose impls can be is a `const
   trait`.
 - Each `unsafe` block sits under an `#[expect(unsafe_code, reason = "…")]` with

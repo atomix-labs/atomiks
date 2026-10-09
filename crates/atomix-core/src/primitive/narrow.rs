@@ -1,7 +1,11 @@
 //! `bool`, the integers up to 64 bits and `*mut T`, over `core`'s atomics (loom's under loom).
 
+#[cfg(lock_bit_test)]
+use core::arch::asm;
 use core::hint::assert_unchecked;
 use core::intrinsics::const_eval_select;
+#[cfg(lock_bit_test)]
+use core::mem::transmute;
 use core::ptr;
 #[cfg(not(loom))]
 use core::sync::atomic;
@@ -16,6 +20,8 @@ use super::{
 };
 #[cfg(target_arch = "aarch64")]
 use super::{FetchBitwise, MinMax};
+#[cfg(lock_bit_test)]
+use crate::atomic::FieldPath;
 use crate::message::{Message, refuse};
 
 /// Exclusive access to a loom cell: `with_mut`, which loom checks against every other access, or,
@@ -207,17 +213,110 @@ macro_rules! bitwise {
     )+};
 }
 
-/// Implements `BitTest` for each primitive whose bit test-and-set is one instruction.
+/// `lock $instruction` on the bit `$position` names of the `$size` at `$cell`, and the bit before,
+/// which `setc` reads from the carry: `$position` is the operand, a register's, named at the
+/// `$size`'s width by `$modifier`, or a `const`.
+#[cfg(lock_bit_test)]
+macro_rules! lock_bit_test {
+    ($instruction:tt $size:tt $modifier:tt, $cell:ident, $($position:tt)+) => {{
+        // ORDERING: every ordering holds. A `lock`ed instruction is a full barrier (Intel's SDM,
+        // Vol. 3A, "Memory Ordering in P6 and More Recent Processor Families": locked instructions
+        // have a total order, and no load or store passes one), and an `asm!` that may touch memory
+        // is one for the compiler, so the block is `SeqCst`.
+        //
+        // SAFETY: `place` is the cell's address, valid for reads and writes of the `$size` the cell
+        // holds and aligned to it while `$cell` is borrowed: `bit_test!` gives each integer its own
+        // width, and `usize`, `isize` and a pointer a `qword`, since `build.rs` refuses every
+        // pointer width but 64. Intel's SDM (Vol. 2A, BT's entry) lets a register's bit offset
+        // reach past a memory operand, so each caller takes it modulo the operand's width: the
+        // instruction reads and writes the operand alone, atomically under `lock`, as every other
+        // access to the cell is atomic. The block is then the `fetch_or`, `fetch_and` or
+        // `fetch_xor` of the bit's mask that LLVM lowers to it, which keeps a pointer's provenance
+        // as core's do. It pushes nothing, and writes `carry` and the flags alone.
+        let carry: u8 = unsafe {
+            let carry;
+            asm!(
+                concat!(
+                    "lock ", $instruction, " ", $size, " ptr [{place}], {position", $modifier, "}"
+                ),
+                "setc {carry}",
+                place = in(reg) $cell.as_ptr(),
+                position = $($position)+,
+                carry = out(reg_byte) carry,
+                options(nostack),
+            );
+            carry
+        };
+        // SAFETY: `setc` wrote 0 or 1 to `carry`, the bytes of `false` and `true`.
+        unsafe { transmute::<u8, bool>(carry) }
+    }};
+}
+
+/// The methods of `BitTest`, each `lock bts`, `btr` or `btc` on a `$size` of `$bits` bits: a
+/// run-time position in the register `$modifier` names, and a field's as an immediate.
+#[cfg(lock_bit_test)]
+macro_rules! lock_bit_test_methods {
+    ($size:tt $modifier:tt, $bits:expr) => {
+        #[inline]
+        fn test_and_set_bit(cell: &Self::Cell, position: u32, _: CoreOrdering) -> bool {
+            lock_bit_test!("bts" $size $modifier, cell, in(reg) u64::from(position % $bits))
+        }
+        #[inline]
+        fn test_and_clear_bit(cell: &Self::Cell, position: u32, _: CoreOrdering) -> bool {
+            lock_bit_test!("btr" $size $modifier, cell, in(reg) u64::from(position % $bits))
+        }
+        #[inline]
+        fn test_and_toggle_bit(cell: &Self::Cell, position: u32, _: CoreOrdering) -> bool {
+            lock_bit_test!("btc" $size $modifier, cell, in(reg) u64::from(position % $bits))
+        }
+        #[inline]
+        fn test_and_set_field<P: FieldPath>(cell: &Self::Cell, _: CoreOrdering) -> bool {
+            lock_bit_test!("bts" $size "", cell, const P::OFFSET % $bits)
+        }
+        #[inline]
+        fn test_and_clear_field<P: FieldPath>(cell: &Self::Cell, _: CoreOrdering) -> bool {
+            lock_bit_test!("btr" $size "", cell, const P::OFFSET % $bits)
+        }
+        #[inline]
+        fn test_and_toggle_field<P: FieldPath>(cell: &Self::Cell, _: CoreOrdering) -> bool {
+            lock_bit_test!("btc" $size "", cell, const P::OFFSET % $bits)
+        }
+    };
+}
+
+/// Implements `BitTest` for each primitive whose bit test-and-set is one instruction: on `x86_64`,
+/// `lock bts`, `btr` and `btc` on the `$size` it is, in an `asm!`, for the reason `BitTest` gives.
 macro_rules! bit_test {
-    ($($kind:ty),+ $(,)?) => {$(
+    ($($kind:ty: $size:tt $modifier:tt),+ $(,)?) => {$(
+        #[cfg(not(lock_bit_test))]
         impl BitTest for $kind {}
+        #[cfg(lock_bit_test)]
+        #[expect(
+            unsafe_code,
+            reason = "`lock bts` and its kin in an `asm!`, which LLVM keeps wherever the bit goes"
+        )]
+        #[expect(
+            clippy::transmute_int_to_bool,
+            reason = "the carry `setc` writes is 0 or 1 already, a `bool`'s bytes"
+        )]
+        impl BitTest for $kind {
+            lock_bit_test_methods!($size $modifier, <$kind>::BITS);
+        }
     )+};
 }
 
 // `x86_64`'s `lock bts`, `btr` and `btc` take 16 bits or more.
-bit_test!(u16, u32, u64, usize, i16, i32, i64, isize);
+bit_test!(
+    u16: "word" ":x", u32: "dword" ":e", u64: "qword" ":r", usize: "qword" ":r",
+    i16: "word" ":x", i32: "dword" ":e", i64: "qword" ":r", isize: "qword" ":r",
+);
+// `aarch64`'s `ldset`, `ldclr` and `ldeor` take 8 bits too.
 #[cfg(target_arch = "aarch64")]
-bit_test!(u8, i8, bool);
+impl BitTest for u8 {}
+#[cfg(target_arch = "aarch64")]
+impl BitTest for i8 {}
+#[cfg(target_arch = "aarch64")]
+impl BitTest for bool {}
 
 /// The unsigned bits of an integer: itself, or its two's complement.
 macro_rules! unsigned_bits {
@@ -233,8 +332,7 @@ macro_rules! unsigned_bits {
 macro_rules! integers {
     ($($int:ident => $cell:ident $(, $signed:ident)?);+ $(;)?) => {$(
         cells!($int => atomic::$cell);
-        // Wrapping: `bit_set` counts its bit modulo the width, and `x86_64`'s `bts` with its
-        // position in a register needs it.
+        // Wrapping: `bit_set` counts its bit modulo the width.
         bitwise!($int: !0, |position: u32| <$int>::wrapping_shl(1, position));
         const impl Primitive for $int {
             const BITS: u32 = <$int>::BITS;
@@ -492,7 +590,20 @@ impl<T> MaskBitwise for *mut T {
 }
 
 // `lock bts`, `btr` and `btc` on the pointer's 64 bits, and `ldset`, `ldclr` and `ldeor`.
+#[cfg(not(lock_bit_test))]
 impl<T> BitTest for *mut T {}
+#[cfg(lock_bit_test)]
+#[expect(
+    unsafe_code,
+    reason = "`lock bts` and its kin in an `asm!`, which LLVM keeps wherever the bit goes"
+)]
+#[expect(
+    clippy::transmute_int_to_bool,
+    reason = "the carry `setc` writes is 0 or 1 already, a `bool`'s bytes"
+)]
+impl<T> BitTest for *mut T {
+    lock_bit_test_methods!("qword" ":r", usize::BITS);
+}
 
 // As the integers', whose cfg `atomic/field/mod.rs` repeats.
 #[cfg(target_arch = "aarch64")]

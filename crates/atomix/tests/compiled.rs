@@ -374,7 +374,7 @@ mod codegen {
         ("locked_slot_set_locked", Only(&["lock orq", "retq"])),
         ("locked_slot_test_and_set_locked", Only(&["lock btsq", "setb", "retq"])),
         ("guarded_set_locked", Only(&["lock orq", "retq"])),
-        ("guarded_test_and_set_marked", Only(&["xorl", "andl", "lock btsq", "setb", "retq"])),
+        ("guarded_test_and_set_marked", Only(&["lock btsq", "setb", "retq"])),
     ];
 
     /// The rest on `x86_64` Linux, where a function that calls aligns the stack with a push.
