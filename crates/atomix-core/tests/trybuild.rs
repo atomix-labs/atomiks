@@ -44,11 +44,12 @@ mod tests {
         if cfg!(feature = "bytemuck") {
             cases.compile_fail("tests/compile_fail/bytemuck/*.rs");
         }
-        // trybuild removes `RUSTFLAGS`, so a build that raises the CPU with it still builds these
-        // with the floor; a `CARGO_TARGET_<TRIPLE>_RUSTFLAGS` adds to the floor instead,
-        // and fails this batch. On `aarch64`, only Apple's floor has LSE2's 16-byte load
-        // and store.
-        if cfg!(all(aarch64_code, not(target_vendor = "apple"))) {
+        // The refusals that LSE2's 16-byte load and store lift, which only macOS's floor has, run
+        // where this test is built without them. trybuild removes `RUSTFLAGS`, so it builds these
+        // with the floor while this test is built at the CPU `RUSTFLAGS` names: a leg that adds
+        // LSE2 through it skips the batch, and one that took LSE2 from macOS's M1 would fail it. A
+        // `CARGO_TARGET_<TRIPLE>_RUSTFLAGS` adds to the floor for both.
+        if cfg!(all(aarch64_code, not(wide_load_store))) {
             cases.compile_fail("tests/compile_fail/aarch64_without_lse2/*.rs");
             if cfg!(feature = "serde") {
                 cases.compile_fail("tests/compile_fail/aarch64_without_lse2/serde/*.rs");

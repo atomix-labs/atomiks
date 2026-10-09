@@ -14,7 +14,7 @@ cargo add --git https://github.com/atomix-labs/atomix atomix-core
 
 `atomix-core` needs a nightly Rust, `nightly-2026-09-28` or newer, and builds
 for `aarch64` and `x86_64`, little-endian with 64-bit pointers, on any OS, and
-for Windows' `arm64ec`; CI tests it on Linux and macOS.
+for Windows' `arm64ec`; CI tests it on Linux, macOS and Windows.
 
 ## Quick Start
 

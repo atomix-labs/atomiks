@@ -1,7 +1,7 @@
 # What `check.yml`, on x86_64 Linux, cannot show: the tests and the loom models on arm64 Linux,
 # where `fetch_or`, `fetch_max` and `fetch_min` exist and the 128-bit atomics are core's; on arm64
-# macOS, whose floor adds LSE2's 128-bit load and store; and on x86_64 macOS. Then the tests on
-# the CPUs below or above the floor that a dependent may build for.
+# macOS, whose floor adds LSE2's 128-bit load and store; on x86_64 macOS; and on Windows, arm64 and
+# x86_64. Then the tests on the CPUs below or above the floor that a dependent may build for.
 name: platforms
 
 on:
@@ -21,6 +21,11 @@ env:
   # cargo installs the toolchain rust-toolchain.toml names, on every runner.
   RUSTUP_AUTO_INSTALL: "1"
 
+defaults:
+  run:
+    # Git's bash on Windows, so a step runs there as it does elsewhere.
+    shell: bash
+
 jobs:
   test:
     strategy:
@@ -31,6 +36,8 @@ jobs:
           - runner: ubuntu-24.04-arm
           - runner: macos-latest
           - runner: macos-15-intel
+          - runner: windows-latest
+          - runner: windows-11-arm
           # aarch64 Linux with LSE2, which the floor lacks: a 128-bit load and store are `ldp` and
           # `stp`. The runner's core, Cobalt 100's Neoverse N2, is named rather than `native`, so
           # every run builds the same code whatever core it lands on.

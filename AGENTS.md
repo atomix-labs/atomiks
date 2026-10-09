@@ -51,18 +51,18 @@ behind its feature; zerocopy's are derives on the types themselves.
 is the facade's `derive` feature. Each crate inherits its version, edition,
 licence and lints from the root `Cargo.toml`, and builds for aarch64 and x86_64,
 little-endian with 64-bit pointers, on any OS, and for Windows' arm64ec;
-`atomix-core`'s build script refuses any other target, and CI tests Linux and
-macOS. `atomix-lock` is yet to be written. The book is under `docs/`. The
+`atomix-core`'s build script refuses any other target, and CI tests Linux, macOS
+and Windows. `atomix-lock` is yet to be written. The book is under `docs/`. The
 toolchain, with each target the tests and the lints build for, is the nightly
 `rust-toolchain.toml` pins, which the crates need for their nightly features.
-The CPU floor is `.cargo/config.toml`'s: x86-64-v3, LSE on aarch64 Linux, and
-the M1 on macOS. The tools are the versions `.config/mise/` pins. The justfile's
-top section holds the repository's own recipes: the loom models, the lints for
-each target and CPU, the codegen fixture's format, and Miri.
+The CPU floor is `.cargo/config.toml`'s: x86-64-v3, LSE on aarch64 beyond macOS,
+and the M1 on macOS. The tools are the versions `.config/mise/` pins. The
+justfile's top section holds the repository's own recipes: the loom models, the
+lints for each target and CPU, the codegen fixture's format, and Miri.
 `.github/workflows/platforms.yml` is the repository's own: the tests and the
-loom models on arm64 Linux and on macOS, arm64 and x86_64, which `check.yml`, on
-x86_64 Linux, cannot run; and the tests on aarch64 Linux with LSE2 and without
-LSE, and on x86-64 v1 and v2.
+loom models on arm64 Linux, and on macOS and Windows, arm64 and x86_64, which
+`check.yml`, on x86_64 Linux, cannot run; and the tests on aarch64 Linux with
+LSE2 and without LSE, and on x86-64 v1 and v2.
 
 ## Rules
 
